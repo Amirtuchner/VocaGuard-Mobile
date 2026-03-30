@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VocaGuard Privacy Policy</title>
+  <style>
+    body { font-family: sans-serif; padding: 16px; line-height: 1.6; color: #212121; }
+    h1 { font-size: 1.4em; }
+    h2 { font-size: 1.1em; margin-top: 1.4em; }
+    p, ul { margin: 0.5em 0; }
+    ul { padding-left: 1.4em; }
+  </style>
+</head>
+<body>
+
+<h1>VocaGuard Privacy Policy</h1>
+<p><em>Last updated: 2026-03-24</em></p>
+
+<h2>1. What VocaGuard Does</h2>
+<p>VocaGuard is a scam-call detection app. It screens incoming calls and, with your
+permission, transcribes audio during active calls to detect scam patterns.</p>
+
+<h2>2. Data Collected</h2>
+<ul>
+  <li><strong>Phone numbers</strong> — checked against local and community databases.</li>
+  <li><strong>Call audio</strong> — transcribed locally on-device using Android's
+  SpeechRecognizer API. Audio is <em>never</em> sent off-device by VocaGuard.</li>
+  <li><strong>Call transcripts</strong> — stored locally in an encrypted Room database.
+  The 50 most recent transcripts are retained; older ones are automatically deleted.</li>
+  <li><strong>Settings</strong> — sensitivity level, locale preference, and whitelist
+  are stored in SharedPreferences on your device.</li>
+</ul>
+
+<h2>3. Data Shared With Third Parties</h2>
+<ul>
+  <li><strong>NumVerify API</strong> (optional) — if you provide an API key, phone
+  numbers are sent to numverify.com for reputation lookup over HTTPS. You control
+  whether this key is set.</li>
+  <li><strong>Community blocklist</strong> (optional) — if you tap "Sync Now", your
+  device downloads a JSON file from the configured URL. No data is uploaded.</li>
+</ul>
+<p>VocaGuard does not use analytics SDKs, advertising networks, or crash reporters.</p>
+
+<h2>4. Permissions Used</h2>
+<ul>
+  <li><strong>READ_PHONE_STATE, READ_CALL_LOG, ANSWER_PHONE_CALLS</strong> — required
+  to identify the caller before the call is answered.</li>
+  <li><strong>RECORD_AUDIO</strong> — required for in-call speech recognition.
+  Audio processing happens entirely on-device.</li>
+  <li><strong>POST_NOTIFICATIONS</strong> — required to show scam alert notifications.</li>
+  <li><strong>ACCESSIBILITY SERVICE</strong> — detects when a call window is active;
+  reads no content from other apps.</li>
+  <li><strong>SYSTEM_ALERT_WINDOW</strong> (optional) — shows an on-screen warning
+  overlay during a detected scam call. Requires manual grant in Settings.</li>
+  <li><strong>INTERNET</strong> — used only for the optional NumVerify lookup and
+  community blocklist download.</li>
+</ul>
+
+<h2>5. Data Retention &amp; Deletion</h2>
+<p>All data is stored exclusively on your device. You can delete individual transcripts
+from the History tab at any time. Uninstalling VocaGuard removes all stored data.</p>
+
+<h2>6. Children's Privacy</h2>
+<p>VocaGuard is not directed at children under 13 and does not knowingly collect
+data from children.</p>
+
+<h2>7. Changes to This Policy</h2>
+<p>Updates will be reflected in the app's Settings screen with a revised "last updated"
+date above.</p>
+
+<h2>8. Contact</h2>
+<p>For questions, open an issue at the VocaGuard project repository.</p>
+
+</body>
+</html>

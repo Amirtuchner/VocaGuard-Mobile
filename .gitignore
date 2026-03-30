@@ -1,0 +1,26 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+app/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# ML training
+ml_training/venv312/
+ml_training/__pycache__/
+ml_training/*.pyc
+
+# Sensitive files
+google-services.json
+*.keystore
+*.jks

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="14dp"
+    android:background="#EE991B1B">
+
+    <TextView
+        android:id="@+id/overlay_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="⚠ SCAM DETECTED"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/white" />
+
+    <TextView
+        android:id="@+id/overlay_subtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Do not share personal information"
+        android:textSize="13sp"
+        android:textColor="#DDFFFFFF" />
+
+</LinearLayout>

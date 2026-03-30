@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Disallows all cleartext (HTTP) traffic across the app.
+    Both the NumVerify API call and the community blocklist download already
+    use HTTPS; this config ensures that can never regress.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust the system CA store only — no user-installed CAs -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    VocaGuard adaptive-icon foreground — headset + single sound wave.
+    Viewport 108 × 108.  Safe zone: 18–90 on each axis.
+
+    Headset:
+      Left ear cup  — centre (30, 54), r=12
+      Right ear cup — centre (68, 54), r=12
+      Headband      — cubic bezier arc over the top
+      Mic boom arm  — down then curves right from the left ear cup
+      Mic tip ball  — cyan circle
+
+    Sound wave:
+      Single concentric arc to the right of the right ear cup,
+      centred at (68, 54), radius 24, spanning ±52° about horizontal.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Headband arc -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#1E90D0"
+        android:strokeWidth="7"
+        android:strokeLineCap="round"
+        android:pathData="M30,54 C30,22 68,22 68,54" />
+
+    <!-- Left ear cup: centre (30,54) r=12 -->
+    <path
+        android:fillColor="#1E90D0"
+        android:pathData="M30,42 A12,12 0 1,0 30,66 A12,12 0 1,0 30,42" />
+
+    <!-- Right ear cup: centre (68,54) r=12 -->
+    <path
+        android:fillColor="#1E90D0"
+        android:pathData="M68,42 A12,12 0 1,0 68,66 A12,12 0 1,0 68,42" />
+
+    <!-- Microphone boom arm — drops from left ear cup, curves right -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#1E90D0"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M30,66 L30,75 Q30,78 33,78 L42,78" />
+
+    <!-- Microphone tip — cyan ball, centre (46,78) r=5 -->
+    <path
+        android:fillColor="#00D4FF"
+        android:pathData="M46,73 A5,5 0 1,0 46,83 A5,5 0 1,0 46,73" />
+
+    <!--
+        Sound wave — single arc.
+        Centre (68,54), radius 24, ±52°:
+          x  = 68 + 24·cos(52°) ≈ 83
+          y₁ = 54 − 24·sin(52°) ≈ 35
+          y₂ = 54 + 24·sin(52°) ≈ 73
+    -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#00D4FF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:pathData="M83,35 A24,24 0 0,1 83,73" />
+
+</vector>

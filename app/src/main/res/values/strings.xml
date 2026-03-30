@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">VocaGuard</string>
+    <string name="accessibility_service_description">VocaGuard detects when a phone call is active so it can start real-time scam pattern analysis. This service observes phone call UI windows and does not read other app content.</string>
+    <string name="widget_description">Shows VocaGuard protection status on your home screen.</string>
+    <string name="widget_status_protected">Protected</string>
+    <string name="widget_status_setup_required">Setup Required</string>
+</resources>

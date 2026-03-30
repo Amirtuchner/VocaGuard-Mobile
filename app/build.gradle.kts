@@ -1,0 +1,114 @@
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
+}
+
+android {
+    namespace = "com.example.vocaguard"
+    compileSdk {
+        version = release(36) {
+            minorApiLevel = 1
+        }
+    }
+
+    defaultConfig {
+        applicationId = "com.example.vocaguard"
+        minSdk = 29
+        targetSdk = 36
+        versionCode = 2
+        versionName = "1.1"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // Signing config for CI — reads from environment variables set by the workflow.
+    // For local release builds, place a keystore.jks in the project root and set
+    // the four env vars, or configure a local.properties-based signing config.
+    val ciKeyAlias = System.getenv("SIGNING_KEY_ALIAS")
+    val ciKeyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+    val ciStorePassword = System.getenv("SIGNING_STORE_PASSWORD")
+    val ciKeystore = rootProject.file("keystore.jks")
+
+    signingConfigs {
+        if (ciKeyAlias != null && ciKeyPassword != null && ciStorePassword != null && ciKeystore.exists()) {
+            create("release") {
+                storeFile = ciKeystore
+                storePassword = ciStorePassword
+                keyAlias = ciKeyAlias
+                keyPassword = ciKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            val releaseSigning = signingConfigs.findByName("release")
+            if (releaseSigning != null) signingConfig = releaseSigning
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+        mlModelBinding = true
+    }
+}
+
+dependencies {
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    // Material Icons Extended
+    implementation("androidx.compose.material:material-icons-extended:1.6.0")
+
+    // LiteRT (formerly TensorFlow Lite)
+    implementation("com.google.ai.edge.litert:litert:1.0.1")
+
+    // Room
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+
+    // ViewModel + lifecycle-aware state collection
+    implementation(libs.viewmodel.compose)
+    implementation(libs.viewmodel.ktx)
+    implementation(libs.lifecycle.runtime.compose)
+
+    // WorkManager
+    implementation(libs.workmanager.ktx)
+
+    // Firebase Crashlytics — degrades gracefully without google-services.json.
+    // To fully enable: add app/google-services.json and apply both plugins (see CrashReporter.kt).
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
+
+    testImplementation(libs.junit)
+    testImplementation("org.robolectric:robolectric:4.11.1")
+    testImplementation("androidx.test:core:1.5.0")
+    testImplementation(libs.room.testing)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+}

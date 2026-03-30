@@ -1,0 +1,50 @@
+text,label
+"Hello this is John from your bank calling about your account",0
+"Hi I'm calling regarding the meeting tomorrow",0
+"This is a reminder about your appointment",0
+"Good morning I'm calling from the doctor's office",0
+"This is the IRS you owe back taxes pay immediately or face arrest",1
+"Internal Revenue Service calling about unpaid taxes you must pay now",1
+"IRS final notice you have arrest warrant for tax fraud call back now",1
+"This is tax department you owe money legal action will be taken",1
+"Your computer has a virus we are from Microsoft support",2
+"Windows technical support your PC is infected with malware",2
+"Apple support calling your computer has been compromised download anydesk",2
+"Tech support detected virus on your computer give us remote access teamviewer",2
+"Your bank account has been suspended verify your information immediately",3
+"Unusual activity detected on your credit card confirm your account number",3
+"Bank of America security alert your account is locked provide your password",3
+"Fraud alert on your account verify your PIN and social security number",3
+"Congratulations you won the lottery claim your prize today",4
+"You won a free vacation call now to claim your prize",4
+"Winner notification you have won cash prize in sweepstakes",4
+"Free cruise congratulations call back to collect your winnings",4
+"Your social security number has been suspended",5
+"SSN compromised illegal activity detected on your social security account",5
+"Social security administration calling about suspended benefits",5
+"Your social security number will be cancelled due to suspicious activity",5
+"This is a recorded message press one to speak to representative",6
+"Final notice this is your last chance call back immediately",6
+"Do not hang up this is an important message about your account",6
+"Automated message your warranty is about to expire press one now",6
+"Verify your account information by clicking this link",7
+"Confirm your password for security update",7
+"Update your information to avoid account suspension",7
+"Password reset required provide your credentials",7
+"Free health insurance you qualify for medicare benefits",8
+"Limited time offer on insurance plan call now",8
+"You are eligible for new insurance coverage act today",8
+"Medicaid enrollment qualify for free health plan",8
+"Donate to our charity help disaster victims",0
+"Make a contribution to support our cause",0
+"Donation request for relief fund",0
+"Help victims of tragedy donate now",0
+"Guaranteed returns of 40 percent monthly on your investment",9
+"Risk free opportunity to double your money in crypto trading",9
+"Exclusive investment platform limited slots available act now",9
+"Our trading algorithm generates passive income guaranteed returns",9
+"This is a message from your local food bank. Thank you for your past donation.",0
+"We are calling from the Red Cross to acknowledge your recent contribution.",0
+"Hi, this is your library calling about an overdue book.",0
+"Your prescription is ready for pickup at the pharmacy.",0
+"This is your dentist office confirming your cleaning appointment on Friday.",0

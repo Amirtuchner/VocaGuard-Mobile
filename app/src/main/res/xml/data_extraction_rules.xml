@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Exclude call transcripts and scam database — may contain sensitive conversation content -->
+        <exclude domain="sharedpref" path="vocaguard_transcripts.xml"/>
+        <exclude domain="sharedpref" path="vocaguard_scam_db.xml"/>
+        <!-- Exclude the network checker cache which stores the API key -->
+        <exclude domain="sharedpref" path="vocaguard_network_scam_cache.xml"/>
+        <!-- Exclude whitelist — device-specific user preference -->
+        <exclude domain="sharedpref" path="vocaguard_whitelist.xml"/>
+        <!-- Exclude community sync state (last-sync timestamp + configurable URL) -->
+        <exclude domain="sharedpref" path="vocaguard_community_sync.xml"/>
+        <!-- Exclude Room database — contains transcripts and scam numbers -->
+        <exclude domain="database" path="vocaguard.db"/>
+    </cloud-backup>
+    <device-transfer>
+        <!-- Exclude same sensitive prefs from device-to-device transfers -->
+        <exclude domain="sharedpref" path="vocaguard_transcripts.xml"/>
+        <exclude domain="sharedpref" path="vocaguard_scam_db.xml"/>
+        <exclude domain="sharedpref" path="vocaguard_network_scam_cache.xml"/>
+        <exclude domain="sharedpref" path="vocaguard_whitelist.xml"/>
+        <exclude domain="sharedpref" path="vocaguard_community_sync.xml"/>
+        <exclude domain="database" path="vocaguard.db"/>
+    </device-transfer>
+</data-extraction-rules>
