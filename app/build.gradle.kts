@@ -52,6 +52,11 @@ android {
             if (releaseSigning != null) signingConfig = releaseSigning
         }
     }
+    lint {
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
+        warningsAsErrors = false
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
