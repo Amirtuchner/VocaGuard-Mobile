@@ -4,4 +4,17 @@
     <string name="widget_description">Shows VocaGuard protection status on your home screen.</string>
     <string name="widget_status_protected">Protected</string>
     <string name="widget_status_setup_required">Setup Required</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title_1">Real-time scam detection</string>
+    <string name="onboarding_desc_1">VocaGuard listens for scam patterns during live calls and alerts you immediately — before you hand over any personal information.</string>
+    <string name="onboarding_title_2">Permissions we need</string>
+    <string name="onboarding_desc_2">To screen calls and transcribe speech, VocaGuard needs the Phone, Microphone, and Accessibility permissions. Your audio is never sent off-device.</string>
+    <string name="onboarding_title_3">You\'re in control</string>
+    <string name="onboarding_desc_3">Adjust detection sensitivity, whitelist trusted numbers, and review call transcripts whenever you like. VocaGuard works quietly in the background.</string>
+    <string name="onboarding_title_4">Call Recording Notice</string>
+    <string name="onboarding_desc_4">VocaGuard records call audio to detect scam patterns in real time. All audio is processed locally on your device and is never uploaded to any server. By tapping \"Get Started\" you consent to call audio recording for scam detection purposes.</string>
+    <string name="onboarding_back">Back</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_get_started">Get Started</string>
 </resources>

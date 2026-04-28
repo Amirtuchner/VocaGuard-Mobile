@@ -1,50 +1,70 @@
-text,label
-"Hello this is John from your bank calling about your account",0
-"Hi I'm calling regarding the meeting tomorrow",0
-"This is a reminder about your appointment",0
-"Good morning I'm calling from the doctor's office",0
-"This is the IRS you owe back taxes pay immediately or face arrest",1
-"Internal Revenue Service calling about unpaid taxes you must pay now",1
-"IRS final notice you have arrest warrant for tax fraud call back now",1
-"This is tax department you owe money legal action will be taken",1
-"Your computer has a virus we are from Microsoft support",2
-"Windows technical support your PC is infected with malware",2
-"Apple support calling your computer has been compromised download anydesk",2
-"Tech support detected virus on your computer give us remote access teamviewer",2
-"Your bank account has been suspended verify your information immediately",3
-"Unusual activity detected on your credit card confirm your account number",3
-"Bank of America security alert your account is locked provide your password",3
-"Fraud alert on your account verify your PIN and social security number",3
-"Congratulations you won the lottery claim your prize today",4
-"You won a free vacation call now to claim your prize",4
-"Winner notification you have won cash prize in sweepstakes",4
-"Free cruise congratulations call back to collect your winnings",4
-"Your social security number has been suspended",5
-"SSN compromised illegal activity detected on your social security account",5
-"Social security administration calling about suspended benefits",5
-"Your social security number will be cancelled due to suspicious activity",5
-"This is a recorded message press one to speak to representative",6
-"Final notice this is your last chance call back immediately",6
-"Do not hang up this is an important message about your account",6
-"Automated message your warranty is about to expire press one now",6
-"Verify your account information by clicking this link",7
-"Confirm your password for security update",7
-"Update your information to avoid account suspension",7
-"Password reset required provide your credentials",7
-"Free health insurance you qualify for medicare benefits",8
-"Limited time offer on insurance plan call now",8
-"You are eligible for new insurance coverage act today",8
-"Medicaid enrollment qualify for free health plan",8
-"Donate to our charity help disaster victims",0
-"Make a contribution to support our cause",0
-"Donation request for relief fund",0
-"Help victims of tragedy donate now",0
-"Guaranteed returns of 40 percent monthly on your investment",9
-"Risk free opportunity to double your money in crypto trading",9
-"Exclusive investment platform limited slots available act now",9
-"Our trading algorithm generates passive income guaranteed returns",9
-"This is a message from your local food bank. Thank you for your past donation.",0
-"We are calling from the Red Cross to acknowledge your recent contribution.",0
-"Hi, this is your library calling about an overdue book.",0
-"Your prescription is ready for pickup at the pharmacy.",0
-"This is your dentist office confirming your cleaning appointment on Friday.",0
+text,label,avg_rms,rms_std_dev,silence_ratio,had_long_silence,call_duration_sec,call_hour,speaker_switches,noise_floor_db,speech_rate_wpm,dtmf_detected
+"Hello this is John from your bank calling about your account",0,0,0,0,0,0,12,0,0,0,0
+"Hi I'm calling regarding the meeting tomorrow",0,0,0,0,0,0,12,0,0,0,0
+"This is a reminder about your appointment",0,0,0,0,0,0,12,0,0,0,0
+"Good morning I'm calling from the doctor's office",0,0,0,0,0,0,12,0,0,0,0
+"This is the IRS you owe back taxes pay immediately or face arrest",1,0,0,0,0,0,12,0,0,0,0
+"Internal Revenue Service calling about unpaid taxes you must pay now",1,0,0,0,0,0,12,0,0,0,0
+"IRS final notice you have arrest warrant for tax fraud call back now",1,0,0,0,0,0,12,0,0,0,0
+"This is tax department you owe money legal action will be taken",1,0,0,0,0,0,12,0,0,0,0
+"Your computer has a virus we are from Microsoft support",2,0,0,0,0,0,12,0,0,0,0
+"Windows technical support your PC is infected with malware",2,0,0,0,0,0,12,0,0,0,0
+"Apple support calling your computer has been compromised download anydesk",2,0,0,0,0,0,12,0,0,0,0
+"Tech support detected virus on your computer give us remote access teamviewer",2,0,0,0,0,0,12,0,0,0,0
+"Your bank account has been suspended verify your information immediately",3,0,0,0,0,0,12,0,0,0,0
+"Unusual activity detected on your credit card confirm your account number",3,0,0,0,0,0,12,0,0,0,0
+"Bank of America security alert your account is locked provide your password",3,0,0,0,0,0,12,0,0,0,0
+"Fraud alert on your account verify your PIN and social security number",3,0,0,0,0,0,12,0,0,0,0
+"Congratulations you won the lottery claim your prize today",4,0,0,0,0,0,12,0,0,0,0
+"You won a free vacation call now to claim your prize",4,0,0,0,0,0,12,0,0,0,0
+"Winner notification you have won cash prize in sweepstakes",4,0,0,0,0,0,12,0,0,0,0
+"Free cruise congratulations call back to collect your winnings",4,0,0,0,0,0,12,0,0,0,0
+"Your social security number has been suspended",5,0,0,0,0,0,12,0,0,0,0
+"SSN compromised illegal activity detected on your social security account",5,0,0,0,0,0,12,0,0,0,0
+"Social security administration calling about suspended benefits",5,0,0,0,0,0,12,0,0,0,0
+"Your social security number will be cancelled due to suspicious activity",5,0,0,0,0,0,12,0,0,0,0
+"This is a recorded message press one to speak to representative",6,0,0,0,0,0,12,0,0,0,0
+"Final notice this is your last chance call back immediately",6,0,0,0,0,0,12,0,0,0,0
+"Do not hang up this is an important message about your account",6,0,0,0,0,0,12,0,0,0,0
+"Automated message your warranty is about to expire press one now",6,0,0,0,0,0,12,0,0,0,0
+"Verify your account information by clicking this link",7,0,0,0,0,0,12,0,0,0,0
+"Confirm your password for security update",7,0,0,0,0,0,12,0,0,0,0
+"Update your information to avoid account suspension",7,0,0,0,0,0,12,0,0,0,0
+"Password reset required provide your credentials",7,0,0,0,0,0,12,0,0,0,0
+"Free health insurance you qualify for medicare benefits",8,0,0,0,0,0,12,0,0,0,0
+"Limited time offer on insurance plan call now",8,0,0,0,0,0,12,0,0,0,0
+"You are eligible for new insurance coverage act today",8,0,0,0,0,0,12,0,0,0,0
+"Medicaid enrollment qualify for free health plan",8,0,0,0,0,0,12,0,0,0,0
+"Donate to our charity help disaster victims",0,0,0,0,0,0,12,0,0,0,0
+"Make a contribution to support our cause",0,0,0,0,0,0,12,0,0,0,0
+"Donation request for relief fund",0,0,0,0,0,0,12,0,0,0,0
+"Help victims of tragedy donate now",0,0,0,0,0,0,12,0,0,0,0
+"Guaranteed returns of 40 percent monthly on your investment",9,0,0,0,0,0,12,0,0,0,0
+"Risk free opportunity to double your money in crypto trading",9,0,0,0,0,0,12,0,0,0,0
+"Exclusive investment platform limited slots available act now",9,0,0,0,0,0,12,0,0,0,0
+"Our trading algorithm generates passive income guaranteed returns",9,0,0,0,0,0,12,0,0,0,0
+"This is a message from your local food bank. Thank you for your past donation.",0,0,0,0,0,0,12,0,0,0,0
+"We are calling from the Red Cross to acknowledge your recent contribution.",0,0,0,0,0,0,12,0,0,0,0
+"Hi, this is your library calling about an overdue book.",0,0,0,0,0,0,12,0,0,0,0
+"Your prescription is ready for pickup at the pharmacy.",0,0,0,0,0,0,12,0,0,0,0
+"This is your dentist office confirming your cleaning appointment on Friday.",0,0,0,0,0,0,12,0,0,0,0
+"Press one to speak to our billing department press two for account services",6,8.5,1.2,0.25,0,90,14,3,1.6,185,1
+"For English press one para Espanol oprima dos please hold while we connect you to the next available agent",6,7.8,0.9,0.30,0,120,10,4,1.8,192,1
+"Thank you for calling your call is very important to us please continue to hold your estimated wait time is five minutes",6,6.5,0.8,0.45,1,180,11,2,1.5,178,1
+"This is an automated message regarding your vehicle warranty please press one to speak with a representative",6,9.0,1.0,0.20,0,60,15,1,1.4,175,1
+"Hello this is agent number 4427 how can I help you today please verify your account number and social security",3,7.2,2.8,0.18,0,240,13,5,1.7,145,0
+"Good afternoon this is the fraud prevention department we have detected suspicious charges please confirm your card number and PIN immediately",3,8.1,3.1,0.15,0,200,14,4,1.9,152,0
+"This is agent Mike from IRS compliance unit your case number is 8847 you owe back taxes action will be taken",1,6.8,2.5,0.22,0,300,9,6,1.6,138,0
+"IRS agent speaking your social security number has been flagged press one to speak with a supervisor immediately",1,9.2,1.1,0.28,0,90,8,2,1.5,180,1
+"We are calling on behalf of Microsoft your computer has been sending error reports please stay on the line while we transfer you to a senior technician",2,7.5,0.7,0.35,1,210,16,3,1.7,188,1
+"Technical support department this call may be recorded for quality assurance your IP address has been flagged for suspicious activity",2,8.3,1.3,0.25,0,150,13,3,1.6,172,1
+"Congratulations this is an automated notification you have been selected press one to claim your prize or press two to opt out",4,9.5,0.6,0.20,0,75,19,1,1.3,195,1
+"Hi calling about your Medicare benefits you may qualify for additional coverage at no cost please hold while I transfer you to an enrollment specialist",8,7.0,2.2,0.30,1,270,10,5,1.8,143,0
+"This is your final notice regarding your outstanding balance legal proceedings will begin within 24 hours unless payment is arranged today",1,6.2,3.5,0.12,0,180,21,2,0.8,128,0
+"Your call is being recorded please note this call is for quality and training purposes agent 229 speaking how may I direct your call",6,8.8,1.5,0.28,0,60,14,2,1.5,168,0
+"Good evening we are calling from Social Security Administration your number ending in 4 digits has been suspended due to suspicious activity",5,7.3,2.4,0.20,0,240,20,4,1.6,142,0
+"Hi there calling from investment advisory firm we have an exclusive opportunity in cryptocurrency trading with guaranteed 30 percent monthly returns",9,6.9,3.2,0.15,0,300,11,3,0.9,135,0
+"Please hold your call is important to us all our agents are busy we will be with you shortly estimated wait time two minutes",0,5.5,0.5,0.60,1,120,14,0,1.9,160,0
+"Hello just confirming your appointment for tomorrow at two pm please press one to confirm or two to reschedule",0,4.8,1.8,0.25,0,45,10,0,0.4,140,1
+"This is doctor Smith office calling about your test results please call us back at your earliest convenience",0,5.2,2.1,0.30,0,30,11,0,0.3,125,0
+"Hi this is Jane from HR following up on your job application we would like to schedule an interview",0,5.8,2.5,0.20,0,60,14,1,0.6,133,0

@@ -1,0 +1,470 @@
+package io.vocaguard.ui
+
+import android.content.Intent
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import io.vocaguard.data.CallTranscript
+import io.vocaguard.data.ScamType
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HistoryTab(viewModel: HistoryViewModel = viewModel()) {
+    val displayed    by viewModel.displayedTranscripts.collectAsStateWithLifecycle()
+    val filter       by viewModel.filter.collectAsStateWithLifecycle()
+    val hasMore      by viewModel.hasMore.collectAsStateWithLifecycle()
+    val ctx = LocalContext.current
+
+    var reportingTranscript by remember { mutableStateOf<CallTranscript?>(null) }
+    var transcriptToDelete  by remember { mutableStateOf<CallTranscript?>(null) }
+    var exportMenuExpanded  by remember { mutableStateOf(false) }
+    var typeDropdownExpanded by remember { mutableStateOf(false) }
+
+    val scamTypes = enumValues<ScamType>()
+        .filter { it != ScamType.UNKNOWN }
+        .map { it.name }
+
+    val isFilterActive = filter.searchQuery.isNotBlank() ||
+        filter.scamTypeFilter != null || filter.showScamOnly
+
+    // Delete confirmation dialog
+    transcriptToDelete?.let { transcript ->
+        AlertDialog(
+            onDismissRequest = { transcriptToDelete = null },
+            title = { Text("Delete Transcript") },
+            text = { Text("Delete this call transcript? This cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.delete(transcript.id)
+                        transcriptToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { transcriptToDelete = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    reportingTranscript?.let { transcript ->
+        ReportScamDialog(
+            initialPhoneNumber = transcript.phoneNumber,
+            onConfirm = { phoneNumber, scamType ->
+                viewModel.reportScamNumber(phoneNumber, scamType)
+                reportingTranscript = null
+            },
+            onDismiss = { reportingTranscript = null }
+        )
+    }
+
+    if (displayed.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                if (isFilterActive) {
+                    Text(
+                        text = "No matching transcripts",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(onClick = { viewModel.clearFilters() }) { Text("Clear filters") }
+                } else {
+                    Text(
+                        text = "No call transcripts yet",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Transcripts appear here after monitored calls",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // ── Header ────────────────────────────────────────────────────────────
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Call History",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Box {
+                    TextButton(onClick = { exportMenuExpanded = true }) { Text("Export") }
+                    DropdownMenu(
+                        expanded = exportMenuExpanded,
+                        onDismissRequest = { exportMenuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Export as text") },
+                            onClick = {
+                                exportMenuExpanded = false
+                                val text = viewModel.exportAsText()
+                                ctx.startActivity(Intent.createChooser(
+                                    Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, text)
+                                        putExtra(Intent.EXTRA_SUBJECT, "VocaGuard Call History")
+                                    }, "Export transcripts"
+                                ))
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Export as CSV") },
+                            onClick = {
+                                exportMenuExpanded = false
+                                val csv = viewModel.exportAsCsv()
+                                ctx.startActivity(Intent.createChooser(
+                                    Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/csv"
+                                        putExtra(Intent.EXTRA_TEXT, csv)
+                                        putExtra(Intent.EXTRA_SUBJECT, "VocaGuard Call History")
+                                    }, "Export CSV"
+                                ))
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── Search bar ────────────────────────────────────────────────────────
+        item {
+            OutlinedTextField(
+                value = filter.searchQuery,
+                onValueChange = { viewModel.setSearchQuery(it) },
+                placeholder = { Text("Search by number or transcript…") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (filter.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear search")
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium
+            )
+        }
+
+        // ── Filter chips ──────────────────────────────────────────────────────
+        item {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                FilterChip(
+                    selected = filter.showScamOnly,
+                    onClick = { viewModel.setShowScamOnly(!filter.showScamOnly) },
+                    label = { Text("Scams only") }
+                )
+
+                // Scam type chip
+                ExposedDropdownMenuBox(
+                    expanded = typeDropdownExpanded,
+                    onExpandedChange = { typeDropdownExpanded = !typeDropdownExpanded }
+                ) {
+                    FilterChip(
+                        selected = filter.scamTypeFilter != null,
+                        onClick = { typeDropdownExpanded = true },
+                        label = {
+                            Text(
+                                filter.scamTypeFilter
+                                    ?.replace("_", " ")
+                                    ?.lowercase()
+                                    ?.replaceFirstChar { it.uppercase() }
+                                    ?: "All types"
+                            )
+                        },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeDropdownExpanded)
+                        },
+                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = typeDropdownExpanded,
+                        onDismissRequest = { typeDropdownExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("All types") },
+                            onClick = { viewModel.setScamTypeFilter(null); typeDropdownExpanded = false }
+                        )
+                        scamTypes.forEach { type ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(type.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() })
+                                },
+                                onClick = {
+                                    viewModel.setScamTypeFilter(type)
+                                    typeDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Transcript list ───────────────────────────────────────────────────
+        items(displayed, key = { it.id }) { transcript ->
+            TranscriptCard(
+                transcript = transcript,
+                onDelete = { transcriptToDelete = transcript },
+                onReport = { reportingTranscript = transcript },
+                onWhitelist = {
+                    if (transcript.phoneNumber.isNotEmpty()) {
+                        viewModel.addToWhitelist(transcript.phoneNumber)
+                    }
+                }
+            )
+        }
+
+        // ── Load more ─────────────────────────────────────────────────────────
+        if (hasMore) {
+            item {
+                OutlinedButton(
+                    onClick = { viewModel.loadMore() },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Load more") }
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(8.dp)) }
+    }
+}
+
+@Composable
+fun TranscriptCard(
+    transcript: CallTranscript,
+    onDelete: () -> Unit,
+    onReport: () -> Unit,
+    onWhitelist: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy  h:mm a", Locale.getDefault()) }
+    val isScam = transcript.detectedScamTypes.isNotEmpty()
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isScam) MaterialTheme.colorScheme.errorContainer
+                             else MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = dateFormat.format(Date(transcript.timestamp)),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (transcript.phoneNumber.isNotEmpty()) {
+                        Text(
+                            text = transcript.phoneNumber,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+                if (transcript.phoneNumber.isNotEmpty()) {
+                    var whitelisted by remember { mutableStateOf(false) }
+                    IconButton(onClick = {
+                        onWhitelist()
+                        whitelisted = true
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Shield,
+                            contentDescription = "Whitelist number",
+                            tint = if (whitelisted) MaterialTheme.colorScheme.primary
+                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                IconButton(onClick = onReport) {
+                    Icon(
+                        imageVector = Icons.Default.Flag,
+                        contentDescription = "Report scam",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (isScam) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    transcript.detectedScamTypes.forEach { type ->
+                        SuggestionChip(
+                            onClick = {},
+                            label = {
+                                Text(
+                                    text = type.replace("_", " ")
+                                        .lowercase()
+                                        .replaceFirstChar { it.uppercase() },
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            },
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            )
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = if (expanded) transcript.text
+                       else transcript.text.take(120) + if (transcript.text.length > 120) "…" else "",
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            if (transcript.text.length > 120) {
+                Row(
+                    modifier = Modifier.clickable { expanded = !expanded }.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (expanded) "Show less" else "Show more",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.KeyboardArrowUp
+                                      else Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReportScamDialog(
+    initialPhoneNumber: String,
+    onConfirm: (phoneNumber: String, scamType: ScamType) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var phoneNumber by remember { mutableStateOf(initialPhoneNumber) }
+    var selectedScamType by remember { mutableStateOf(ScamType.IRS_SCAM) }
+    var expanded by remember { mutableStateOf(false) }
+
+    val scamTypes = enumValues<ScamType>().filter { it != ScamType.UNKNOWN }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Report Scam Number") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = phoneNumber,
+                    onValueChange = { phoneNumber = it },
+                    label = { Text("Phone Number") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedScamType.name.replace("_", " ").lowercase()
+                            .replaceFirstChar { it.uppercase() },
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Scam Type") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        scamTypes.forEach { scamType ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        scamType.name.replace("_", " ").lowercase()
+                                            .replaceFirstChar { it.uppercase() }
+                                    )
+                                },
+                                onClick = {
+                                    selectedScamType = scamType
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(phoneNumber, selectedScamType) },
+                enabled = phoneNumber.isNotBlank()
+            ) { Text("Report") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}

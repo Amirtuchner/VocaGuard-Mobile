@@ -5,17 +5,13 @@ plugins {
 }
 
 android {
-    namespace = "com.example.vocaguard"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    namespace = "io.vocaguard"
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.vocaguard"
+        applicationId = "io.vocaguard"
         minSdk = 29
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 2
         versionName = "1.1"
 
@@ -99,6 +95,15 @@ dependencies {
 
     // WorkManager
     implementation(libs.workmanager.ktx)
+
+    // Phone number parsing and E.164 normalization
+    implementation(libs.libphonenumber)
+
+    // Adaptive navigation (NavigationSuiteScaffold — auto-switches between bar/rail/drawer)
+    implementation("androidx.compose.material3:material3-adaptive-navigation-suite")
+
+    // EncryptedSharedPreferences for secure API key storage
+    implementation(libs.security.crypto)
 
     // Firebase Crashlytics — degrades gracefully without google-services.json.
     // To fully enable: add app/google-services.json and apply both plugins (see CrashReporter.kt).

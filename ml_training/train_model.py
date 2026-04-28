@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import re
+import math
+from collections import Counter
 
 # Configuration
 NUM_CLASSES = 11  # 0: legitimate, 1-10: scam types
@@ -18,13 +20,71 @@ EPOCHS = 100
 BATCH_SIZE = 32
 VALIDATION_SPLIT = 0.2
 
-NUM_FEATURES = 26
+NUM_FEATURES = 42  # 26 keyword/text + 5 conversational behaviour + 6 audio/metadata + 5 call-centre signals
 
-def extract_features(text):
+
+# ---------------------------------------------------------------------------
+# Conversational behaviour helpers — must mirror TextPreprocessor.kt exactly
+# ---------------------------------------------------------------------------
+
+def _repetition_score(text):
+    """Fraction of 3-word n-grams that are repeated — signals scripted speech."""
+    words = [w for w in text.split() if len(w) > 2]
+    if len(words) < 3:
+        return 0.0
+    trigrams = [f"{words[i]} {words[i+1]} {words[i+2]}" for i in range(len(words) - 2)]
+    repeated = len(trigrams) - len(set(trigrams))
+    return min(repeated / len(trigrams), 1.0)
+
+
+def _question_density(text):
+    """Ratio of question words to total words — interrogation/pressure signal."""
+    words = [w for w in text.split() if w]
+    if not words:
+        return 0.0
+    q_words = {"who", "what", "when", "where", "why", "how",
+               "can", "could", "would", "do", "are", "is"}
+    return min(sum(1 for w in words if w in q_words) / len(words), 1.0)
+
+
+def _has_long_monologue(text):
+    """1.0 if any sentence exceeds 50 words — suggests script reading."""
+    segments = re.split(r'[.!?]+', text)
+    return 1.0 if any(len([w for w in s.split() if w]) > 50 for s in segments) else 0.0
+
+
+def _urgency_escalates(text):
+    """1.0 if urgency terms are denser in the second half — classic scam escalation."""
+    words = text.split()
+    mid = len(words) // 2
+    urgency_terms = ["urgent", "immediately", "right now", "act now",
+                     "final", "last chance", "failure to"]
+    first = " ".join(words[:mid])
+    second = " ".join(words[mid:])
+    first_count = sum(1 for t in urgency_terms if t in first)
+    second_count = sum(1 for t in urgency_terms if t in second)
+    return 1.0 if second_count > first_count else 0.0
+
+
+def _has_repeated_openers(text):
+    """1.0 if 3+ sentences share the same first word — hallmark of a read script."""
+    sentences = [s.strip().split() for s in re.split(r'[.!?]+', text) if s.strip()]
+    openers = [s[0].lower() for s in sentences if s]
+    if len(openers) < 3:
+        return 0.0
+    return 1.0 if max(Counter(openers).values(), default=0) >= 3 else 0.0
+
+def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
+                     had_long_silence=0.0, call_duration_sec=0.0, call_hour=12,
+                     speaker_switches=0, noise_floor_db=0.0, speech_rate_wpm=0.0,
+                     dtmf_detected=0.0):
     """
-    Extract numerical features from text.
+    Extract numerical features from text + optional audio/metadata signals.
     Must match TextPreprocessor.extractFeatures() in Android app.
-    25 features total.
+    42 features total (26 keyword/text + 5 conversational + 6 audio/metadata +
+    5 call-centre signals).
+
+    All audio/metadata args default to 0 so existing transcript-only CSVs still work.
     """
     text_lower = text.lower()
     text_len = len(text)
@@ -46,48 +106,108 @@ def extract_features(text):
     features.append(sum(c.isupper() for c in text) / text_len)                            # 6: uppercase ratio
 
     # Features 7-10: Generic scam signals
-    features.append(flag('urgent', 'immediately', 'right now', 'at once'))                # 7: urgency
-    features.append(flag('suspended', 'locked', 'frozen', 'blocked'))                     # 8: account blocked
-    features.append(flag('verify', 'confirm', 'validate'))                                # 9: verification
-    features.append(flag('money', 'payment', 'funds', 'cash', 'pay'))                     # 10: money
+    features.append(flag('urgent', 'immediately', 'right now', 'at once',
+                         'срочно', 'немедленно', 'сейчас же', 'прямо сейчас', 'незамедлительно'))   # 7: urgency
+    features.append(flag('suspended', 'locked', 'frozen', 'blocked',
+                         'заблокирован', 'заморожен', 'приостановлен', 'закрыт'))                   # 8: account blocked
+    features.append(flag('verify', 'confirm', 'validate',
+                         'подтвердите', 'верифицируйте', 'проверьте', 'подтверждение'))              # 9: verification
+    features.append(flag('money', 'payment', 'funds', 'cash', 'pay',
+                         'деньги', 'оплата', 'средства', 'перевод', 'платёж', 'платеж'))            # 10: money
 
     # Features 11-19: Category-specific keywords
     features.append(flag('irs', 'internal revenue', 'tax department', 'tax debt',
-                         'back taxes', 'unpaid tax'))                                      # 11: IRS
+                         'back taxes', 'unpaid tax',
+                         'налоговая', 'налоги', 'налоговый долг', 'задолженность',
+                         'налоговая служба', 'фнс'))                                                 # 11: IRS/tax
     features.append(flag('arrest', 'warrant', 'jail', 'prison', 'prosecution',
-                         'charges', 'law enforcement', 'officer'))                         # 12: legal threat
+                         'charges', 'law enforcement', 'officer',
+                         'арест', 'ордер на арест', 'тюрьма', 'уголовное дело',
+                         'полиция', 'следствие', 'обвинение', 'прокуратура'))                       # 12: legal threat
     features.append(flag('virus', 'malware', 'infected', 'spyware', 'ransomware',
-                         'remote access', 'anydesk', 'teamviewer'))                        # 13: tech threat
+                         'remote access', 'anydesk', 'teamviewer',
+                         'вирус', 'вредоносное', 'заражён', 'взломан', 'хакер',
+                         'удалённый доступ', 'шпионское по'))                                       # 13: tech threat
     features.append(flag('microsoft', 'windows', 'apple', 'computer', 'device',
-                         'tech support', 'technical support'))                             # 14: tech brand
+                         'tech support', 'technical support',
+                         'майкрософт', 'виндовс', 'эппл', 'компьютер',
+                         'техподдержка', 'техническая поддержка'))                                  # 14: tech brand
     features.append(flag('bank', 'credit card', 'debit card', 'account number',
-                         'routing number', 'wire transfer', 'pin'))                        # 15: banking
+                         'routing number', 'wire transfer', 'pin',
+                         'банк', 'кредитная карта', 'дебетовая карта', 'номер счёта',
+                         'реквизиты', 'пин-код', 'перевод средств'))                                # 15: banking
     features.append(flag('won', 'winner', 'prize', 'lottery', 'sweepstakes',
-                         'congratulations', 'reward'))                                     # 16: lottery
+                         'congratulations', 'reward',
+                         'выиграли', 'победитель', 'приз', 'лотерея',
+                         'поздравляем', 'выигрыш', 'джекпот'))                                      # 16: lottery
     features.append(flag('social security', 'ssn', 'social security number',
-                         'ss number', 'federal benefits'))                                 # 17: SSN
+                         'ss number', 'federal benefits',
+                         'снилс', 'пенсионный фонд', 'страховой номер',
+                         'инн', 'паспортные данные'))                                               # 17: SSN/identity
     features.append(flag('press one', 'press 1', 'recorded message',
-                         'automated', 'warranty', 'extended warranty'))                    # 18: robocall
+                         'automated', 'warranty', 'extended warranty',
+                         'нажмите один', 'нажмите 1', 'записанное сообщение',
+                         'автоматическое уведомление', 'гарантия на автомобиль'))                   # 18: robocall
     features.append(flag('password', 'credentials', 'login', 'username',
-                         'click', 'link', 'update your'))                                  # 19: phishing
+                         'click', 'link', 'update your',
+                         'пароль', 'логин', 'учётные данные', 'ссылка',
+                         'обновите данные', 'войдите в систему'))                                   # 19: phishing
 
-    # Features 20-25: More category signals
+    # Features 20-26: More category signals
     features.append(flag('insurance', 'medicare', 'medicaid', 'health plan',
-                         'health insurance', 'coverage', 'enrollment'))                    # 20: insurance
+                         'health insurance', 'coverage', 'enrollment',
+                         'страховка', 'медицинская страховка', 'полис',
+                         'страхование', 'омс', 'дмс'))                                              # 20: insurance
     features.append(flag('investment', 'trading', 'profit', 'returns',
-                         'broker', 'portfolio', 'invest', 'stock', 'crypto'))              # 21: investment
+                         'broker', 'portfolio', 'invest', 'stock', 'crypto',
+                         'инвестиции', 'трейдинг', 'прибыль', 'доходность', 'брокер',
+                         'криптовалюта', 'акции', 'вложить', 'заработок',
+                         'пассивный доход'))                                                        # 21: investment
     features.append(flag('gift card', 'bitcoin', 'western union', 'wire',
-                         'cryptocurrency', 'prepaid card'))                                # 22: payment method
+                         'cryptocurrency', 'prepaid card',
+                         'биткоин', 'криптовалюта', 'вестерн юнион',
+                         'электронный кошелёк', 'предоплата', 'подарочная карта'))                  # 22: payment method
     features.append(flag('free', 'no cost', 'no charge', 'at no cost',
-                         'qualify', 'eligible', 'complimentary'))                          # 23: free offer
+                         'qualify', 'eligible', 'complimentary',
+                         'бесплатно', 'без оплаты', 'имеете право',
+                         'подходите', 'бесплатная консультация'))                                   # 23: free offer
     features.append(flag('call back', 'call now', 'call immediately',
-                         'call us', 'contact us', 'call this number'))                     # 24: callback pressure
+                         'call us', 'contact us', 'call this number',
+                         'перезвоните', 'позвоните сейчас', 'срочно позвоните',
+                         'свяжитесь с нами', 'звоните немедленно'))                                 # 24: callback pressure
     features.append(flag('final notice', 'last chance', 'act now',
                          'time is running out', 'do not delay', 'do not ignore',
-                         'last warning', 'failure to'))                                    # 25: deadline pressure
+                         'last warning', 'failure to',
+                         'последнее уведомление', 'последний шанс', 'действуйте сейчас',
+                         'время истекает', 'не игнорируйте', 'финальное предупреждение'))           # 25: deadline pressure
     features.append(flag('charity', 'donate', 'donation', 'help victims',
                          'disaster relief', 'relief fund', 'humanitarian',
-                         'tax deductible', 'nonprofit', 'fundraising'))                    # 26: donation fraud
+                         'tax deductible', 'nonprofit', 'fundraising',
+                         'благотворительность', 'пожертвование', 'помогите жертвам',
+                         'гуманитарная помощь', 'фонд помощи', 'сбор средств'))                    # 26: donation fraud
+
+    # Features 27-31: Conversational behaviour (derived from transcript)
+    features.append(_repetition_score(text_lower))                                        # 27: repeated phrases
+    features.append(_question_density(text_lower))                                        # 28: question-word density
+    features.append(_has_long_monologue(text))                                            # 29: uninterrupted monologue
+    features.append(_urgency_escalates(text_lower))                                       # 30: urgency heavier in 2nd half
+    features.append(_has_repeated_openers(text))                                          # 31: scripted sentence openers
+
+    # Features 32-37: Audio/prosody + call metadata (0.0 for transcript-only training rows)
+    features.append(min(avg_rms / 20.0, 1.0))                                            # 32: normalised avg loudness
+    features.append(min(rms_std_dev / 5.0, 1.0))                                         # 33: normalised loudness variation
+    features.append(min(silence_ratio, 1.0))                                              # 34: fraction of call silent
+    features.append(float(had_long_silence))                                              # 35: had a scripted-pause silence
+    features.append(min(call_duration_sec / 600.0, 1.0))                                  # 36: normalised duration (10 min max)
+    features.append(1.0 if (call_hour < 8 or call_hour >= 20) else 0.0)                  # 37: off-hours call
+
+    # Features 38-42: Call-centre / multi-speaker / DTMF signals (0.0 for transcript-only rows)
+    call_dur_min = call_duration_sec / 60.0 if call_duration_sec > 0 else 0.0
+    features.append(min(speaker_switches / call_dur_min, 1.0) if call_dur_min > 0 else 0.0)  # 38: speaker switches per minute
+    features.append(min(noise_floor_db / 2.0, 1.0))                                      # 39: background noise floor normalised
+    features.append(min(speech_rate_wpm / 300.0, 1.0))                                   # 40: speech rate normalised (300 wpm max)
+    features.append(float(dtmf_detected))                                                 # 41: DTMF / IVR tones detected
+    features.append(1.0 if noise_floor_db > 1.0 else 0.0)                                # 42: elevated background noise flag
 
     return features
 
@@ -95,12 +215,13 @@ def load_data(csv_path):
     """
     Load training data from CSV file.
 
-    CSV format:
-    text,label
-    "This is the IRS. You owe money.",1
-    "Your computer has a virus.",2
-    "Hello, this is your bank.",3
-    ...
+    Minimum required columns:
+        text,label
+
+    Optional audio/metadata columns (default to 0 when absent):
+        avg_rms, rms_std_dev, silence_ratio, had_long_silence,
+        call_duration_sec, call_hour,
+        speaker_switches, noise_floor_db, speech_rate_wpm, dtmf_detected
 
     Labels:
     0 - Legitimate call
@@ -117,8 +238,22 @@ def load_data(csv_path):
     """
     df = pd.read_csv(csv_path)
 
-    # Extract features
-    X = np.array([extract_features(text) for text in df['text']])
+    def row_features(row):
+        return extract_features(
+            text=row['text'],
+            avg_rms=row.get('avg_rms', 0.0),
+            rms_std_dev=row.get('rms_std_dev', 0.0),
+            silence_ratio=row.get('silence_ratio', 0.0),
+            had_long_silence=row.get('had_long_silence', 0.0),
+            call_duration_sec=row.get('call_duration_sec', 0.0),
+            call_hour=int(row.get('call_hour', 12)),
+            speaker_switches=int(row.get('speaker_switches', 0)),
+            noise_floor_db=float(row.get('noise_floor_db', 0.0)),
+            speech_rate_wpm=float(row.get('speech_rate_wpm', 0.0)),
+            dtmf_detected=float(row.get('dtmf_detected', 0.0)),
+        )
+
+    X = np.array([row_features(row) for _, row in df.iterrows()])
     y = np.array(df['label'])
 
     return X, y
@@ -251,7 +386,7 @@ def main():
     print("\n6. Converting to TensorFlow Lite...")
     convert_to_tflite(model, 'scam_detector.tflite')
 
-    print("\n✓ Training complete!")
+    print("\nTraining complete!")
     print("\nNext steps:")
     print("1. Copy scam_detector.tflite to app/src/main/assets/")
     print("2. Rebuild and install the app")

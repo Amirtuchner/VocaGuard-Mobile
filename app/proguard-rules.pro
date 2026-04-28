@@ -36,7 +36,7 @@
 # ============================================================
 # App data / domain classes (serialised by Room)
 # ============================================================
--keepclassmembers class com.example.vocaguard.data.** {
+-keepclassmembers class io.vocaguard.** {
     public <init>(...);
     <fields>;
 }

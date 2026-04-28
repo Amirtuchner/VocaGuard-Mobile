@@ -7,8 +7,8 @@
         errorLine1="        whitelistPrefs.edit().clear().commit() // commit() for synchronous clear in tests"
         errorLine2="                                      ~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/ScamDatabaseManager.kt"
-            line="178"
+            file="src/main/java/io/vocaguard/data/ScamDatabaseManager.kt"
+            line="213"
             column="39"/>
     </issue>
 
@@ -18,7 +18,7 @@
         errorLine1="            Manifest.permission.POST_NOTIFICATIONS"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/ui/PermissionsManager.kt"
+            file="src/main/java/io/vocaguard/ui/PermissionsManager.kt"
             line="20"
             column="13"/>
     </issue>
@@ -29,9 +29,20 @@
         errorLine1="        permissions[&quot;Notifications&quot;] = hasPermission(Manifest.permission.POST_NOTIFICATIONS)"
         errorLine2="                                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/ui/PermissionsManager.kt"
+            file="src/main/java/io/vocaguard/ui/PermissionsManager.kt"
             line="31"
             column="54"/>
+    </issue>
+
+    <issue
+        id="OldTargetApi"
+        message="Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the `android.os.Build.VERSION_CODES` javadoc for details."
+        errorLine1="        targetSdk = 35"
+        errorLine2="        ~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="14"
+            column="9"/>
     </issue>
 
     <issue
@@ -40,7 +51,7 @@
         errorLine1="            val view = LayoutInflater.from(context).inflate(R.layout.overlay_scam_alert, null)"
         errorLine2="                                                                                         ~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/ui/ScamOverlayManager.kt"
+            file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
             line="54"
             column="90"/>
     </issue>
@@ -51,8 +62,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -62,8 +73,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -73,8 +84,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -84,8 +95,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -95,8 +106,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -106,8 +117,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -117,8 +128,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -128,8 +139,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -139,8 +150,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -150,8 +161,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -161,8 +172,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -172,8 +183,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -183,8 +194,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -194,8 +205,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -205,8 +216,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -216,8 +227,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -227,8 +238,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -238,8 +249,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -249,8 +260,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -260,8 +271,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -271,8 +282,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -282,8 +293,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -293,8 +304,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -304,8 +315,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -315,8 +326,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -326,8 +337,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -337,8 +348,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -348,8 +359,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -359,8 +370,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -370,8 +381,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -381,8 +392,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -392,8 +403,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -403,8 +414,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -414,8 +425,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -425,8 +436,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -436,8 +447,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -447,8 +458,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -458,8 +469,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -469,8 +480,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -480,8 +491,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -491,8 +502,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -502,8 +513,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -513,8 +524,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -524,8 +535,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -535,8 +546,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -546,8 +557,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -557,8 +568,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -568,8 +579,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -579,8 +590,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -590,8 +601,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -601,8 +612,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -612,8 +623,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -623,8 +634,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -634,8 +645,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -645,8 +656,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -656,8 +667,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -667,8 +678,8 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -678,8 +689,30 @@
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
-            file="src/main/java/com/example/vocaguard/MainActivity.kt"
-            line="88"
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
+            column="46"/>
+    </issue>
+
+    <issue
+        id="InvalidFragmentVersionForActivityResult"
+        message="Upgrade Fragment version to at least 1.3.0."
+        errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
+        errorLine2="                                             ^">
+        <location
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
+            column="46"/>
+    </issue>
+
+    <issue
+        id="InvalidFragmentVersionForActivityResult"
+        message="Upgrade Fragment version to at least 1.3.0."
+        errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
+        errorLine2="                                             ^">
+        <location
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="70"
             column="46"/>
     </issue>
 
@@ -690,8 +723,30 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/AndroidManifest.xml"
-            line="32"
+            line="38"
             column="13"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.application than 9.1.0 is available: 9.2.0. (There is also a newer version of 9.1.𝑥 available, if upgrading to 9.2.0 is difficult: 9.1.1)"
+        errorLine1="agp = &quot;9.1.0&quot;"
+        errorLine2="      ~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/VocaGuard/gradle/libs.versions.toml"
+            line="2"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of `compileSdk` than 35 is available: 36"
+        errorLine1="    compileSdk = 35"
+        errorLine2="    ~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="9"
+            column="5"/>
     </issue>
 
     <issue
@@ -701,18 +756,18 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="85"
+            line="81"
             column="20"/>
     </issue>
 
     <issue
         id="GradleDependency"
-        message="A newer version of com.google.ai.edge.litert:litert than 1.0.1 is available: 2.1.3"
+        message="A newer version of com.google.ai.edge.litert:litert than 1.0.1 is available: 2.1.4"
         errorLine1="    implementation(&quot;com.google.ai.edge.litert:litert:1.0.1&quot;)"
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="88"
+            line="84"
             column="20"/>
     </issue>
 
@@ -723,7 +778,7 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="110"
+            line="115"
             column="24"/>
     </issue>
 
@@ -784,7 +839,7 @@
 
     <issue
         id="GradleDependency"
-        message="A newer version of androidx.compose:compose-bom than 2024.09.00 is available: 2026.03.01"
+        message="A newer version of androidx.compose:compose-bom than 2024.09.00 is available: 2026.04.01"
         errorLine1="composeBom = &quot;2024.09.00&quot;"
         errorLine2="             ~~~~~~~~~~~~">
         <location
@@ -883,7 +938,7 @@
 
     <issue
         id="GradleDependency"
-        message="A newer version of com.google.firebase:firebase-bom than 33.7.0 is available: 34.11.0"
+        message="A newer version of com.google.firebase:firebase-bom than 33.7.0 is available: 34.12.0"
         errorLine1="firebaseBom = &quot;33.7.0&quot;"
         errorLine2="              ~~~~~~~~">
         <location
@@ -893,13 +948,24 @@
     </issue>
 
     <issue
+        id="GradleDependency"
+        message="A newer version of androidx.security:security-crypto than 1.1.0-alpha06 is available: 1.1.0"
+        errorLine1="securityCrypto = &quot;1.1.0-alpha06&quot;"
+        errorLine2="                 ~~~~~~~~~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/VocaGuard/gradle/libs.versions.toml"
+            line="18"
+            column="18"/>
+    </issue>
+
+    <issue
         id="NewerVersionAvailable"
         message="A newer version of org.jetbrains.kotlinx:kotlinx-coroutines-android than 1.9.0 is available: 1.10.2"
         errorLine1="    implementation(&quot;org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0&quot;)"
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="82"
+            line="78"
             column="20"/>
     </issue>
 
@@ -910,7 +976,7 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="109"
+            line="114"
             column="24"/>
     </issue>
 
@@ -921,13 +987,13 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="112"
+            line="117"
             column="24"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of org.jetbrains.kotlin.plugin.compose than 2.2.10 is available: 2.3.20"
+        message="A newer version of org.jetbrains.kotlin.plugin.compose than 2.2.10 is available: 2.3.21"
         errorLine1="kotlin = &quot;2.2.10&quot;"
         errorLine2="         ~~~~~~~~">
         <location
@@ -937,12 +1003,23 @@
     </issue>
 
     <issue
+        id="NewerVersionAvailable"
+        message="A newer version of com.googlecode.libphonenumber:libphonenumber than 8.13.51 is available: 9.0.29"
+        errorLine1="libphonenumber = &quot;8.13.51&quot;"
+        errorLine2="                 ~~~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/VocaGuard/gradle/libs.versions.toml"
+            line="19"
+            column="18"/>
+    </issue>
+
+    <issue
         id="SwitchIntDef"
         message="Switch statement on an `int` with known associated constant missing case `AccessibilityEvent.TYPE_ANNOUNCEMENT`, `AccessibilityEvent.TYPE_ASSIST_READING_CONTEXT`, `AccessibilityEvent.TYPE_GESTURE_DETECTION_END`, `AccessibilityEvent.TYPE_GESTURE_DETECTION_START`, `AccessibilityEvent.TYPE_SPEECH_STATE_CHANGE`, `AccessibilityEvent.TYPE_TOUCH_EXPLORATION_GESTURE_END`, `AccessibilityEvent.TYPE_TOUCH_EXPLORATION_GESTURE_START`, `AccessibilityEvent.TYPE_TOUCH_INTERACTION_END`, `AccessibilityEvent.TYPE_TOUCH_INTERACTION_START`, `AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED`, `AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED`, `AccessibilityEvent.TYPE_VIEW_CLICKED`, `AccessibilityEvent.TYPE_VIEW_CONTEXT_CLICKED`, `AccessibilityEvent.TYPE_VIEW_FOCUSED`, `AccessibilityEvent.TYPE_VIEW_HOVER_ENTER`, `AccessibilityEvent.TYPE_VIEW_HOVER_EXIT`, `AccessibilityEvent.TYPE_VIEW_LONG_CLICKED`, `AccessibilityEvent.TYPE_VIEW_SCROLLED`, `AccessibilityEvent.TYPE_VIEW_SELECTED`, `AccessibilityEvent.TYPE_VIEW_TARGETED_BY_SCROLL`, `AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED`, `AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED`, `AccessibilityEvent.TYPE_VIEW_TEXT_TRAVERSED_AT_MOVEMENT_GRANULARITY`, `AccessibilityEvent.TYPE_WINDOWS_CHANGED`, `AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED`"
         errorLine1="            when (event.eventType) {"
         errorLine2="            ~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/service/CallAudioAccessibilityService.kt"
+            file="src/main/java/io/vocaguard/service/CallAudioAccessibilityService.kt"
             line="34"
             column="13"/>
     </issue>
@@ -954,7 +1031,7 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="88"
+            line="84"
             column="20"/>
     </issue>
 
@@ -962,14 +1039,14 @@
         id="Aligned16KB"
         message="The native library `x86_64/libtensorflowlite_jni.so` (from `com.google.ai.edge.litert:litert:1.0.1`) is not 16 KB aligned">
         <location
-            file="$GRADLE_USER_HOME/caches/9.3.1/transforms/8223e7c189d6727f29c1c6f306fc72c8/workspace/transformed/litert-1.0.1/jni/x86_64/libtensorflowlite_jni.so"/>
+            file="$GRADLE_USER_HOME/caches/9.3.1/transforms/a87c34996e151586d609739fab3325ef/workspace/transformed/litert-1.0.1/jni/x86_64/libtensorflowlite_jni.so"/>
     </issue>
 
     <issue
         id="Aligned16KB"
         message="The native library `x86_64/libtensorflowlite_jni.so` (from `com.google.ai.edge.litert:litert:1.0.1`) is not 16 KB aligned">
         <location
-            file="$GRADLE_USER_HOME/caches/9.3.1/transforms/8223e7c189d6727f29c1c6f306fc72c8/workspace/transformed/litert-1.0.1/jni/x86_64/libtensorflowlite_jni.so"/>
+            file="$GRADLE_USER_HOME/caches/9.3.1/transforms/a87c34996e151586d609739fab3325ef/workspace/transformed/litert-1.0.1/jni/x86_64/libtensorflowlite_jni.so"/>
     </issue>
 
     <issue
@@ -978,8 +1055,41 @@
         errorLine1="    private val context: Context = application.applicationContext"
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/ui/SettingsViewModel.kt"
+            file="src/main/java/io/vocaguard/ui/FamilyDashboardViewModel.kt"
             line="18"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `ModelUpdateManager` which has field `context` pointing to `Context`); this is a memory leak"
+        errorLine1="        @Volatile private var instance: ModelUpdateManager? = null"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/ml/ModelUpdateManager.kt"
+            line="43"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `ReportSubmitter` which has field `context` pointing to `Context`); this is a memory leak"
+        errorLine1="        @Volatile private var instance: ReportSubmitter? = null"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/data/ReportSubmitter.kt"
+            line="35"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="This field leaks a context object"
+        errorLine1="    private val context: Context = application.applicationContext"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/ui/SettingsViewModel.kt"
+            line="21"
             column="5"/>
     </issue>
 
@@ -1158,20 +1268,31 @@
         errorLine1="        set(value) = prefs.edit().putString(KEY_SYNC_URL, value).apply()"
         errorLine2="                     ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/CommunityScamSync.kt"
-            line="61"
+            file="src/main/java/io/vocaguard/data/CommunityScamSync.kt"
+            line="68"
             column="22"/>
     </issue>
 
     <issue
         id="UseKtx"
         message="Use the KTX extension function `SharedPreferences.edit` instead?"
-        errorLine1="                prefs.edit().putLong(KEY_LAST_SYNC, System.currentTimeMillis()).apply()"
-        errorLine2="                ~~~~~~~~~~~~">
+        errorLine1="                    prefs.edit()"
+        errorLine2="                    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/CommunityScamSync.kt"
-            line="91"
-            column="17"/>
+            file="src/main/java/io/vocaguard/data/CommunityScamSync.kt"
+            line="108"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs.edit().putString(KEY_LAST_ERROR, lastError).apply()"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/data/CommunityScamSync.kt"
+            line="127"
+            column="9"/>
     </issue>
 
     <issue
@@ -1180,7 +1301,7 @@
         errorLine1="        set(value) = prefs.edit().putInt(KEY_SENSITIVITY, value.coerceIn(0, 100)).apply()"
         errorLine2="                     ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/DetectionSettings.kt"
+            file="src/main/java/io/vocaguard/data/DetectionSettings.kt"
             line="25"
             column="22"/>
     </issue>
@@ -1191,7 +1312,7 @@
         errorLine1="        set(value) = prefs.edit().putString(KEY_LOCALE, value).apply()"
         errorLine2="                     ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/DetectionSettings.kt"
+            file="src/main/java/io/vocaguard/data/DetectionSettings.kt"
             line="34"
             column="22"/>
     </issue>
@@ -1202,9 +1323,152 @@
         errorLine1="        set(value) = prefs.edit().putBoolean(KEY_ONBOARDING, value).apply()"
         errorLine2="                     ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/DetectionSettings.kt"
+            file="src/main/java/io/vocaguard/data/DetectionSettings.kt"
             line="39"
             column="22"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        set(value) = prefs.edit().putBoolean(KEY_ENABLE_TTS, value).apply()"
+        errorLine2="                     ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/data/DetectionSettings.kt"
+            line="44"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        set(value) = prefs.edit().putBoolean(KEY_ENABLE_SOUND, value).apply()"
+        errorLine2="                     ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/data/DetectionSettings.kt"
+            line="49"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        set(value) = prefs.edit().putBoolean(KEY_ENABLE_VIBRATION, value).apply()"
+        errorLine2="                     ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/data/DetectionSettings.kt"
+            line="54"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs.edit().putBoolean(&quot;alert_type_${scamType.name}&quot;, enabled).apply()"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/data/DetectionSettings.kt"
+            line="67"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        set(value) = prefs.edit().putString(KEY_REPORT_ENDPOINT, value).apply()"
+        errorLine2="                     ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/data/DetectionSettings.kt"
+            line="77"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            val dialIntent = Intent(Intent.ACTION_CALL, Uri.parse(&quot;tel:${contact.phoneNumber}&quot;)).apply {"
+        errorLine2="                                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/alert/FamilyAlertSender.kt"
+            line="196"
+            column="57"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        set(value) = prefs.edit().putBoolean(KEY_ENABLED, value).apply()"
+        errorLine2="                     ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/data/FamilyGuardSettings.kt"
+            line="32"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        set(value) = prefs.edit().putBoolean(KEY_SENIOR_MODE, value).apply()"
+        errorLine2="                     ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/data/FamilyGuardSettings.kt"
+            line="37"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        set(value) = prefs.edit().putString(KEY_SENIOR_NAME, value.trim()).apply()"
+        errorLine2="                     ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/data/FamilyGuardSettings.kt"
+            line="42"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        set(value) = prefs.edit().putString(KEY_WEBHOOK_URL, value.trim()).apply()"
+        errorLine2="                     ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/data/FamilyGuardSettings.kt"
+            line="47"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        set(value) = prefs.edit().putBoolean(KEY_CALL_ALERT, value).apply()"
+        errorLine2="                     ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/data/FamilyGuardSettings.kt"
+            line="56"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            prefs.edit().putString(KEY_CONTACTS, arr.toString()).apply()"
+        errorLine2="            ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/data/FamilyGuardSettings.kt"
+            line="83"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            prefs.edit().putString(KEY_CURRENT_VERSION, remoteVersion).apply()"
+        errorLine2="            ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/ml/ModelUpdateManager.kt"
+            line="79"
+            column="13"/>
     </issue>
 
     <issue
@@ -1213,8 +1477,8 @@
         errorLine1="        prefs.edit().putString(KEY_API_KEY, key).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/NetworkScamChecker.kt"
-            line="31"
+            file="src/main/java/io/vocaguard/data/NetworkScamChecker.kt"
+            line="46"
             column="9"/>
     </issue>
 
@@ -1224,8 +1488,8 @@
         errorLine1="                prefs.edit().remove(phoneNumber).apply()"
         errorLine2="                ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/NetworkScamChecker.kt"
-            line="125"
+            file="src/main/java/io/vocaguard/data/NetworkScamChecker.kt"
+            line="140"
             column="17"/>
     </issue>
 
@@ -1235,8 +1499,8 @@
         errorLine1="            prefs.edit().remove(phoneNumber).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/NetworkScamChecker.kt"
-            line="136"
+            file="src/main/java/io/vocaguard/data/NetworkScamChecker.kt"
+            line="151"
             column="13"/>
     </issue>
 
@@ -1246,8 +1510,8 @@
         errorLine1="        prefs.edit().putString(phoneNumber, obj.toString()).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/NetworkScamChecker.kt"
-            line="148"
+            file="src/main/java/io/vocaguard/data/NetworkScamChecker.kt"
+            line="163"
             column="9"/>
     </issue>
 
@@ -1257,8 +1521,8 @@
         errorLine1="            prefs.edit().putString(KEY_API_KEY, key).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/NetworkScamChecker.kt"
-            line="156"
+            file="src/main/java/io/vocaguard/data/NetworkScamChecker.kt"
+            line="171"
             column="13"/>
     </issue>
 
@@ -1268,8 +1532,8 @@
         errorLine1="        whitelistPrefs.edit().putStringSet(KEY_WHITELIST, current).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/ScamDatabaseManager.kt"
-            line="128"
+            file="src/main/java/io/vocaguard/data/ScamDatabaseManager.kt"
+            line="163"
             column="9"/>
     </issue>
 
@@ -1279,8 +1543,8 @@
         errorLine1="        whitelistPrefs.edit().putStringSet(KEY_WHITELIST, current).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/ScamDatabaseManager.kt"
-            line="136"
+            file="src/main/java/io/vocaguard/data/ScamDatabaseManager.kt"
+            line="171"
             column="9"/>
     </issue>
 
@@ -1290,9 +1554,20 @@
         errorLine1="        whitelistPrefs.edit().clear().commit() // commit() for synchronous clear in tests"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/data/ScamDatabaseManager.kt"
-            line="178"
+            file="src/main/java/io/vocaguard/data/ScamDatabaseManager.kt"
+            line="213"
             column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                        Uri.parse(&quot;tel:${primaryContact.phoneNumber}&quot;)"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/ui/SeniorHomeScreen.kt"
+            line="149"
+            column="25"/>
     </issue>
 
     <issue
@@ -1302,7 +1577,7 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="82"
+            line="78"
             column="20"/>
     </issue>
 
@@ -1313,7 +1588,7 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="85"
+            line="81"
             column="20"/>
     </issue>
 
@@ -1324,7 +1599,18 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="88"
+            line="84"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;androidx.compose.material3:material3-adaptive-navigation-suite&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="103"
             column="20"/>
     </issue>
 
@@ -1335,7 +1621,7 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="109"
+            line="114"
             column="24"/>
     </issue>
 
@@ -1346,7 +1632,7 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="110"
+            line="115"
             column="24"/>
     </issue>
 
@@ -1357,7 +1643,7 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="112"
+            line="117"
             column="24"/>
     </issue>
 
@@ -1367,7 +1653,7 @@
         errorLine1="                &quot;⚠ SCAM DETECTED: ${formatScamType(scamType)}&quot;"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/ui/ScamOverlayManager.kt"
+            file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
             line="56"
             column="17"/>
     </issue>
@@ -1378,7 +1664,7 @@
         errorLine1="                &quot;⚠ SCAM DETECTED: ${formatScamType(scamType)}&quot;"
         errorLine2="                 ~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/ui/ScamOverlayManager.kt"
+            file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
             line="56"
             column="18"/>
     </issue>
@@ -1389,7 +1675,7 @@
         errorLine1="                &quot;${(confidence * 100).toInt()}% confidence — do not share personal info&quot;"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/ui/ScamOverlayManager.kt"
+            file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
             line="58"
             column="17"/>
     </issue>
@@ -1400,7 +1686,7 @@
         errorLine1="                &quot;${(confidence * 100).toInt()}% confidence — do not share personal info&quot;"
         errorLine2="                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/example/vocaguard/ui/ScamOverlayManager.kt"
+            file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
             line="58"
             column="47"/>
     </issue>
