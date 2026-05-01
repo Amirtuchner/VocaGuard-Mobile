@@ -43,4 +43,11 @@ interface TranscriptDao {
     /** Lightweight projection for trend chart — timestamps + scam flags, no full text. */
     @Query("SELECT timestamp, detectedScamTypesJson FROM call_transcripts WHERE timestamp >= :since ORDER BY timestamp ASC")
     fun observeSummariesSince(since: Long): Flow<List<TranscriptSummary>>
+
+    /** One-shot count of scam calls since [since] — used by the home-screen widget. */
+    @Query("SELECT COUNT(*) FROM call_transcripts WHERE detectedScamTypesJson != '' AND isFalsePositive = 0 AND timestamp >= :since")
+    suspend fun countScamsSince(since: Long): Int
+
+    @Query("UPDATE call_transcripts SET isFalsePositive = 1 WHERE id = :id")
+    suspend fun markAsFalsePositive(id: Long)
 }

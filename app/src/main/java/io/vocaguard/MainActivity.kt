@@ -20,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -89,13 +90,24 @@ class MainActivity : ComponentActivity() {
             // Senior mode is reactive so toggling it in Settings rebuilds the theme immediately.
             val seniorMode = remember { mutableStateOf(familySettings.seniorModeEnabled) }
 
-            VocaGuardTheme(seniorMode = seniorMode.value) {
+            // Theme preference is read reactively via the SettingsViewModel so a toggle in
+            // Settings takes effect immediately without restarting the activity.
+            val themePreference = remember { mutableStateOf(detectionSettings.themePreference) }
+            val systemDark = isSystemInDarkTheme()
+            val darkTheme = when (themePreference.value) {
+                DetectionSettings.THEME_DARK  -> true
+                DetectionSettings.THEME_LIGHT -> false
+                else -> systemDark
+            }
+
+            VocaGuardTheme(darkTheme = darkTheme, seniorMode = seniorMode.value) {
                 var onboardingDone by remember { mutableStateOf(detectionSettings.onboardingComplete) }
                 if (onboardingDone) {
                     MainScreen(
                         permissionsManager  = permissionsManager,
                         selectedTab         = selectedTab,
                         seniorMode          = seniorMode,
+                        themePreference     = themePreference,
                         pendingFamilyAlert  = pendingFamilyAlert
                     )
                 } else {
@@ -159,6 +171,7 @@ fun MainScreen(
     permissionsManager: PermissionsManager,
     selectedTab: MutableState<Int>,
     seniorMode: MutableState<Boolean>,
+    themePreference: MutableState<String>,
     pendingFamilyAlert: MutableState<PendingFamilyAlert?>,
 ) {
     var selectedTabValue by selectedTab
@@ -248,8 +261,9 @@ fun MainScreen(
             0 -> if (seniorMode.value) SeniorHomeScreen() else HomeTab(permissionsManager)
             1 -> HistoryTab()
             2 -> SettingsTab(
-                permissionsManager = permissionsManager,
-                onSeniorModeChanged = { seniorMode.value = it }
+                permissionsManager  = permissionsManager,
+                onSeniorModeChanged = { seniorMode.value = it },
+                onThemeChanged      = { themePreference.value = it }
             )
             3 -> FamilyDashboard(viewModel = familyViewModel)
         }

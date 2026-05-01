@@ -53,7 +53,8 @@ class FamilyAlertSender(private val context: Context) {
     suspend fun sendAlert(
         scamType: ScamType,
         confidence: Float,
-        callerNumber: String = ""
+        callerNumber: String = "",
+        customMessage: String = ""
     ) {
         if (!settings.isEnabled) return
         val contacts = settings.contacts
@@ -65,7 +66,7 @@ class FamilyAlertSender(private val context: Context) {
         val scamLabel = scamType.displayName()
 
         contacts.forEach { contact ->
-            sendSms(contact, senderName, scamLabel, confidencePct, timeStr, scamType, confidence)
+            sendSms(contact, senderName, scamLabel, confidencePct, timeStr, scamType, confidence, customMessage)
         }
 
         val webhookUrl = settings.webhookUrl
@@ -83,14 +84,20 @@ class FamilyAlertSender(private val context: Context) {
         confidencePct: Int,
         timeStr: String,
         scamType: ScamType,
-        confidence: Float
+        confidence: Float,
+        customMessage: String = ""
     ) = withContext(Dispatchers.IO) {
         try {
             val deepLink = buildDeepLink(senderName, scamType, confidence)
             val message = buildString {
-                append("[VocaGuard] ⚠️ SCAM ALERT\n")
-                append("$senderName's phone detected a $scamLabel at $timeStr ($confidencePct% confidence).\n\n")
-                append("Tap to view in VocaGuard:\n$deepLink")
+                if (customMessage.isNotBlank()) {
+                    append("[VocaGuard] $customMessage\n\n")
+                    append("Tap to view in VocaGuard:\n$deepLink")
+                } else {
+                    append("[VocaGuard] SCAM ALERT\n")
+                    append("$senderName's phone detected a $scamLabel at $timeStr ($confidencePct% confidence).\n\n")
+                    append("Tap to view in VocaGuard:\n$deepLink")
+                }
             }
 
             @Suppress("DEPRECATION")

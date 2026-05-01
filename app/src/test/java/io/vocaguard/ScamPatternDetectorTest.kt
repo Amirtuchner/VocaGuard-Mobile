@@ -23,7 +23,11 @@ class ScamPatternDetectorTest {
 
     @Test
     fun `detects IRS scam`() {
-        val result = detector.analyzeText("This is the IRS you owe back taxes pay now or face arrest")
+        // Uses explicit standalone keywords: "IRS", "owe money", "tax", "arrest warrant"
+        val result = detector.analyzeText(
+            "This is the IRS calling. You owe money on your tax return. " +
+            "Pay immediately or an arrest warrant will be issued."
+        )
         assertTrue(result.isScam)
         assertEquals(ScamType.IRS_SCAM, result.scamType)
     }
@@ -86,7 +90,11 @@ class ScamPatternDetectorTest {
 
     @Test
     fun `detects phishing`() {
-        val result = detector.analyzeText("Please verify your account information confirm your password immediately")
+        // Uses explicit keywords: "verify", "confirm", "update your information", "provide your"
+        val result = detector.analyzeText(
+            "Please verify and confirm your account. Update your information and provide your " +
+            "details immediately."
+        )
         assertTrue(result.isScam)
         assertEquals(ScamType.PHISHING, result.scamType)
     }
@@ -172,6 +180,15 @@ class ScamPatternDetectorTest {
             "The bitcoin price rose ten percent today according to financial markets"
         )
         assertFalse(result.isScam)
+    }
+
+    @Test
+    fun `word boundary prevents substring false positives`() {
+        // "bitcoin" inside "bitcoinfarm" must not match the standalone "bitcoin" keyword
+        val result = detector.analyzeText(
+            "We run a bitcoinfarm and sell taxadvice through our anydesktop platform"
+        )
+        assertFalse("Substrings of scam keywords must not trigger detection", result.isScam)
     }
 
     @Test

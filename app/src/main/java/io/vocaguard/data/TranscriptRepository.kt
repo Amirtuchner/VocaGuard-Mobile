@@ -51,6 +51,11 @@ class TranscriptRepository(private val dao: TranscriptDao) {
 
     suspend fun delete(id: Long) = dao.deleteById(id)
 
+    suspend fun markAsFalsePositive(id: Long) = dao.markAsFalsePositive(id)
+
+    /** One-shot count for the widget — no Flow needed. */
+    suspend fun countScamsSince(since: Long): Int = dao.countScamsSince(since)
+
     suspend fun clearAll() = dao.clearAll()
 
     fun countScamCallsSince(since: Long): Flow<Int> = dao.countScamCallsSince(since)

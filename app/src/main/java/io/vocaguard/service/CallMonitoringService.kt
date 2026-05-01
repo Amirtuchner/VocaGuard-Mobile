@@ -40,6 +40,8 @@ class CallMonitoringService : Service() {
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "call_monitoring_channel"
         private const val MAX_SPEECH_RESTARTS = 10
+        /** Max time to wait for a single STT session to produce a result or error (ms). */
+        private const val STT_SESSION_TIMEOUT_MS = 30_000L
 
         // VAD (Voice Activity Detection) constants
         /** RMS dB below which the mic is considered silent. */
@@ -78,6 +80,8 @@ class CallMonitoringService : Service() {
     private var speechRecognizer: SpeechRecognizer? = null
     private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
     private var isMonitoring = false
+    /** Cancels the running STT session and restarts it if no result arrives in time. */
+    private var sttTimeoutJob: Job? = null
     private var lastNotificationUpdate = 0L
     private lateinit var scamDetector: HybridScamDetector
     private lateinit var alertManager: ScamAlertManager
@@ -253,6 +257,7 @@ class CallMonitoringService : Service() {
                 }
 
                 override fun onError(error: Int) {
+                    sttTimeoutJob?.cancel()
                     Log.w(TAG, "Speech recognition error: $error")
                     if (!isMonitoring) return
 
@@ -286,6 +291,7 @@ class CallMonitoringService : Service() {
                 }
 
                 override fun onResults(results: Bundle?) {
+                    sttTimeoutJob?.cancel()
                     speechRestartCount = 0
                     consecutiveLowRmsCount = 0 // reset VAD counter — speech was heard
                     handleSpeechResults(results)
@@ -312,6 +318,8 @@ class CallMonitoringService : Service() {
     }
 
     private fun startSpeechRecognition() {
+        // Cancel any running timeout watchdog before starting a new session.
+        sttTimeoutJob?.cancel()
         try {
             val locale = DetectionSettings.getInstance(this).locale
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -322,6 +330,17 @@ class CallMonitoringService : Service() {
                 putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
             }
             speechRecognizer?.startListening(intent)
+
+            // Watchdog: if STT neither completes nor errors within the timeout, force a restart
+            // to prevent the foreground service from hanging indefinitely.
+            sttTimeoutJob = serviceScope.launch {
+                delay(STT_SESSION_TIMEOUT_MS)
+                if (isActive && isMonitoring) {
+                    Log.w(TAG, "STT session timed out — forcing restart")
+                    speechRecognizer?.stopListening()
+                    startSpeechRecognition()
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error starting speech recognition", e)
         }

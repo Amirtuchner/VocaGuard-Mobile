@@ -109,6 +109,10 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         scamDb.addToWhitelist(phoneNumber)
     }
 
+    fun markAsFalsePositive(id: Long) {
+        viewModelScope.launch { repository.markAsFalsePositive(id) }
+    }
+
     // ── Export ────────────────────────────────────────────────────────────────
 
     /**

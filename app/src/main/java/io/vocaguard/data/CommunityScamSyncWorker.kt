@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.work.BackoffPolicy
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -37,7 +38,11 @@ class CommunityScamSyncWorker(
             val request = PeriodicWorkRequestBuilder<CommunityScamSyncWorker>(
                 24, TimeUnit.HOURS,
                 4, TimeUnit.HOURS  // flex: run any time in the last 4 h of the 24-h period
-            ).build()
+            )
+                // Cap retry backoff at 30 min (exponential: 30 m → 60 m → 2 h → 5 h max).
+                // Without this, the default 10 s initial delay grows unpredictably on failure.
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
+                .build()
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 WORK_NAME,

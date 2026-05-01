@@ -9,6 +9,7 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 
 /**
  * Checks a remote version manifest and downloads an updated TFLite model if one is available.
@@ -39,6 +40,9 @@ class ModelUpdateManager private constructor(private val context: Context) {
 
         private const val CONNECT_TIMEOUT_MS = 10_000
         private const val READ_TIMEOUT_MS = 30_000
+        private const val KEY_LAST_CHECK_TS = "last_model_check_ts"
+        /** Auto-check at most once every 24 h to avoid unnecessary network calls. */
+        private const val AUTO_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 
         @Volatile private var instance: ModelUpdateManager? = null
 
@@ -63,10 +67,12 @@ class ModelUpdateManager private constructor(private val context: Context) {
      * @return A human-readable status string suitable for display in the Settings UI.
      */
     suspend fun checkAndDownload(): String = withContext(Dispatchers.IO) {
+        prefs.edit().putLong(KEY_LAST_CHECK_TS, System.currentTimeMillis()).apply()
         try {
             val manifest = fetchManifest()
             val remoteVersion = manifest.getString("version")
             val remoteUrl = manifest.getString("url")
+            val expectedSha256 = manifest.optString("sha256", "")
 
             if (remoteVersion == currentVersion) {
                 Log.i(TAG, "Model is up to date (v$currentVersion)")
@@ -74,7 +80,7 @@ class ModelUpdateManager private constructor(private val context: Context) {
             }
 
             Log.i(TAG, "Downloading model v$remoteVersion from $remoteUrl")
-            downloadModel(remoteUrl)
+            downloadModel(remoteUrl, expectedSha256)
 
             prefs.edit().putString(KEY_CURRENT_VERSION, remoteVersion).apply()
             Log.i(TAG, "Model updated to v$remoteVersion")
@@ -83,6 +89,15 @@ class ModelUpdateManager private constructor(private val context: Context) {
             Log.e(TAG, "Model update check failed", e)
             "Update check failed: ${e.message}"
         }
+    }
+
+    /**
+     * Returns true if an auto-check is due (last check was more than [AUTO_CHECK_INTERVAL_MS] ago).
+     * Intended for use in the Settings ViewModel to trigger a background check on startup.
+     */
+    fun isAutoCheckDue(): Boolean {
+        val last = prefs.getLong(KEY_LAST_CHECK_TS, 0L)
+        return System.currentTimeMillis() - last > AUTO_CHECK_INTERVAL_MS
     }
 
     private fun fetchManifest(): JSONObject {
@@ -101,7 +116,7 @@ class ModelUpdateManager private constructor(private val context: Context) {
         }
     }
 
-    private fun downloadModel(urlString: String) {
+    private fun downloadModel(urlString: String, expectedSha256: String = "") {
         modelFile.parentFile?.mkdirs()
         val tmp = File(modelFile.parent, "${modelFile.name}.tmp")
 
@@ -117,7 +132,19 @@ class ModelUpdateManager private constructor(private val context: Context) {
                     input.copyTo(output)
                 }
             }
-            // Atomic rename: only replace the live model once download completes.
+            // Verify SHA-256 if the manifest provided one — prevents model poisoning.
+            if (expectedSha256.isNotEmpty()) {
+                val actual = sha256Hex(tmp)
+                if (!actual.equals(expectedSha256, ignoreCase = true)) {
+                    tmp.delete()
+                    throw Exception(
+                        "Model hash mismatch (expected $expectedSha256, got $actual). " +
+                        "Download may be corrupted or tampered."
+                    )
+                }
+                Log.i(TAG, "Model SHA-256 verified: $actual")
+            }
+            // Atomic rename: only replace the live model once download and verification complete.
             if (!tmp.renameTo(modelFile)) {
                 tmp.delete()
                 throw Exception("Failed to install downloaded model")
@@ -126,5 +153,17 @@ class ModelUpdateManager private constructor(private val context: Context) {
             if (tmp.exists()) tmp.delete()
             connection.disconnect()
         }
+    }
+
+    private fun sha256Hex(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(8192)
+            var read: Int
+            while (input.read(buffer).also { read = it } != -1) {
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 }

@@ -10,7 +10,8 @@ data class CallTranscriptEntity(
     val timestamp: Long,
     val text: String,
     val phoneNumber: String,
-    val detectedScamTypesJson: String // comma-separated enum names
+    val detectedScamTypesJson: String, // comma-separated enum names
+    val isFalsePositive: Int = 0       // 0 = normal, 1 = user-marked false positive
 ) {
     fun toDomain(): CallTranscript = CallTranscript(
         id = id,
@@ -18,7 +19,8 @@ data class CallTranscriptEntity(
         text = text,
         phoneNumber = phoneNumber,
         detectedScamTypes = if (detectedScamTypesJson.isEmpty()) emptyList()
-                            else detectedScamTypesJson.split(",")
+                            else detectedScamTypesJson.split(","),
+        isFalsePositive = isFalsePositive != 0
     )
 }
 
@@ -27,5 +29,6 @@ fun CallTranscript.toEntity() = CallTranscriptEntity(
     timestamp = timestamp,
     text = text,
     phoneNumber = phoneNumber,
-    detectedScamTypesJson = detectedScamTypes.joinToString(",")
+    detectedScamTypesJson = detectedScamTypes.joinToString(","),
+    isFalsePositive = if (isFalsePositive) 1 else 0
 )

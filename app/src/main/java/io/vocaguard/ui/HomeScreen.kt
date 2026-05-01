@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -195,7 +196,18 @@ fun HomeTab(
 
         items(permissions.toList()) { (name, granted) ->
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                PermissionItem(name = name, granted = granted)
+                PermissionItem(
+                    name = name,
+                    granted = granted,
+                    onClick = if (granted) null else ({
+                        when (name) {
+                            "Draw Overlay" -> permissionsManager.openOverlaySettings()
+                            "Accessibility" -> permissionsManager.openAccessibilitySettings()
+                            "Call Screening" -> permissionsManager.openCallScreeningSettings()
+                            else -> permissionsManager.openAppSettings()
+                        }
+                    })
+                )
             }
         }
 
@@ -422,10 +434,12 @@ private val permissionIcons: Map<String, ImageVector> = mapOf(
 )
 
 @Composable
-fun PermissionItem(name: String, granted: Boolean) {
+fun PermissionItem(name: String, granted: Boolean, onClick: (() -> Unit)? = null) {
     val permIcon = permissionIcons[name] ?: Icons.Default.Shield
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         colors = CardDefaults.cardColors(
             containerColor = if (granted) MaterialTheme.colorScheme.secondaryContainer
                              else MaterialTheme.colorScheme.surfaceVariant
@@ -452,7 +466,9 @@ fun PermissionItem(name: String, granted: Boolean) {
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = if (granted) "Enabled" else "Not granted",
+                    text = if (granted) "Enabled"
+                           else if (onClick != null) "Tap to fix"
+                           else "Not granted",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (granted) MaterialTheme.colorScheme.secondary
                             else MaterialTheme.colorScheme.error

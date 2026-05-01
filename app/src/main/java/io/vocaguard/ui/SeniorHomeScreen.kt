@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Sos
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,7 +22,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.vocaguard.alert.FamilyAlertSender
 import io.vocaguard.data.FamilyGuardSettings
+import io.vocaguard.data.ScamType
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Simplified home screen designed for seniors.
@@ -41,6 +46,17 @@ fun SeniorHomeScreen(
     val context = LocalContext.current
     val familySettings = remember { FamilyGuardSettings.getInstance(context) }
     val primaryContact = remember { familySettings.contacts.firstOrNull() }
+    val scope = rememberCoroutineScope()
+    var panicSent by remember { mutableStateOf(false) }
+
+    // Re-enable the panic button 60 s after it was tapped, in case the alert failed or
+    // the user needs to resend.
+    LaunchedEffect(panicSent) {
+        if (panicSent) {
+            delay(60_000L)
+            panicSent = false
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -174,6 +190,54 @@ fun SeniorHomeScreen(
                         text = "Your family contact",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                    )
+                }
+            }
+        }
+
+        // ── Panic button — sends immediate alert to caregiver ─────────────────
+        if (familySettings.isEnabled && primaryContact != null) {
+            Button(
+                onClick = {
+                    if (!panicSent) {
+                        panicSent = true
+                        scope.launch {
+                            FamilyAlertSender(context).sendAlert(
+                                scamType = ScamType.UNKNOWN,
+                                confidence = 1.0f,
+                                customMessage = "HELP: ${familySettings.seniorName.ifBlank { "Your family member" }} pressed the panic button and needs assistance."
+                            )
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (panicSent) MaterialTheme.colorScheme.surfaceVariant
+                                     else MaterialTheme.colorScheme.error
+                ),
+                enabled = !panicSent
+            ) {
+                Icon(
+                    Icons.Outlined.Sos,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        text = if (panicSent) "Alert sent!" else "I'm being scammed!",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = if (panicSent) "Your family has been notified"
+                               else "Tap to alert your family now",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (panicSent) MaterialTheme.colorScheme.onSurfaceVariant
+                                else MaterialTheme.colorScheme.onError.copy(alpha = 0.8f)
                     )
                 }
             }

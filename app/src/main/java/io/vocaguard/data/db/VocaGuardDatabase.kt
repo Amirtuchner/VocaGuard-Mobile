@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [CallTranscriptEntity::class, ScamNumberEntity::class, FamilyAlertEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class VocaGuardDatabase : RoomDatabase() {
@@ -27,6 +27,15 @@ abstract class VocaGuardDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "ALTER TABLE scam_numbers ADD COLUMN expiresAt INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
+        /** v3 → v4: add isFalsePositive column for user feedback on false-positive detections. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE call_transcripts ADD COLUMN isFalsePositive INTEGER NOT NULL DEFAULT 0"
                 )
             }
         }
@@ -57,7 +66,7 @@ abstract class VocaGuardDatabase : RoomDatabase() {
                     VocaGuardDatabase::class.java,
                     "vocaguard.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }

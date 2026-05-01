@@ -42,6 +42,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _enableVibration = MutableStateFlow(detectionSettings.enableVibration)
     val enableVibration: StateFlow<Boolean> = _enableVibration.asStateFlow()
 
+    private val _themePreference = MutableStateFlow(detectionSettings.themePreference)
+    val themePreference: StateFlow<String> = _themePreference.asStateFlow()
+
     private val _apiKeySaved = MutableStateFlow(false)
     val apiKeySaved: StateFlow<Boolean> = _apiKeySaved.asStateFlow()
 
@@ -73,6 +76,22 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val _modelUpdateStatus = MutableStateFlow("")
     val modelUpdateStatus: StateFlow<String> = _modelUpdateStatus.asStateFlow()
+
+    init {
+        // Auto-check for a model update once per day in the background.
+        viewModelScope.launch {
+            val manager = io.vocaguard.ml.ModelUpdateManager.getInstance(getApplication())
+            if (manager.isAutoCheckDue()) {
+                val result = manager.checkAndDownload()
+                // Only surface the status if there's actually something new — don't
+                // override an empty status with "up to date" on every launch.
+                if (result.contains("updated", ignoreCase = true) ||
+                    result.contains("failed", ignoreCase = true)) {
+                    _modelUpdateStatus.value = result
+                }
+            }
+        }
+    }
 
     // ── Family Guard Mode ─────────────────────────────────────────────────────
 
@@ -124,6 +143,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setEnableVibration(value: Boolean) {
         _enableVibration.value = value
         detectionSettings.enableVibration = value
+    }
+
+    fun setThemePreference(theme: String) {
+        _themePreference.value = theme
+        detectionSettings.themePreference = theme
     }
 
     // ── API key ───────────────────────────────────────────────────────────────

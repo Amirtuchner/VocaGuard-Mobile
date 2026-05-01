@@ -38,8 +38,10 @@ class ScamDetectionPipelineTest {
 
     @Test
     fun `IRS owe-money text triggers scam alert`() {
+        // Uses standalone keywords: "IRS", "owe money", "tax", "arrest warrant"
         val result = detector.analyzeText(
-            "This is the IRS. You owe back taxes and must pay immediately or face arrest."
+            "This is the IRS. You owe money on your tax return and must pay immediately " +
+            "or face an arrest warrant."
         )
         assertTrue(result.isScam)
         assertEquals(ScamType.IRS_SCAM, result.scamType)

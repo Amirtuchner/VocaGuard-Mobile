@@ -30,7 +30,7 @@ class HybridScamDetectorTest {
     @Test
     fun `returns rule-based result when ML unavailable`() {
         // TFLite model is not in test assets, so ML is disabled and rule-based takes over
-        val result = detector.analyzeText("This is the IRS you owe back taxes pay now or face arrest")
+        val result = detector.analyzeText("This is the IRS you owe money on your tax return and face an arrest warrant")
         // With ML disabled, result should still detect the scam via rules
         assertTrue("Expected scam to be detected by rule-based fallback", result.isScam)
         assertEquals(ScamType.IRS_SCAM, result.scamType)
@@ -68,7 +68,7 @@ class HybridScamDetectorTest {
 
     @Test
     fun `keywords list populated for rule-based hits`() {
-        val result = detector.analyzeText("IRS you owe back taxes pay immediately arrest")
+        val result = detector.analyzeText("IRS you owe money on your tax return arrest warrant immediately")
         assertTrue(result.isScam)
         assertTrue(result.keywords.isNotEmpty())
     }

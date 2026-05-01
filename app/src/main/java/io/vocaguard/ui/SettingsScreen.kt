@@ -29,6 +29,7 @@ import io.vocaguard.data.ScamType
 fun SettingsTab(
     permissionsManager: PermissionsManager,
     onSeniorModeChanged: (Boolean) -> Unit = {},
+    onThemeChanged: (String) -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -44,6 +45,7 @@ fun SettingsTab(
     val enableSound    by viewModel.enableSound.collectAsStateWithLifecycle()
     val enableVibration by viewModel.enableVibration.collectAsStateWithLifecycle()
     val alertTypeEnabled by viewModel.alertTypeEnabled.collectAsStateWithLifecycle()
+    val themePreference  by viewModel.themePreference.collectAsStateWithLifecycle()
     val reportEndpointUrl by viewModel.reportEndpointUrl.collectAsStateWithLifecycle()
     val reportEndpointSaved by viewModel.reportEndpointSaved.collectAsStateWithLifecycle()
     val modelUpdateStatus by viewModel.modelUpdateStatus.collectAsStateWithLifecycle()
@@ -252,6 +254,44 @@ fun SettingsTab(
                         checked = enableVibration,
                         onCheckedChange = { viewModel.setEnableVibration(it) }
                     )
+                }
+            }
+        }
+
+        // ── App Theme ──────────────────────────────────────────────────────────
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "App Theme",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Choose light, dark, or follow your system setting.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val themeOptions = listOf(
+                        io.vocaguard.data.DetectionSettings.THEME_SYSTEM to "System default",
+                        io.vocaguard.data.DetectionSettings.THEME_LIGHT  to "Light",
+                        io.vocaguard.data.DetectionSettings.THEME_DARK   to "Dark"
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        themeOptions.forEach { (value, label) ->
+                            FilterChip(
+                                selected = themePreference == value,
+                                onClick  = { viewModel.setThemePreference(value); onThemeChanged(value) },
+                                label    = { Text(label) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                 }
             }
         }

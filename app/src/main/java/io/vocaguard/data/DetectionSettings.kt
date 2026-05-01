@@ -48,6 +48,11 @@ class DetectionSettings private constructor(context: Context) {
         get() = prefs.getBoolean(KEY_ENABLE_SOUND, true)
         set(value) = prefs.edit().putBoolean(KEY_ENABLE_SOUND, value).apply()
 
+    /** User's preferred app theme: "system", "dark", or "light". */
+    var themePreference: String
+        get() = prefs.getString(KEY_THEME, THEME_SYSTEM) ?: THEME_SYSTEM
+        set(value) = prefs.edit().putString(KEY_THEME, value).apply()
+
     /** Whether to vibrate the phone when a scam is detected. */
     var enableVibration: Boolean
         get() = prefs.getBoolean(KEY_ENABLE_VIBRATION, true)
@@ -87,6 +92,11 @@ class DetectionSettings private constructor(context: Context) {
         private const val KEY_ENABLE_SOUND = "enable_sound"
         private const val KEY_ENABLE_VIBRATION = "enable_vibration"
         private const val KEY_REPORT_ENDPOINT = "report_endpoint_url"
+        private const val KEY_THEME = "theme_preference"
+        /** Valid values: "system", "dark", "light". */
+        const val THEME_SYSTEM = "system"
+        const val THEME_DARK   = "dark"
+        const val THEME_LIGHT  = "light"
 
         /** Supported locales shown in the Settings UI. */
         val SUPPORTED_LOCALES = listOf(

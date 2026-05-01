@@ -9,5 +9,6 @@ data class CallTranscript(
     val timestamp: Long = System.currentTimeMillis(),
     val text: String,
     val detectedScamTypes: List<String> = emptyList(),
-    val phoneNumber: String = ""
+    val phoneNumber: String = "",
+    val isFalsePositive: Boolean = false
 )

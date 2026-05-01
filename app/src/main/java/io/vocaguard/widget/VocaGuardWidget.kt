@@ -9,7 +9,10 @@ import android.content.pm.PackageManager
 import android.widget.RemoteViews
 import io.vocaguard.MainActivity
 import io.vocaguard.R
+import io.vocaguard.data.TranscriptRepository
 import io.vocaguard.ui.PermissionsManager
+import kotlinx.coroutines.runBlocking
+import java.util.Calendar
 
 /**
  * Home screen widget that shows "Protected" when all required permissions are granted,
@@ -40,12 +43,30 @@ class VocaGuardWidget : AppWidgetProvider() {
                 context.checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED
             }
 
+            // Count today's scam calls for the subtitle (blocking is acceptable inside a
+            // BroadcastReceiver — the system allows up to 10 s for this to complete).
+            val todayScams = runBlocking {
+                val midnightMs = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                TranscriptRepository.getInstance(context).countScamsSince(midnightMs)
+            }
+
             val views = RemoteViews(context.packageName, R.layout.widget_vocaguard)
 
             views.setTextViewText(
                 R.id.widget_status,
                 if (allGranted) context.getString(R.string.widget_status_protected)
                 else context.getString(R.string.widget_status_setup_required)
+            )
+
+            views.setTextViewText(
+                R.id.widget_subtitle,
+                if (todayScams > 0) "Blocked $todayScams scam${if (todayScams == 1) "" else "s"} today"
+                else "VocaGuard"
             )
 
             // Tapping the widget opens the app

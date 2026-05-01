@@ -123,4 +123,42 @@ class TranscriptRepositoryTest {
         val loaded = repository.loadAll()[0]
         assertTrue(loaded.detectedScamTypes.isEmpty())
     }
+
+    @Test
+    fun `markAsFalsePositive sets isFalsePositive flag`() = runBlocking {
+        repository.save(CallTranscript(
+            id = 1L, text = "scam call", detectedScamTypes = listOf("IRS_SCAM")
+        ))
+        repository.markAsFalsePositive(1L)
+
+        val loaded = repository.loadAll()[0]
+        assertTrue("isFalsePositive should be true after marking", loaded.isFalsePositive)
+    }
+
+    @Test
+    fun `countScamsSince excludes false-positive entries`() = runBlocking {
+        val since = 0L
+        repository.save(CallTranscript(
+            id = 1L, timestamp = 1000L, text = "real scam", detectedScamTypes = listOf("IRS_SCAM")
+        ))
+        repository.save(CallTranscript(
+            id = 2L, timestamp = 2000L, text = "false positive", detectedScamTypes = listOf("ROBOCALL")
+        ))
+        repository.markAsFalsePositive(2L)
+
+        val count = repository.countScamsSince(since)
+        assertEquals("Only non-false-positive scam calls should be counted", 1, count)
+    }
+
+    @Test
+    fun `countScamsSince excludes clean calls`() = runBlocking {
+        val since = 0L
+        repository.save(CallTranscript(id = 1L, text = "clean", detectedScamTypes = emptyList()))
+        repository.save(CallTranscript(
+            id = 2L, text = "scam", detectedScamTypes = listOf("BANK_FRAUD")
+        ))
+
+        val count = repository.countScamsSince(since)
+        assertEquals(1, count)
+    }
 }

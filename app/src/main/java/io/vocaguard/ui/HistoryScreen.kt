@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -259,7 +260,8 @@ fun HistoryTab(viewModel: HistoryViewModel = viewModel()) {
                     if (transcript.phoneNumber.isNotEmpty()) {
                         viewModel.addToWhitelist(transcript.phoneNumber)
                     }
-                }
+                },
+                onMarkFalsePositive = { viewModel.markAsFalsePositive(transcript.id) }
             )
         }
 
@@ -282,17 +284,22 @@ fun TranscriptCard(
     transcript: CallTranscript,
     onDelete: () -> Unit,
     onReport: () -> Unit,
-    onWhitelist: () -> Unit
+    onWhitelist: () -> Unit,
+    onMarkFalsePositive: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var markedFalsePositive by remember(transcript.id) { mutableStateOf(transcript.isFalsePositive) }
     val dateFormat = remember { SimpleDateFormat("MMM d, yyyy  h:mm a", Locale.getDefault()) }
     val isScam = transcript.detectedScamTypes.isNotEmpty()
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (isScam) MaterialTheme.colorScheme.errorContainer
-                             else MaterialTheme.colorScheme.surface
+            containerColor = when {
+                isScam && markedFalsePositive -> MaterialTheme.colorScheme.surfaceVariant
+                isScam -> MaterialTheme.colorScheme.errorContainer
+                else -> MaterialTheme.colorScheme.surface
+            }
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -336,6 +343,19 @@ fun TranscriptCard(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                // "Not a scam" button — only shown for scam-flagged, not yet corrected entries
+                if (isScam && !markedFalsePositive) {
+                    IconButton(onClick = {
+                        markedFalsePositive = true
+                        onMarkFalsePositive()
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.ThumbDown,
+                            contentDescription = "Mark as not a scam",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 IconButton(onClick = onDelete) {
                     Icon(
                         imageVector = Icons.Default.Delete,
@@ -345,7 +365,14 @@ fun TranscriptCard(
                 }
             }
 
-            if (isScam) {
+            if (isScam && markedFalsePositive) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Marked as not a scam",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else if (isScam) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     transcript.detectedScamTypes.forEach { type ->

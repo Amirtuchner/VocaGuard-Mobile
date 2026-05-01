@@ -86,14 +86,23 @@ class ScamPatternDetector() {
         )
     }
 
+    /**
+     * Returns true if [text] contains [keyword] as a whole word (word-boundary match,
+     * case-insensitive). Prevents false positives like "bitcoin" inside "habitcoin".
+     */
+    private fun containsWord(text: String, keyword: String): Boolean {
+        val pattern = "(?<![\\w])${Regex.escape(keyword.lowercase())}(?![\\w])"
+        return Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(text)
+    }
+
     fun analyzeText(text: String): DetectionResult {
         val lowerText = text.lowercase()
 
         // Shared signal boosts (computed once)
-        val urgencyBoost = if (URGENCY_KEYWORDS.any { lowerText.contains(it.lowercase()) }) 0.2f else 0f
-        val threatBoost  = if (THREAT_KEYWORDS.any  { lowerText.contains(it.lowercase()) }) 0.25f else 0f
-        val paymentBoost = if (PAYMENT_KEYWORDS.any  { lowerText.contains(it.lowercase()) }) 0.2f else 0f
-        val infoBoost    = if (INFO_REQUEST_KEYWORDS.any { lowerText.contains(it.lowercase()) }) 0.15f else 0f
+        val urgencyBoost = if (URGENCY_KEYWORDS.any { containsWord(lowerText, it) }) 0.2f else 0f
+        val threatBoost  = if (THREAT_KEYWORDS.any  { containsWord(lowerText, it) }) 0.25f else 0f
+        val paymentBoost = if (PAYMENT_KEYWORDS.any  { containsWord(lowerText, it) }) 0.2f else 0f
+        val infoBoost    = if (INFO_REQUEST_KEYWORDS.any { containsWord(lowerText, it) }) 0.15f else 0f
 
         // Score every scam type and keep the best match
         var bestType: ScamType = ScamType.UNKNOWN
@@ -101,11 +110,13 @@ class ScamPatternDetector() {
         var bestKeywords: List<String> = emptyList()
 
         for ((scamType, keywords) in SCAM_PATTERNS) {
-            val matched = keywords.filter { lowerText.contains(it.lowercase()) }
+            val matched = keywords.filter { containsWord(lowerText, it) }
             if (matched.isEmpty()) continue
 
-            val confidence = (matched.size.toFloat() / keywords.size.toFloat() +
-                    urgencyBoost + threatBoost + paymentBoost + infoBoost)
+            // Each matched keyword contributes a fixed weight — prevents bias toward
+            // categories with fewer keywords (e.g. ROBOCALL has 6, TECH_SUPPORT has 14).
+            val keywordScore = (matched.size * 0.12f).coerceAtMost(0.60f)
+            val confidence = (keywordScore + urgencyBoost + threatBoost + paymentBoost + infoBoost)
                 .coerceAtMost(1.0f)
 
             if (confidence > bestConfidence) {
@@ -149,10 +160,10 @@ class ScamPatternDetector() {
         var score = 0f
 
         // Check for multiple red flags
-        val urgencyCount = URGENCY_KEYWORDS.count { text.contains(it.lowercase()) }
-        val threatCount = THREAT_KEYWORDS.count { text.contains(it.lowercase()) }
-        val paymentCount = PAYMENT_KEYWORDS.count { text.contains(it.lowercase()) }
-        val infoRequestCount = INFO_REQUEST_KEYWORDS.count { text.contains(it.lowercase()) }
+        val urgencyCount = URGENCY_KEYWORDS.count { containsWord(text, it) }
+        val threatCount = THREAT_KEYWORDS.count { containsWord(text, it) }
+        val paymentCount = PAYMENT_KEYWORDS.count { containsWord(text, it) }
+        val infoRequestCount = INFO_REQUEST_KEYWORDS.count { containsWord(text, it) }
 
         // Weight different factors
         score += urgencyCount * 0.15f
