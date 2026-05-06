@@ -42,6 +42,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _enableVibration = MutableStateFlow(detectionSettings.enableVibration)
     val enableVibration: StateFlow<Boolean> = _enableVibration.asStateFlow()
 
+    private val _messageScanEnabled = MutableStateFlow(detectionSettings.messageScanEnabled)
+    val messageScanEnabled: StateFlow<Boolean> = _messageScanEnabled.asStateFlow()
+
     private val _themePreference = MutableStateFlow(detectionSettings.themePreference)
     val themePreference: StateFlow<String> = _themePreference.asStateFlow()
 
@@ -143,6 +146,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setEnableVibration(value: Boolean) {
         _enableVibration.value = value
         detectionSettings.enableVibration = value
+    }
+
+    fun setMessageScanEnabled(value: Boolean) {
+        _messageScanEnabled.value = value
+        detectionSettings.messageScanEnabled = value
     }
 
     fun setThemePreference(theme: String) {

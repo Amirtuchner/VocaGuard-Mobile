@@ -35,7 +35,8 @@ class PermissionsManagerTest {
             "Notifications",
             "Call Screening",
             "Accessibility",
-            "Draw Overlay"
+            "Draw Overlay",
+            "Notification Access"
         )
         assertTrue(
             "Missing keys: ${expectedKeys - permissions.keys}",
@@ -46,7 +47,7 @@ class PermissionsManagerTest {
     @Test
     fun `checkAllPermissions returns exactly 8 entries`() {
         val permissions = manager.checkAllPermissions()
-        assertTrue("Expected 8 permission entries, got ${permissions.size}", permissions.size == 8)
+        assertTrue("Expected 9 permission entries, got ${permissions.size}", permissions.size == 9)
     }
 
     @Test

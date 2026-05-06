@@ -44,6 +44,7 @@ fun SettingsTab(
     val enableTts      by viewModel.enableTts.collectAsStateWithLifecycle()
     val enableSound    by viewModel.enableSound.collectAsStateWithLifecycle()
     val enableVibration by viewModel.enableVibration.collectAsStateWithLifecycle()
+    val messageScanEnabled by viewModel.messageScanEnabled.collectAsStateWithLifecycle()
     val alertTypeEnabled by viewModel.alertTypeEnabled.collectAsStateWithLifecycle()
     val themePreference  by viewModel.themePreference.collectAsStateWithLifecycle()
     val reportEndpointUrl by viewModel.reportEndpointUrl.collectAsStateWithLifecycle()
@@ -254,6 +255,67 @@ fun SettingsTab(
                         checked = enableVibration,
                         onCheckedChange = { viewModel.setEnableVibration(it) }
                     )
+                }
+            }
+        }
+
+        // ── Message Scanning (WhatsApp / Telegram) ──────────────────────────────
+        item {
+            val hasAccess = permissionsManager.hasNotificationListenerAccess()
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Message Scanning",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Scans WhatsApp and Telegram message notifications for scam patterns. " +
+                            "When a scam is detected the notification is dismissed and you receive a " +
+                            "VocaGuard warning instead. Requires Notification Access.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AlertToggleRow(
+                        label = "Scan messages",
+                        description = "WhatsApp, Telegram",
+                        checked = messageScanEnabled,
+                        onCheckedChange = { viewModel.setMessageScanEnabled(it) }
+                    )
+                    if (!hasAccess) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "Notification Access required",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Grant VocaGuard Notification Access so it can read message " +
+                                        "notification text. Message content is only analysed on-device " +
+                                        "and never sent anywhere.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedButton(
+                                    onClick = { permissionsManager.openNotificationListenerSettings() }
+                                ) {
+                                    Text("Open Notification Access")
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

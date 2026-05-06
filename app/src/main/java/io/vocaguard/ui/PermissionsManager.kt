@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import io.vocaguard.service.MessagingScamDetectorService
 
 class PermissionsManager(private val context: Context) {
 
@@ -32,6 +33,7 @@ class PermissionsManager(private val context: Context) {
         permissions["Call Screening"] = isCallScreeningEnabled()
         permissions["Accessibility"] = isAccessibilityEnabled()
         permissions["Draw Overlay"] = Settings.canDrawOverlays(context)
+        permissions["Notification Access"] = hasNotificationListenerAccess()
 
         return permissions
     }
@@ -41,6 +43,17 @@ class PermissionsManager(private val context: Context) {
 
     /** Whether CALL_PHONE is granted — required for Family Guard phone-call alerts. */
     fun hasCallPhone(): Boolean = hasPermission(Manifest.permission.CALL_PHONE)
+
+    /** Whether VocaGuard has Notification Access — required for message scanning. */
+    fun hasNotificationListenerAccess(): Boolean =
+        MessagingScamDetectorService.isEnabled(context)
+
+    /** Opens the system Notification Access settings screen. */
+    fun openNotificationListenerSettings() {
+        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        context.startActivity(intent)
+    }
 
     private fun hasPermission(permission: String): Boolean {
         return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED

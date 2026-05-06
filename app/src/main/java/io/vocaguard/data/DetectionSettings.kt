@@ -58,6 +58,14 @@ class DetectionSettings private constructor(context: Context) {
         get() = prefs.getBoolean(KEY_ENABLE_VIBRATION, true)
         set(value) = prefs.edit().putBoolean(KEY_ENABLE_VIBRATION, value).apply()
 
+    /**
+     * Whether to scan WhatsApp and Telegram notifications for scam message text.
+     * Requires Notification Access (granted via system Settings).
+     */
+    var messageScanEnabled: Boolean
+        get() = prefs.getBoolean(KEY_MESSAGE_SCAN, true)
+        set(value) = prefs.edit().putBoolean(KEY_MESSAGE_SCAN, value).apply()
+
     // ── Per-scam-type alert toggles ────────────────────────────────────────────
 
     /**
@@ -91,6 +99,7 @@ class DetectionSettings private constructor(context: Context) {
         private const val KEY_ENABLE_TTS = "enable_tts"
         private const val KEY_ENABLE_SOUND = "enable_sound"
         private const val KEY_ENABLE_VIBRATION = "enable_vibration"
+        private const val KEY_MESSAGE_SCAN = "message_scan_enabled"
         private const val KEY_REPORT_ENDPOINT = "report_endpoint_url"
         private const val KEY_THEME = "theme_preference"
         /** Valid values: "system", "dark", "light". */
