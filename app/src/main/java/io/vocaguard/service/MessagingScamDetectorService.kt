@@ -115,8 +115,12 @@ class MessagingScamDetectorService : NotificationListenerService() {
 
         // MessagingStyle — used by WhatsApp and Telegram for individual/group chats.
         // Each message is a Bundle with a "text" key.
-        @Suppress("UNCHECKED_CAST")
-        val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+        val messages = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            extras.getParcelableArray(Notification.EXTRA_MESSAGES, Bundle::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+        }
         if (messages != null) {
             val joined = messages.mapNotNull { msg ->
                 (msg as? Bundle)?.getCharSequence("text")?.toString()
