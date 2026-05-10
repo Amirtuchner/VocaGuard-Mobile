@@ -331,9 +331,9 @@ class TextPreprocessor {
             // Arabic
             "استثمار", "تداول", "ربح", "عائد", "وسيط", "عملة مشفرة", "بيتكوين",
             // Spanish
-            "inversión", "ganancias", "rentabilidad", "criptomoneda", "bitcoin", "ingresos pasivos",
+            "inversión", "ganancias", "rentabilidad", "criptomoneda", "ingresos pasivos",
             // French
-            "investissement", "rendement", "bénéfices", "cryptomonnaie", "bitcoin", "revenus passifs"))
+            "investissement", "rendement", "bénéfices", "cryptomonnaie", "revenus passifs"))
         features.add(flag(
             "gift card", "bitcoin", "western union", "wire",
             "cryptocurrency", "prepaid card",
@@ -346,9 +346,9 @@ class TextPreprocessor {
             // Arabic
             "بطاقة هدية", "بيتكوين", "تحويل مالي", "ويسترن يونيون",
             // Spanish
-            "tarjeta de regalo", "bitcoin", "western union", "transferencia",
+            "tarjeta de regalo", "western union", "transferencia",
             // French
-            "carte cadeau", "bitcoin", "western union", "virement"))
+            "carte cadeau", "western union", "virement"))
         features.add(flag(
             "free", "no cost", "no charge", "at no cost", "qualify", "eligible", "complimentary",
             // Russian

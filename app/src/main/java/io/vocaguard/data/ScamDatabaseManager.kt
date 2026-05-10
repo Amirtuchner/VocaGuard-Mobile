@@ -78,7 +78,7 @@ class ScamDatabaseManager private constructor(context: Context) {
                 if (deleted > 0) Log.i(TAG, "Purged $deleted expired scam number(s)")
 
                 scamNumberDao.getAll().forEach { entity ->
-                    scamDatabase[entity.phoneNumber] = entity.toDomain()
+                    scamDatabase.putIfAbsent(entity.phoneNumber, entity.toDomain())
                 }
                 Log.d(TAG, "Loaded ${scamDatabase.size} scam numbers from database")
             } catch (e: Exception) {

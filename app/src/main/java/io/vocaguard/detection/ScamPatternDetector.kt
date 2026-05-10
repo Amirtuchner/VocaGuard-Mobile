@@ -146,9 +146,9 @@ class ScamPatternDetector() {
                 // Arabic
                 "استثمار", "عائد مضمون", "عملة مشفرة", "بيتكوين", "تداول",
                 // Spanish
-                "inversión garantizada", "ganancias altas", "criptomoneda", "bitcoin", "trading", "ingresos pasivos",
+                "inversión garantizada", "ganancias altas", "criptomoneda", "trading", "ingresos pasivos",
                 // French
-                "investissement garanti", "rendements élevés", "cryptomonnaie", "bitcoin", "trading", "revenus passifs"
+                "investissement garanti", "rendements élevés", "cryptomonnaie", "trading", "revenus passifs"
             ),
             ScamType.DONATION_FRAUD to listOf(
                 // English
@@ -216,9 +216,9 @@ class ScamPatternDetector() {
             // Arabic
             "بطاقة هدية", "بيتكوين", "تحويل مالي", "ويسترن يونيون",
             // Spanish
-            "tarjeta de regalo", "bitcoin", "transferencia bancaria", "western union", "pague ahora",
+            "tarjeta de regalo", "transferencia bancaria", "western union", "pague ahora",
             // French
-            "carte cadeau", "bitcoin", "virement bancaire", "western union", "payez maintenant"
+            "carte cadeau", "virement bancaire", "western union", "payez maintenant"
         )
 
         // Personal info request keywords

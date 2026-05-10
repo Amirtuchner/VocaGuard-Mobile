@@ -250,16 +250,16 @@ def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
         'השקעה', 'מסחר', 'רווח', 'תשואה', 'ברוקר', 'קריפטו', 'ביטקוין',
         'להשקיע', 'הכפלת כסף', 'פורקס', 'מניות',
         'استثمار', 'تداول', 'ربح', 'عائد', 'وسيط', 'عملة مشفرة', 'بيتكوين',
-        'inversión', 'ganancias', 'rentabilidad', 'criptomoneda', 'bitcoin', 'ingresos pasivos',
-        'investissement', 'rendement', 'bénéfices', 'cryptomonnaie', 'bitcoin', 'revenus passifs'))
+        'inversión', 'ganancias', 'rentabilidad', 'criptomoneda', 'ingresos pasivos',
+        'investissement', 'rendement', 'bénéfices', 'cryptomonnaie', 'revenus passifs'))
     features.append(flag(                                                                            # 22: payment method
         'gift card', 'bitcoin', 'western union', 'wire', 'cryptocurrency', 'prepaid card',
         'биткоин', 'криптовалюта', 'вестерн юнион', 'электронный кошелёк',
         'предоплата', 'подарочная карта',
         'גיפט קארד', 'ביטקוין', 'קריפטו', 'כרטיס מתנה', 'ביט', 'פייבוקס', 'העברה מיידית',
         'بطاقة هدية', 'بيتكوين', 'تحويل مالي', 'ويسترن يونيون',
-        'tarjeta de regalo', 'bitcoin', 'western union', 'transferencia',
-        'carte cadeau', 'bitcoin', 'western union', 'virement'))
+        'tarjeta de regalo', 'western union', 'transferencia',
+        'carte cadeau', 'western union', 'virement'))
     features.append(flag(                                                                            # 23: free offer
         'free', 'no cost', 'no charge', 'at no cost', 'qualify', 'eligible', 'complimentary',
         'бесплатно', 'без оплаты', 'имеете право', 'подходите', 'бесплатная консультация',
