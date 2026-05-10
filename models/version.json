@@ -1,5 +1,5 @@
 {
-  "version": "1.2",
+  "version": "1.3",
   "url": "https://raw.githubusercontent.com/Amirtuchner/VocaGuard-Mobile/main/models/scam_detector.tflite",
-  "sha256": "ca21b4e5d800529df4f87f821ab9c9eccade9b45691224e89e46aa885e9cf194"
+  "sha256": "7f1a30c0eca72cd99277c6140131e5e0a0ad033751ad21ccd49577ff0dc70cc1"
 }

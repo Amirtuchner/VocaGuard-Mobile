@@ -141,7 +141,11 @@ class TextPreprocessor {
             // Hebrew
             "עכשיו", "מיד", "דחוף", "בדחיפות", "תוך שעה", "ללא דיחוי", "מהר",
             // Arabic
-            "الآن", "عاجل", "فوراً", "على الفور", "بسرعة"))
+            "الآن", "عاجل", "فوراً", "على الفور", "بسرعة",
+            // Spanish
+            "urgente", "inmediatamente", "ahora mismo", "de inmediato",
+            // French
+            "immédiatement", "maintenant", "de suite", "sans délai"))
         features.add(flag(
             "suspended", "locked", "frozen", "blocked",
             // Russian
@@ -149,7 +153,11 @@ class TextPreprocessor {
             // Hebrew
             "חסום", "נחסם", "הוקפא", "מוקפא", "מושעה", "נחסמה", "הוקפאה", "נחסמת",
             // Arabic
-            "محظور", "مجمد", "معلق", "موقوف", "مغلق"))
+            "محظور", "مجمد", "معلق", "موقوف", "مغلق",
+            // Spanish
+            "suspendido", "bloqueado", "congelado", "cancelado",
+            // French
+            "suspendu", "bloqué", "gelé", "résilié"))
         features.add(flag(
             "verify", "confirm", "validate",
             // Russian
@@ -157,7 +165,11 @@ class TextPreprocessor {
             // Hebrew
             "אמת", "אימות", "לאמת", "לאשר", "לוודא", "אישור", "קוד אימות", "קוד otp",
             // Arabic
-            "تحقق", "أكد", "تأكيد", "التحقق", "رمز التحقق", "رمز otp"))
+            "تحقق", "أكد", "تأكيد", "التحقق", "رمز التحقق", "رمز otp",
+            // Spanish
+            "verificar", "confirmar", "validar", "verificación",
+            // French
+            "vérifier", "confirmer", "valider", "vérification"))
         features.add(flag(
             "money", "payment", "funds", "cash", "pay",
             // Russian
@@ -165,7 +177,11 @@ class TextPreprocessor {
             // Hebrew
             "כסף", "תשלום", "העברה", "לשלם", "ביט", "פייבוקס", "מזומן", "העברת כסף",
             // Arabic
-            "المال", "دفع", "تحويل", "مبلغ", "أموال"))
+            "المال", "دفع", "تحويل", "مبلغ", "أموال",
+            // Spanish
+            "dinero", "pago", "transferencia", "efectivo", "pagar",
+            // French
+            "argent", "paiement", "virement", "espèces", "payer"))
 
         // Features 11-19: Category-specific keywords
         features.add(flag(
@@ -175,7 +191,11 @@ class TextPreprocessor {
             // Hebrew
             "מס הכנסה", "רשות המסים", "חוב מס", "חוב לרשות", "עיקול מס",
             // Arabic
-            "الضريبة", "مصلحة الضرائب", "ديون ضريبية", "الإيرادات الداخلية"))
+            "الضريبة", "مصلحة الضرائب", "ديون ضريبية", "الإيرادات الداخلية",
+            // Spanish
+            "servicio de impuestos", "hacienda", "deuda fiscal", "impuestos",
+            // French
+            "impôts", "service des impôts", "dette fiscale", "fisc"))
         features.add(flag(
             "arrest", "warrant", "jail", "prison", "prosecution",
             "charges", "law enforcement", "officer",
@@ -186,7 +206,11 @@ class TextPreprocessor {
             "מעצר", "צו מעצר", "תיק פלילי", "כליאה", "עצור", "תביעה פלילית",
             "הוצאה לפועל", "עיקול", "צו", "חקירה",
             // Arabic
-            "اعتقال", "مذكرة اعتقال", "قضية جنائية", "الحجز", "سجن", "ملاحقة قضائية"))
+            "اعتقال", "مذكرة اعتقال", "قضية جنائية", "الحجز", "سجن", "ملاحقة قضائية",
+            // Spanish
+            "arresto", "orden de arresto", "cárcel", "prisión", "demanda", "policía",
+            // French
+            "arrestation", "mandat d'arrêt", "prison", "poursuites", "police"))
         features.add(flag(
             "virus", "malware", "infected", "spyware", "ransomware",
             "remote access", "anydesk", "teamviewer",
@@ -197,7 +221,11 @@ class TextPreprocessor {
             "וירוס", "תוכנה זדונית", "פרוץ", "נגוע", "גישה מרחוק",
             "teamviewer", "anydesk", "להוריד תוכנה", "תיקון מחשב",
             // Arabic
-            "فيروس", "برامج خبيثة", "مخترق", "وصول عن بعد"))
+            "فيروس", "برامج خبيثة", "مخترق", "وصول عن بعد",
+            // Spanish
+            "virus informático", "software malicioso", "infectado", "acceso remoto",
+            // French
+            "virus informatique", "logiciel malveillant", "infecté", "accès à distance"))
         features.add(flag(
             "microsoft", "windows", "apple", "computer", "device",
             "tech support", "technical support",
@@ -206,7 +234,11 @@ class TextPreprocessor {
             // Hebrew
             "מיקרוסופט", "חלונות", "תמיכה טכנית", "שירות לקוחות טכני", "נציג תמיכה",
             // Arabic
-            "مايكروسوفت", "ويندوز", "آبل", "دعم فني", "خدمة العملاء التقنية"))
+            "مايكروسوفت", "ويندوز", "آبل", "دعم فني", "خدمة العملاء التقنية",
+            // Spanish
+            "soporte técnico", "asistencia técnica",
+            // French
+            "support technique", "assistance technique"))
         features.add(flag(
             "bank", "credit card", "debit card", "account number",
             "routing number", "wire transfer", "pin",
@@ -217,7 +249,11 @@ class TextPreprocessor {
             "בנק", "כרטיס אשראי", "מספר חשבון", "פרטי בנק", "פין", "העברה בנקאית",
             "חשבון בנק", "כרטיס חיוב",
             // Arabic
-            "بنك", "بطاقة ائتمان", "رقم الحساب", "تحويل بنكي", "بطاقة الخصم"))
+            "بنك", "بطاقة ائتمان", "رقم الحساب", "تحويل بنكي", "بطاقة الخصم",
+            // Spanish
+            "banco", "tarjeta de crédito", "número de cuenta", "transferencia bancaria",
+            // French
+            "banque", "carte de crédit", "numéro de compte", "virement bancaire", "code pin"))
         features.add(flag(
             "won", "winner", "prize", "lottery", "sweepstakes", "congratulations", "reward",
             // Russian
@@ -225,7 +261,11 @@ class TextPreprocessor {
             // Hebrew
             "זכית", "הגרלה", "פרס", "מזל טוב", "זוכה", "זכייה", "הגרלת",
             // Arabic
-            "فزت", "جائزة", "يانصيب", "مبروك", "فائز", "قرعة"))
+            "فزت", "جائزة", "يانصيب", "مبروك", "فائز", "قرعة",
+            // Spanish
+            "ganaste", "lotería", "premio", "felicitaciones", "ganador",
+            // French
+            "gagné", "loterie", "prix", "félicitations", "gagnant"))
         features.add(flag(
             "social security", "ssn", "social security number", "ss number", "federal benefits",
             // Russian
@@ -233,7 +273,11 @@ class TextPreprocessor {
             // Hebrew
             "תעודת זהות", "מספר תעודת זהות", "פרטים אישיים", "מספר ביטוח לאומי", "ת.ז",
             // Arabic
-            "رقم الهوية", "بطاقة هوية", "الهوية الوطنية", "رقم الضمان الاجتماعي"))
+            "رقم الهوية", "بطاقة هوية", "الهوية الوطنية", "رقم الضمان الاجتماعي",
+            // Spanish
+            "seguridad social", "número de seguridad social", "dni", "documentos de identidad",
+            // French
+            "sécurité sociale", "numéro de sécurité sociale", "carte d'identité", "pièce d'identité"))
         features.add(flag(
             "press one", "press 1", "recorded message", "automated", "warranty", "extended warranty",
             // Russian
@@ -242,7 +286,11 @@ class TextPreprocessor {
             // Hebrew
             "לחץ אחת", "לחץ 1", "הודעה מוקלטת", "הודעה אוטומטית", "אחריות מורחבת",
             // Arabic
-            "اضغط واحد", "اضغط 1", "رسالة مسجلة", "آلية", "ضمان ممتد"))
+            "اضغط واحد", "اضغط 1", "رسالة مسجلة", "آلية", "ضمان ممتد",
+            // Spanish
+            "presione 1", "mensaje grabado", "no cuelgue", "llame de vuelta",
+            // French
+            "appuyez sur 1", "message enregistré", "ne raccrochez pas", "rappeler"))
         features.add(flag(
             "password", "credentials", "login", "username", "click", "link", "update your",
             // Russian
@@ -251,7 +299,11 @@ class TextPreprocessor {
             "סיסמה", "פרטי כניסה", "לחץ כאן", "קישור", "עדכן פרטים", "היכנס",
             "פרטי משתמש", "כניסה לחשבון",
             // Arabic
-            "كلمة المرور", "بيانات الدخول", "انقر هنا", "رابط", "تسجيل الدخول"))
+            "كلمة المرور", "بيانات الدخول", "انقر هنا", "رابط", "تسجيل الدخول",
+            // Spanish
+            "contraseña", "haga clic", "enlace", "actualice su información",
+            // French
+            "mot de passe", "cliquez", "lien", "mettez à jour vos informations"))
 
         // Features 20-26: More category signals
         features.add(flag(
@@ -262,7 +314,11 @@ class TextPreprocessor {
             // Hebrew
             "ביטוח", "ביטוח בריאות", "פוליסה", "כיסוי ביטוחי", "ביטוח לאומי", "מגן",
             // Arabic
-            "تأمين", "تأمين صحي", "وثيقة تأمين", "تغطية تأمينية"))
+            "تأمين", "تأمين صحي", "وثيقة تأمين", "تغطية تأمينية",
+            // Spanish
+            "seguro de salud", "cobertura médica", "póliza de seguro", "seguro médico",
+            // French
+            "assurance maladie", "assurance santé", "couverture médicale", "mutuelle"))
         features.add(flag(
             "investment", "trading", "profit", "returns",
             "broker", "portfolio", "invest", "stock", "crypto",
@@ -273,7 +329,11 @@ class TextPreprocessor {
             "השקעה", "מסחר", "רווח", "תשואה", "ברוקר", "קריפטו", "ביטקוין",
             "להשקיע", "הכפלת כסף", "פורקס", "מניות",
             // Arabic
-            "استثمار", "تداول", "ربح", "عائد", "وسيط", "عملة مشفرة", "بيتكوين"))
+            "استثمار", "تداول", "ربح", "عائد", "وسيط", "عملة مشفرة", "بيتكوين",
+            // Spanish
+            "inversión", "ganancias", "rentabilidad", "criptomoneda", "bitcoin", "ingresos pasivos",
+            // French
+            "investissement", "rendement", "bénéfices", "cryptomonnaie", "bitcoin", "revenus passifs"))
         features.add(flag(
             "gift card", "bitcoin", "western union", "wire",
             "cryptocurrency", "prepaid card",
@@ -284,7 +344,11 @@ class TextPreprocessor {
             "גיפט קארד", "ביטקוין", "קריפטו", "כרטיס מתנה", "ביט", "פייבוקס",
             "העברה מיידית",
             // Arabic
-            "بطاقة هدية", "بيتكوين", "تحويل مالي", "ويسترن يونيون"))
+            "بطاقة هدية", "بيتكوين", "تحويل مالي", "ويسترن يونيون",
+            // Spanish
+            "tarjeta de regalo", "bitcoin", "western union", "transferencia",
+            // French
+            "carte cadeau", "bitcoin", "western union", "virement"))
         features.add(flag(
             "free", "no cost", "no charge", "at no cost", "qualify", "eligible", "complimentary",
             // Russian
@@ -292,7 +356,11 @@ class TextPreprocessor {
             // Hebrew
             "חינם", "ללא עלות", "זכאי", "מגיע לך", "בחינם", "ללא תשלום",
             // Arabic
-            "مجاناً", "مجاني", "مؤهل", "تستحق", "بدون رسوم"))
+            "مجاناً", "مجاني", "مؤهل", "تستحق", "بدون رسوم",
+            // Spanish
+            "gratis", "gratuito", "califica", "elegible", "sin costo",
+            // French
+            "gratuit", "sans frais", "éligible", "qualifie"))
         features.add(flag(
             "call back", "call now", "call immediately", "call us", "contact us", "call this number",
             // Russian
@@ -301,7 +369,11 @@ class TextPreprocessor {
             // Hebrew
             "התקשר עכשיו", "חזור אלינו", "התקשרו אלינו", "צור קשר", "התקשר למספר",
             // Arabic
-            "اتصل الآن", "اتصل بنا", "تواصل معنا", "اتصل بهذا الرقم"))
+            "اتصل الآن", "اتصل بنا", "تواصل معنا", "اتصل بهذا الرقم",
+            // Spanish
+            "llámenos", "llame ahora", "contáctenos", "llame a este número",
+            // French
+            "appelez-nous", "appelez maintenant", "contactez-nous", "rappeler ce numéro"))
         features.add(flag(
             "final notice", "last chance", "act now",
             "time is running out", "do not delay", "do not ignore",
@@ -313,7 +385,11 @@ class TextPreprocessor {
             "הודעה אחרונה", "הזדמנות אחרונה", "פג תוקף", "תוך 24 שעות",
             "תוך 48 שעות", "עד מחר", "ייחסם", "יינתק", "יבוטל", "יימחק",
             // Arabic
-            "إشعار نهائي", "فرصة أخيرة", "ينتهي", "خلال 24 ساعة", "آخر تحذير"))
+            "إشعار نهائي", "فرصة أخيرة", "ينتهي", "خلال 24 ساعة", "آخر تحذير",
+            // Spanish
+            "aviso final", "última oportunidad", "actúe ahora", "tiempo agotado", "último aviso",
+            // French
+            "avis final", "dernière chance", "agissez maintenant", "délai expiré", "dernier avertissement"))
         features.add(flag(
             "charity", "donate", "donation", "help victims",
             "disaster relief", "relief fund", "humanitarian",
@@ -324,7 +400,11 @@ class TextPreprocessor {
             // Hebrew
             "צדקה", "תרומה", "לתרום", "קרן סיוע", "עמותה", "ארגון ללא מטרות רווח",
             // Arabic
-            "خيرية", "تبرع", "صندوق مساعدة", "إغاثة", "منظمة غير ربحية"))
+            "خيرية", "تبرع", "صندوق مساعدة", "إغاثة", "منظمة غير ربحية",
+            // Spanish
+            "donación", "caridad", "víctimas", "ayuda humanitaria", "sin fines de lucro",
+            // French
+            "don", "charité", "victimes", "aide humanitaire", "organisation à but non lucratif"))
 
         // Features 27-31: Conversational behaviour
         features.add(repetitionScore(t))                           // 27: repeated phrases
@@ -383,7 +463,11 @@ class TextPreprocessor {
             // Hebrew
             "מה", "מי", "מתי", "איפה", "למה", "איך", "האם", "כמה", "היכן",
             // Arabic
-            "ما", "من", "متى", "أين", "لماذا", "كيف", "هل", "كم"
+            "ما", "من", "متى", "أين", "لماذا", "كيف", "هل", "كم",
+            // Spanish
+            "quién", "qué", "cuándo", "dónde", "por qué", "cómo", "puede", "podría",
+            // French
+            "qui", "quoi", "quand", "où", "pourquoi", "comment", "peut", "pourrait"
         )
         return (words.count { it in qWords }.toFloat() / words.size).coerceIn(0f, 1f)
     }
@@ -405,7 +489,11 @@ class TextPreprocessor {
             // Hebrew
             "דחוף", "עכשיו", "מיד", "תוך שעה", "הזדמנות אחרונה", "ייחסם", "יינתק",
             // Arabic
-            "عاجل", "الآن", "فوراً", "فرصة أخيرة"
+            "عاجل", "الآن", "فوراً", "فرصة أخيرة",
+            // Spanish
+            "urgente", "inmediatamente", "ahora mismo", "última oportunidad", "actúe ahora",
+            // French
+            "immédiatement", "maintenant", "dernière chance", "agissez maintenant"
         )
         val firstCount = urgencyTerms.count { words.take(mid).joinToString(" ").contains(it) }
         val secondCount = urgencyTerms.count { words.drop(mid).joinToString(" ").contains(it) }

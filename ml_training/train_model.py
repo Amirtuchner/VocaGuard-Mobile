@@ -49,6 +49,10 @@ def _question_density(text):
         "מה", "מי", "מתי", "איפה", "למה", "איך", "האם", "כמה", "היכן",
         # Arabic
         "ما", "من", "متى", "أين", "لماذا", "كيف", "هل", "كم",
+        # Spanish
+        "quién", "qué", "cuándo", "dónde", "por qué", "cómo", "puede", "podría",
+        # French
+        "qui", "quoi", "quand", "où", "pourquoi", "comment", "peut", "pourrait",
     }
     return min(sum(1 for w in words if w in q_words) / len(words), 1.0)
 
@@ -72,6 +76,10 @@ def _urgency_escalates(text):
         "דחוף", "עכשיו", "מיד", "תוך שעה", "הזדמנות אחרונה", "ייחסם", "יינתק",
         # Arabic
         "عاجل", "الآن", "فوراً", "فرصة أخيرة",
+        # Spanish
+        "urgente", "inmediatamente", "ahora mismo", "última oportunidad", "actúe ahora",
+        # French
+        "immédiatement", "maintenant", "dernière chance", "agissez maintenant",
     ]
     first = " ".join(words[:mid])
     second = " ".join(words[mid:])
@@ -124,29 +132,39 @@ def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
         'urgent', 'immediately', 'right now', 'at once',
         'срочно', 'немедленно', 'сейчас же', 'прямо сейчас', 'незамедлительно',
         'עכשיו', 'מיד', 'דחוף', 'בדחיפות', 'תוך שעה', 'ללא דיחוי', 'מהר',
-        'الآن', 'عاجل', 'فوراً', 'على الفور', 'بسرعة'))
+        'الآن', 'عاجل', 'فوراً', 'على الفور', 'بسرعة',
+        'urgente', 'inmediatamente', 'ahora mismo', 'de inmediato',
+        'immédiatement', 'maintenant', 'de suite', 'sans délai'))
     features.append(flag(                                                                            # 8: account blocked
         'suspended', 'locked', 'frozen', 'blocked',
         'заблокирован', 'заморожен', 'приостановлен', 'закрыт',
         'חסום', 'נחסם', 'הוקפא', 'מוקפא', 'מושעה', 'נחסמה', 'הוקפאה', 'נחסמת',
-        'محظور', 'مجمد', 'معلق', 'موقوف', 'مغلق'))
+        'محظور', 'مجمد', 'معلق', 'موقوف', 'مغلق',
+        'suspendido', 'bloqueado', 'congelado', 'cancelado',
+        'suspendu', 'bloqué', 'gelé', 'résilié'))
     features.append(flag(                                                                            # 9: verification
         'verify', 'confirm', 'validate',
         'подтвердите', 'верифицируйте', 'проверьте', 'подтверждение',
         'אמת', 'אימות', 'לאמת', 'לאשר', 'לוודא', 'אישור', 'קוד אימות', 'קוד otp',
-        'تحقق', 'أكد', 'تأكيد', 'التحقق', 'رمز التحقق', 'رمز otp'))
+        'تحقق', 'أكد', 'تأكيد', 'التحقق', 'رمز التحقق', 'رمز otp',
+        'verificar', 'confirmar', 'validar', 'verificación',
+        'vérifier', 'confirmer', 'valider', 'vérification'))
     features.append(flag(                                                                            # 10: money
         'money', 'payment', 'funds', 'cash', 'pay',
         'деньги', 'оплата', 'средства', 'перевод', 'платёж', 'платеж',
         'כסף', 'תשלום', 'העברה', 'לשלם', 'ביט', 'פייבוקס', 'מזומן', 'העברת כסף',
-        'المال', 'دفع', 'تحويل', 'مبلغ', 'أموال'))
+        'المال', 'دفع', 'تحويل', 'مبلغ', 'أموال',
+        'dinero', 'pago', 'transferencia', 'efectivo', 'pagar',
+        'argent', 'paiement', 'virement', 'espèces', 'payer'))
 
     # Features 11-19: Category-specific keywords
     features.append(flag(                                                                            # 11: IRS/tax
         'irs', 'internal revenue', 'tax department', 'tax debt', 'back taxes', 'unpaid tax',
         'налоговая', 'налоги', 'налоговый долг', 'задолженность', 'налоговая служба', 'фнс',
         'מס הכנסה', 'רשות המסים', 'חוב מס', 'חוב לרשות', 'עיקול מס',
-        'الضريبة', 'مصلحة الضرائب', 'ديون ضريبية', 'الإيرادات الداخلية'))
+        'الضريبة', 'مصلحة الضرائب', 'ديون ضريبية', 'الإيرادات الداخلية',
+        'servicio de impuestos', 'hacienda', 'deuda fiscal', 'impuestos',
+        "impôts", 'service des impôts', 'dette fiscale', 'fisc'))
     features.append(flag(                                                                            # 12: legal threat
         'arrest', 'warrant', 'jail', 'prison', 'prosecution',
         'charges', 'law enforcement', 'officer',
@@ -154,7 +172,9 @@ def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
         'следствие', 'обвинение', 'прокуратура',
         'מעצר', 'צו מעצר', 'תיק פלילי', 'כליאה', 'עצור', 'תביעה פלילית',
         'הוצאה לפועל', 'עיקול', 'צו', 'חקירה',
-        'اعتقال', 'مذكرة اعتقال', 'قضية جنائية', 'الحجز', 'سجن', 'ملاحقة قضائية'))
+        'اعتقال', 'مذكرة اعتقال', 'قضية جنائية', 'الحجز', 'سجن', 'ملاحقة قضائية',
+        'arresto', 'orden de arresto', 'cárcel', 'prisión', 'demanda', 'policía',
+        'arrestation', "mandat d'arrêt", 'prison', 'poursuites', 'police'))
     features.append(flag(                                                                            # 13: tech threat
         'virus', 'malware', 'infected', 'spyware', 'ransomware',
         'remote access', 'anydesk', 'teamviewer',
@@ -162,13 +182,17 @@ def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
         'удалённый доступ', 'шпионское по',
         'וירוס', 'תוכנה זדונית', 'פרוץ', 'נגוע', 'גישה מרחוק',
         'teamviewer', 'anydesk', 'להוריד תוכנה', 'תיקון מחשב',
-        'فيروس', 'برامج خبيثة', 'مخترق', 'وصول عن بعد'))
+        'فيروس', 'برامج خبيثة', 'مخترق', 'وصول عن بعد',
+        'virus informático', 'software malicioso', 'infectado', 'acceso remoto',
+        'virus informatique', 'logiciel malveillant', 'infecté', 'accès à distance'))
     features.append(flag(                                                                            # 14: tech brand
         'microsoft', 'windows', 'apple', 'computer', 'device',
         'tech support', 'technical support',
         'майкрософт', 'виндовс', 'эппл', 'компьютер', 'техподдержка', 'техническая поддержка',
         'מיקרוסופט', 'חלונות', 'תמיכה טכנית', 'שירות לקוחות טכני', 'נציג תמיכה',
-        'مايكروسوفت', 'ويندوز', 'آبل', 'دعم فني', 'خدمة العملاء التقنية'))
+        'مايكروسوفت', 'ويندوز', 'آبل', 'دعم فني', 'خدمة العملاء التقنية',
+        'soporte técnico', 'asistencia técnica',
+        'support technique', 'assistance technique'))
     features.append(flag(                                                                            # 15: banking
         'bank', 'credit card', 'debit card', 'account number',
         'routing number', 'wire transfer', 'pin',
@@ -176,36 +200,48 @@ def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
         'реквизиты', 'пин-код', 'перевод средств',
         'בנק', 'כרטיס אשראי', 'מספר חשבון', 'פרטי בנק', 'פין', 'העברה בנקאית',
         'חשבון בנק', 'כרטיס חיוב',
-        'بنك', 'بطاقة ائتمان', 'رقم الحساب', 'تحويل بنكي', 'بطاقة الخصم'))
+        'بنك', 'بطاقة ائتمان', 'رقم الحساب', 'تحويل بنكي', 'بطاقة الخصم',
+        'banco', 'tarjeta de crédito', 'número de cuenta', 'transferencia bancaria',
+        'banque', 'carte de crédit', 'numéro de compte', 'virement bancaire', 'code pin'))
     features.append(flag(                                                                            # 16: lottery
         'won', 'winner', 'prize', 'lottery', 'sweepstakes', 'congratulations', 'reward',
         'выиграли', 'победитель', 'приз', 'лотерея', 'поздравляем', 'выигрыш', 'джекпот',
         'זכית', 'הגרלה', 'פרס', 'מזל טוב', 'זוכה', 'זכייה', 'הגרלת',
-        'فزت', 'جائزة', 'يانصيب', 'مبروك', 'فائز', 'قرعة'))
+        'فزت', 'جائزة', 'يانصيب', 'مبروك', 'فائز', 'قرعة',
+        'ganaste', 'lotería', 'premio', 'felicitaciones', 'ganador',
+        'gagné', 'loterie', 'prix', 'félicitations', 'gagnant'))
     features.append(flag(                                                                            # 17: SSN/identity
         'social security', 'ssn', 'social security number', 'ss number', 'federal benefits',
         'снилс', 'пенсионный фонд', 'страховой номер', 'инн', 'паспортные данные',
         'תעודת זהות', 'מספר תעודת זהות', 'פרטים אישיים', 'מספר ביטוח לאומי', 'ת.ז',
-        'رقم الهوية', 'بطاقة هوية', 'الهوية الوطنية', 'رقم الضمان الاجتماعي'))
+        'رقم الهوية', 'بطاقة هوية', 'الهوية الوطنية', 'رقم الضمان الاجتماعي',
+        'seguridad social', 'número de seguridad social', 'dni', 'documentos de identidad',
+        'sécurité sociale', 'numéro de sécurité sociale', "carte d'identité", "pièce d'identité"))
     features.append(flag(                                                                            # 18: robocall
         'press one', 'press 1', 'recorded message', 'automated', 'warranty', 'extended warranty',
         'нажмите один', 'нажмите 1', 'записанное сообщение',
         'автоматическое уведомление', 'гарантия на автомобиль',
         'לחץ אחת', 'לחץ 1', 'הודעה מוקלטת', 'הודעה אוטומטית', 'אחריות מורחבת',
-        'اضغط واحد', 'اضغط 1', 'رسالة مسجلة', 'آلية', 'ضمان ممتد'))
+        'اضغط واحد', 'اضغط 1', 'رسالة مسجلة', 'آلية', 'ضمان ممتد',
+        'presione 1', 'mensaje grabado', 'no cuelgue', 'llame de vuelta',
+        'appuyez sur 1', 'message enregistré', 'ne raccrochez pas', 'rappeler'))
     features.append(flag(                                                                            # 19: phishing
         'password', 'credentials', 'login', 'username', 'click', 'link', 'update your',
         'пароль', 'логин', 'учётные данные', 'ссылка', 'обновите данные', 'войдите в систему',
         'סיסמה', 'פרטי כניסה', 'לחץ כאן', 'קישור', 'עדכן פרטים', 'היכנס',
         'פרטי משתמש', 'כניסה לחשבון',
-        'كلمة المرور', 'بيانات الدخول', 'انقر هنا', 'رابط', 'تسجيل الدخول'))
+        'كلمة المرور', 'بيانات الدخول', 'انقر هنا', 'رابط', 'تسجيل الدخول',
+        'contraseña', 'haga clic', 'enlace', 'actualice su información',
+        'mot de passe', 'cliquez', 'lien', 'mettez à jour vos informations'))
 
     # Features 20-26: More category signals
     features.append(flag(                                                                            # 20: insurance
         'insurance', 'medicare', 'medicaid', 'health plan', 'health insurance', 'coverage', 'enrollment',
         'страховка', 'медицинская страховка', 'полис', 'страхование', 'омс', 'дмс',
         'ביטוח', 'ביטוח בריאות', 'פוליסה', 'כיסוי ביטוחי', 'ביטוח לאומי', 'מגן',
-        'تأمين', 'تأمين صحي', 'وثيقة تأمين', 'تغطية تأمينية'))
+        'تأمين', 'تأمين صحي', 'وثيقة تأمين', 'تغطية تأمينية',
+        'seguro de salud', 'cobertura médica', 'póliza de seguro', 'seguro médico',
+        'assurance maladie', 'assurance santé', 'couverture médicale', 'mutuelle'))
     features.append(flag(                                                                            # 21: investment
         'investment', 'trading', 'profit', 'returns',
         'broker', 'portfolio', 'invest', 'stock', 'crypto',
@@ -213,23 +249,31 @@ def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
         'криптовалюта', 'акции', 'вложить', 'заработок', 'пассивный доход',
         'השקעה', 'מסחר', 'רווח', 'תשואה', 'ברוקר', 'קריפטו', 'ביטקוין',
         'להשקיע', 'הכפלת כסף', 'פורקס', 'מניות',
-        'استثمار', 'تداول', 'ربح', 'عائد', 'وسيط', 'عملة مشفرة', 'بيتكوين'))
+        'استثمار', 'تداول', 'ربح', 'عائد', 'وسيط', 'عملة مشفرة', 'بيتكوين',
+        'inversión', 'ganancias', 'rentabilidad', 'criptomoneda', 'bitcoin', 'ingresos pasivos',
+        'investissement', 'rendement', 'bénéfices', 'cryptomonnaie', 'bitcoin', 'revenus passifs'))
     features.append(flag(                                                                            # 22: payment method
         'gift card', 'bitcoin', 'western union', 'wire', 'cryptocurrency', 'prepaid card',
         'биткоин', 'криптовалюта', 'вестерн юнион', 'электронный кошелёк',
         'предоплата', 'подарочная карта',
         'גיפט קארד', 'ביטקוין', 'קריפטו', 'כרטיס מתנה', 'ביט', 'פייבוקס', 'העברה מיידית',
-        'بطاقة هدية', 'بيتكوين', 'تحويل مالي', 'ويسترن يونيون'))
+        'بطاقة هدية', 'بيتكوين', 'تحويل مالي', 'ويسترن يونيون',
+        'tarjeta de regalo', 'bitcoin', 'western union', 'transferencia',
+        'carte cadeau', 'bitcoin', 'western union', 'virement'))
     features.append(flag(                                                                            # 23: free offer
         'free', 'no cost', 'no charge', 'at no cost', 'qualify', 'eligible', 'complimentary',
         'бесплатно', 'без оплаты', 'имеете право', 'подходите', 'бесплатная консультация',
         'חינם', 'ללא עלות', 'זכאי', 'מגיע לך', 'בחינם', 'ללא תשלום',
-        'مجاناً', 'مجاني', 'مؤهل', 'تستحق', 'بدون رسوم'))
+        'مجاناً', 'مجاني', 'مؤهل', 'تستحق', 'بدون رسوم',
+        'gratis', 'gratuito', 'califica', 'elegible', 'sin costo',
+        'gratuit', 'sans frais', 'éligible', 'qualifie'))
     features.append(flag(                                                                            # 24: callback pressure
         'call back', 'call now', 'call immediately', 'call us', 'contact us', 'call this number',
         'перезвоните', 'позвоните сейчас', 'срочно позвоните', 'свяжитесь с нами', 'звоните немедленно',
         'התקשר עכשיו', 'חזור אלינו', 'התקשרו אלינו', 'צור קשר', 'התקשר למספר',
-        'اتصل الآن', 'اتصل بنا', 'تواصل معنا', 'اتصل بهذا الرقم'))
+        'اتصل الآن', 'اتصل بنا', 'تواصل معنا', 'اتصل بهذا الرقم',
+        'llámenos', 'llame ahora', 'contáctenos', 'llame a este número',
+        'appelez-nous', 'appelez maintenant', 'contactez-nous', 'rappeler ce numéro'))
     features.append(flag(                                                                            # 25: deadline pressure
         'final notice', 'last chance', 'act now',
         'time is running out', 'do not delay', 'do not ignore', 'last warning', 'failure to',
@@ -237,14 +281,18 @@ def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
         'время истекает', 'не игнорируйте', 'финальное предупреждение',
         'הודעה אחרונה', 'הזדמנות אחרונה', 'פג תוקף', 'תוך 24 שעות',
         'תוך 48 שעות', 'עד מחר', 'ייחסם', 'יינתק', 'יבוטל', 'יימחק',
-        'إشعار نهائي', 'فرصة أخيرة', 'ينتهي', 'خلال 24 ساعة', 'آخر تحذير'))
+        'إشعار نهائي', 'فرصة أخيرة', 'ينتهي', 'خلال 24 ساعة', 'آخر تحذير',
+        'aviso final', 'última oportunidad', 'actúe ahora', 'tiempo agotado', 'último aviso',
+        'avis final', 'dernière chance', 'agissez maintenant', 'délai expiré', 'dernier avertissement'))
     features.append(flag(                                                                            # 26: donation fraud
         'charity', 'donate', 'donation', 'help victims',
         'disaster relief', 'relief fund', 'humanitarian', 'tax deductible', 'nonprofit', 'fundraising',
         'благотворительность', 'пожертвование', 'помогите жертвам',
         'гуманитарная помощь', 'фонд помощи', 'сбор средств',
         'צדקה', 'תרומה', 'לתרום', 'קרן סיוע', 'עמותה', 'ארגון ללא מטרות רווח',
-        'خيرية', 'تبرع', 'صندوق مساعدة', 'إغاثة', 'منظمة غير ربحية'))
+        'خيرية', 'تبرع', 'صندوق مساعدة', 'إغاثة', 'منظمة غير ربحية',
+        'donación', 'caridad', 'víctimas', 'ayuda humanitaria', 'sin fines de lucro',
+        'don', 'charité', 'victimes', 'aide humanitaire', 'organisation à but non lucratif'))
 
     # Features 27-31: Conversational behaviour (derived from transcript)
     features.append(_repetition_score(text_lower))                                        # 27: repeated phrases

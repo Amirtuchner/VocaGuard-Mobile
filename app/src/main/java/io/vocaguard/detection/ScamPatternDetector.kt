@@ -20,7 +20,11 @@ class ScamPatternDetector() {
                 // Hebrew
                 "מס הכנסה", "רשות המסים", "חוב מס", "עיקול מס",
                 // Arabic
-                "مصلحة الضرائب", "ديون ضريبية", "الضريبة"
+                "مصلحة الضرائب", "ديون ضريبية", "الضريبة",
+                // Spanish
+                "servicio de impuestos", "hacienda", "deuda fiscal", "impuestos", "agencia tributaria",
+                // French
+                "impôts", "service des impôts", "dette fiscale", "fisc", "direction générale des finances"
             ),
             ScamType.TECH_SUPPORT to listOf(
                 // English
@@ -32,7 +36,11 @@ class ScamPatternDetector() {
                 // Hebrew
                 "וירוס", "תמיכה טכנית", "גישה מרחוק", "תוכנה זדונית", "נגוע",
                 // Arabic
-                "فيروس", "دعم فني", "وصول عن بعد", "برامج خبيثة"
+                "فيروس", "دعم فني", "وصول عن بعد", "برامج خبيثة",
+                // Spanish
+                "soporte técnico", "acceso remoto", "virus informático", "infectado", "software malicioso",
+                // French
+                "support technique", "accès à distance", "virus informatique", "infecté", "logiciel malveillant"
             ),
             ScamType.BANK_FRAUD to listOf(
                 // English
@@ -44,7 +52,11 @@ class ScamPatternDetector() {
                 // Hebrew
                 "חשבון בנק", "כרטיס אשראי", "חשבון חסום", "פעילות חשודה", "הונאה",
                 // Arabic
-                "حساب بنكي", "بطاقة ائتمان", "نشاط مشبوه", "احتيال"
+                "حساب بنكي", "بطاقة ائتمان", "نشاط مشبوه", "احتيال",
+                // Spanish
+                "cuenta bancaria", "tarjeta de crédito", "actividad sospechosa", "fraude bancario", "cuenta bloqueada",
+                // French
+                "compte bancaire", "carte de crédit", "activité suspecte", "fraude bancaire", "compte bloqué"
             ),
             ScamType.LOTTERY_PRIZE to listOf(
                 // English
@@ -55,7 +67,11 @@ class ScamPatternDetector() {
                 // Hebrew
                 "זכית", "הגרלה", "פרס", "מזל טוב", "זוכה",
                 // Arabic
-                "فزت", "يانصيب", "جائزة", "مبروك", "فائز"
+                "فزت", "يانصيب", "جائزة", "مبروك", "فائز",
+                // Spanish
+                "ganaste", "lotería", "premio", "felicitaciones", "ganador", "reclamar su premio",
+                // French
+                "gagné", "loterie", "prix", "félicitations", "gagnant", "réclamez votre prix"
             ),
             ScamType.SOCIAL_SECURITY to listOf(
                 // English
@@ -66,7 +82,11 @@ class ScamPatternDetector() {
                 // Hebrew
                 "תעודת זהות", "מספר ביטוח לאומי", "פרטים אישיים", "ת.ז",
                 // Arabic
-                "رقم الهوية", "الهوية الوطنية", "رقم الضمان الاجتماعي"
+                "رقم الهوية", "الهوية الوطنية", "رقم الضمان الاجتماعي",
+                // Spanish
+                "seguridad social", "número de seguridad social", "actividad ilegal", "dni", "documentos de identidad",
+                // French
+                "sécurité sociale", "numéro de sécurité sociale", "activité illégale", "carte d'identité", "pièce d'identité"
             ),
             ScamType.ROBOCALL to listOf(
                 // English
@@ -77,7 +97,11 @@ class ScamPatternDetector() {
                 // Hebrew
                 "לחץ 1", "הודעה מוקלטת", "הודעה אוטומטית",
                 // Arabic
-                "اضغط 1", "رسالة مسجلة", "لا تغلق"
+                "اضغط 1", "رسالة مسجلة", "لا تغلق",
+                // Spanish
+                "presione 1", "mensaje grabado", "no cuelgue", "llame de vuelta", "aviso final",
+                // French
+                "appuyez sur 1", "message enregistré", "ne raccrochez pas", "rappeler", "avis final"
             ),
             ScamType.PHISHING to listOf(
                 // English
@@ -88,7 +112,11 @@ class ScamPatternDetector() {
                 // Hebrew
                 "אמת", "לחץ כאן", "קישור", "עדכן פרטים", "אישור",
                 // Arabic
-                "تحقق", "انقر هنا", "رابط", "تأكيد"
+                "تحقق", "انقر هنا", "رابط", "تأكيد",
+                // Spanish
+                "verifique", "confirme", "haga clic", "enlace", "actualice su información", "contraseña",
+                // French
+                "vérifiez", "confirmez", "cliquez", "lien", "mettez à jour vos informations", "mot de passe"
             ),
             ScamType.INSURANCE to listOf(
                 // English
@@ -99,7 +127,11 @@ class ScamPatternDetector() {
                 // Hebrew
                 "ביטוח בריאות", "פוליסה", "כיסוי ביטוחי",
                 // Arabic
-                "تأمين صحي", "وثيقة تأمين", "تغطية تأمينية"
+                "تأمين صحي", "وثيقة تأمين", "تغطية تأمينية",
+                // Spanish
+                "seguro de salud", "cobertura médica", "póliza de seguro", "seguro médico",
+                // French
+                "assurance maladie", "assurance santé", "couverture médicale", "mutuelle"
             ),
             ScamType.INVESTMENT_SCAM to listOf(
                 // English
@@ -112,7 +144,11 @@ class ScamPatternDetector() {
                 // Hebrew
                 "השקעה", "תשואה מובטחת", "קריפטו", "הכפלת כסף", "פורקס",
                 // Arabic
-                "استثمار", "عائد مضمون", "عملة مشفرة", "بيتكوين", "تداول"
+                "استثمار", "عائد مضمون", "عملة مشفرة", "بيتكوين", "تداول",
+                // Spanish
+                "inversión garantizada", "ganancias altas", "criptomoneda", "bitcoin", "trading", "ingresos pasivos",
+                // French
+                "investissement garanti", "rendements élevés", "cryptomonnaie", "bitcoin", "trading", "revenus passifs"
             ),
             ScamType.DONATION_FRAUD to listOf(
                 // English
@@ -124,7 +160,11 @@ class ScamPatternDetector() {
                 // Hebrew
                 "צדקה", "תרומה", "לתרום", "עמותה", "קרן סיוע",
                 // Arabic
-                "خيرية", "تبرع", "إغاثة", "منظمة غير ربحية"
+                "خيرية", "تبرع", "إغاثة", "منظمة غير ربحية",
+                // Spanish
+                "donación", "caridad", "víctimas", "ayuda humanitaria", "sin fines de lucro", "recaudación de fondos",
+                // French
+                "don", "charité", "victimes", "aide humanitaire", "organisation à but non lucratif", "collecte de fonds"
             )
         )
 
@@ -139,7 +179,11 @@ class ScamPatternDetector() {
             // Hebrew
             "דחוף", "עכשיו", "מיד", "הזדמנות אחרונה", "תוך 24 שעות",
             // Arabic
-            "عاجل", "الآن", "فوراً", "فرصة أخيرة", "خلال 24 ساعة"
+            "عاجل", "الآن", "فوراً", "فرصة أخيرة", "خلال 24 ساعة",
+            // Spanish
+            "urgente", "inmediatamente", "ahora mismo", "última oportunidad", "solo hoy", "tiempo limitado",
+            // French
+            "immédiatement", "maintenant", "dernière chance", "aujourd'hui seulement", "temps limité"
         )
 
         // Threat/pressure keywords
@@ -152,7 +196,11 @@ class ScamPatternDetector() {
             // Hebrew
             "מעצר", "משטרה", "תיק פלילי", "חסום", "מוקפא", "עיקול",
             // Arabic
-            "اعتقال", "شرطة", "قضية جنائية", "محظور", "مجمد"
+            "اعتقال", "شرطة", "قضية جنائية", "محظور", "مجمد",
+            // Spanish
+            "arresto", "policía", "demanda", "acción legal", "suspendido", "congelado", "orden de arresto",
+            // French
+            "arrestation", "police", "poursuites judiciaires", "suspendu", "gelé", "mandat d'arrêt"
         )
 
         // Payment request keywords
@@ -166,7 +214,11 @@ class ScamPatternDetector() {
             // Hebrew
             "גיפט קארד", "ביטקוין", "העברה בנקאית", "ביט", "פייבוקס",
             // Arabic
-            "بطاقة هدية", "بيتكوين", "تحويل مالي", "ويسترن يونيون"
+            "بطاقة هدية", "بيتكوين", "تحويل مالي", "ويسترن يونيون",
+            // Spanish
+            "tarjeta de regalo", "bitcoin", "transferencia bancaria", "western union", "pague ahora",
+            // French
+            "carte cadeau", "bitcoin", "virement bancaire", "western union", "payez maintenant"
         )
 
         // Personal info request keywords
@@ -180,7 +232,11 @@ class ScamPatternDetector() {
             // Hebrew
             "סיסמה", "פין", "מספר חשבון", "תעודת זהות",
             // Arabic
-            "كلمة المرور", "رقم الحساب", "بطاقة هوية"
+            "كلمة المرور", "رقم الحساب", "بطاقة هوية",
+            // Spanish
+            "número de seguridad social", "contraseña", "número de cuenta", "fecha de nacimiento", "pin",
+            // French
+            "numéro de sécurité sociale", "mot de passe", "numéro de compte", "date de naissance", "code pin"
         )
     }
 
