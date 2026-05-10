@@ -17,7 +17,7 @@ import io.vocaguard.ui.ScamOverlayManager
  * Monitors WhatsApp and Telegram notifications for scam message patterns.
  *
  * When a notification from a watched app arrives, the message text is extracted
- * and analysed by [ScamPatternDetector]. On a positive detection the notification
+ * and analysed by [HybridScamDetector]. On a positive detection the notification
  * is cancelled (so the user is not prompted to open or reply to it), the existing
  * alert pipeline is fired (sound / vibration / TTS / family alert), and an overlay
  * warning is shown if SYSTEM_ALERT_WINDOW is granted.
@@ -53,6 +53,39 @@ class MessagingScamDetectorService : NotificationListenerService() {
             ) ?: return false
             val cn = ComponentName(context, MessagingScamDetectorService::class.java)
             return flat.contains(cn.flattenToString())
+        }
+
+        /**
+         * Extracts the most informative text string from a notification, trying
+         * several extras in priority order. Exposed as internal so it can be
+         * unit-tested without a live service instance.
+         */
+        internal fun extractText(notification: Notification): String? {
+            val extras: Bundle = notification.extras
+
+            // MessagingStyle — used by WhatsApp and Telegram for individual/group chats.
+            // Each message is a Bundle with a "text" key.
+            val messages = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                extras.getParcelableArray(Notification.EXTRA_MESSAGES, Bundle::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+            }
+            if (messages != null) {
+                val joined = messages.mapNotNull { msg ->
+                    (msg as? Bundle)?.getCharSequence("text")?.toString()
+                }.joinToString(" ")
+                if (joined.isNotBlank()) return joined
+            }
+
+            // BigTextStyle fallback (long single message).
+            val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+            if (!bigText.isNullOrBlank()) return bigText.toString()
+
+            // Standard title + body (most common for simple notifications).
+            val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+            val body  = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
+            return "$title $body".trim().takeIf { it.isNotBlank() }
         }
     }
 
@@ -104,37 +137,5 @@ class MessagingScamDetectorService : NotificationListenerService() {
 
         // Overlay warning on top of whatever app is in the foreground.
         overlayManager.show(result.scamType, result.confidence)
-    }
-
-    /**
-     * Extracts the most informative text string from a notification, trying
-     * several extras in priority order.
-     */
-    private fun extractText(notification: Notification): String? {
-        val extras: Bundle = notification.extras
-
-        // MessagingStyle — used by WhatsApp and Telegram for individual/group chats.
-        // Each message is a Bundle with a "text" key.
-        val messages = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            extras.getParcelableArray(Notification.EXTRA_MESSAGES, Bundle::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            extras.getParcelableArray(Notification.EXTRA_MESSAGES)
-        }
-        if (messages != null) {
-            val joined = messages.mapNotNull { msg ->
-                (msg as? Bundle)?.getCharSequence("text")?.toString()
-            }.joinToString(" ")
-            if (joined.isNotBlank()) return joined
-        }
-
-        // BigTextStyle fallback (long single message).
-        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
-        if (!bigText.isNullOrBlank()) return bigText.toString()
-
-        // Standard title + body (most common for simple notifications).
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
-        val body  = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
-        return "$title $body".trim().takeIf { it.isNotBlank() }
     }
 }
