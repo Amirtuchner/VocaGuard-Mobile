@@ -42,8 +42,14 @@ def _question_density(text):
     words = [w for w in text.split() if w]
     if not words:
         return 0.0
-    q_words = {"who", "what", "when", "where", "why", "how",
-               "can", "could", "would", "do", "are", "is"}
+    q_words = {
+        # English
+        "who", "what", "when", "where", "why", "how", "can", "could", "would", "do", "are", "is",
+        # Hebrew
+        "מה", "מי", "מתי", "איפה", "למה", "איך", "האם", "כמה", "היכן",
+        # Arabic
+        "ما", "من", "متى", "أين", "لماذا", "كيف", "هل", "كم",
+    }
     return min(sum(1 for w in words if w in q_words) / len(words), 1.0)
 
 
@@ -57,8 +63,16 @@ def _urgency_escalates(text):
     """1.0 if urgency terms are denser in the second half — classic scam escalation."""
     words = text.split()
     mid = len(words) // 2
-    urgency_terms = ["urgent", "immediately", "right now", "act now",
-                     "final", "last chance", "failure to"]
+    urgency_terms = [
+        # English
+        "urgent", "immediately", "right now", "act now", "final", "last chance", "failure to",
+        # Russian
+        "срочно", "немедленно", "последний шанс", "действуйте сейчас",
+        # Hebrew
+        "דחוף", "עכשיו", "מיד", "תוך שעה", "הזדמנות אחרונה", "ייחסם", "יינתק",
+        # Arabic
+        "عاجل", "الآن", "فوراً", "فرصة أخيرة",
+    ]
     first = " ".join(words[:mid])
     second = " ".join(words[mid:])
     first_count = sum(1 for t in urgency_terms if t in first)
@@ -106,85 +120,131 @@ def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
     features.append(sum(c.isupper() for c in text) / text_len)                            # 6: uppercase ratio
 
     # Features 7-10: Generic scam signals
-    features.append(flag('urgent', 'immediately', 'right now', 'at once',
-                         'срочно', 'немедленно', 'сейчас же', 'прямо сейчас', 'незамедлительно'))   # 7: urgency
-    features.append(flag('suspended', 'locked', 'frozen', 'blocked',
-                         'заблокирован', 'заморожен', 'приостановлен', 'закрыт'))                   # 8: account blocked
-    features.append(flag('verify', 'confirm', 'validate',
-                         'подтвердите', 'верифицируйте', 'проверьте', 'подтверждение'))              # 9: verification
-    features.append(flag('money', 'payment', 'funds', 'cash', 'pay',
-                         'деньги', 'оплата', 'средства', 'перевод', 'платёж', 'платеж'))            # 10: money
+    features.append(flag(                                                                            # 7: urgency
+        'urgent', 'immediately', 'right now', 'at once',
+        'срочно', 'немедленно', 'сейчас же', 'прямо сейчас', 'незамедлительно',
+        'עכשיו', 'מיד', 'דחוף', 'בדחיפות', 'תוך שעה', 'ללא דיחוי', 'מהר',
+        'الآن', 'عاجل', 'فوراً', 'على الفور', 'بسرعة'))
+    features.append(flag(                                                                            # 8: account blocked
+        'suspended', 'locked', 'frozen', 'blocked',
+        'заблокирован', 'заморожен', 'приостановлен', 'закрыт',
+        'חסום', 'נחסם', 'הוקפא', 'מוקפא', 'מושעה', 'נחסמה', 'הוקפאה', 'נחסמת',
+        'محظور', 'مجمد', 'معلق', 'موقوف', 'مغلق'))
+    features.append(flag(                                                                            # 9: verification
+        'verify', 'confirm', 'validate',
+        'подтвердите', 'верифицируйте', 'проверьте', 'подтверждение',
+        'אמת', 'אימות', 'לאמת', 'לאשר', 'לוודא', 'אישור', 'קוד אימות', 'קוד otp',
+        'تحقق', 'أكد', 'تأكيد', 'التحقق', 'رمز التحقق', 'رمز otp'))
+    features.append(flag(                                                                            # 10: money
+        'money', 'payment', 'funds', 'cash', 'pay',
+        'деньги', 'оплата', 'средства', 'перевод', 'платёж', 'платеж',
+        'כסף', 'תשלום', 'העברה', 'לשלם', 'ביט', 'פייבוקס', 'מזומן', 'העברת כסף',
+        'المال', 'دفع', 'تحويل', 'مبلغ', 'أموال'))
 
     # Features 11-19: Category-specific keywords
-    features.append(flag('irs', 'internal revenue', 'tax department', 'tax debt',
-                         'back taxes', 'unpaid tax',
-                         'налоговая', 'налоги', 'налоговый долг', 'задолженность',
-                         'налоговая служба', 'фнс'))                                                 # 11: IRS/tax
-    features.append(flag('arrest', 'warrant', 'jail', 'prison', 'prosecution',
-                         'charges', 'law enforcement', 'officer',
-                         'арест', 'ордер на арест', 'тюрьма', 'уголовное дело',
-                         'полиция', 'следствие', 'обвинение', 'прокуратура'))                       # 12: legal threat
-    features.append(flag('virus', 'malware', 'infected', 'spyware', 'ransomware',
-                         'remote access', 'anydesk', 'teamviewer',
-                         'вирус', 'вредоносное', 'заражён', 'взломан', 'хакер',
-                         'удалённый доступ', 'шпионское по'))                                       # 13: tech threat
-    features.append(flag('microsoft', 'windows', 'apple', 'computer', 'device',
-                         'tech support', 'technical support',
-                         'майкрософт', 'виндовс', 'эппл', 'компьютер',
-                         'техподдержка', 'техническая поддержка'))                                  # 14: tech brand
-    features.append(flag('bank', 'credit card', 'debit card', 'account number',
-                         'routing number', 'wire transfer', 'pin',
-                         'банк', 'кредитная карта', 'дебетовая карта', 'номер счёта',
-                         'реквизиты', 'пин-код', 'перевод средств'))                                # 15: banking
-    features.append(flag('won', 'winner', 'prize', 'lottery', 'sweepstakes',
-                         'congratulations', 'reward',
-                         'выиграли', 'победитель', 'приз', 'лотерея',
-                         'поздравляем', 'выигрыш', 'джекпот'))                                      # 16: lottery
-    features.append(flag('social security', 'ssn', 'social security number',
-                         'ss number', 'federal benefits',
-                         'снилс', 'пенсионный фонд', 'страховой номер',
-                         'инн', 'паспортные данные'))                                               # 17: SSN/identity
-    features.append(flag('press one', 'press 1', 'recorded message',
-                         'automated', 'warranty', 'extended warranty',
-                         'нажмите один', 'нажмите 1', 'записанное сообщение',
-                         'автоматическое уведомление', 'гарантия на автомобиль'))                   # 18: robocall
-    features.append(flag('password', 'credentials', 'login', 'username',
-                         'click', 'link', 'update your',
-                         'пароль', 'логин', 'учётные данные', 'ссылка',
-                         'обновите данные', 'войдите в систему'))                                   # 19: phishing
+    features.append(flag(                                                                            # 11: IRS/tax
+        'irs', 'internal revenue', 'tax department', 'tax debt', 'back taxes', 'unpaid tax',
+        'налоговая', 'налоги', 'налоговый долг', 'задолженность', 'налоговая служба', 'фнс',
+        'מס הכנסה', 'רשות המסים', 'חוב מס', 'חוב לרשות', 'עיקול מס',
+        'الضريبة', 'مصلحة الضرائب', 'ديون ضريبية', 'الإيرادات الداخلية'))
+    features.append(flag(                                                                            # 12: legal threat
+        'arrest', 'warrant', 'jail', 'prison', 'prosecution',
+        'charges', 'law enforcement', 'officer',
+        'арест', 'ордер на арест', 'тюрьма', 'уголовное дело', 'полиция',
+        'следствие', 'обвинение', 'прокуратура',
+        'מעצר', 'צו מעצר', 'תיק פלילי', 'כליאה', 'עצור', 'תביעה פלילית',
+        'הוצאה לפועל', 'עיקול', 'צו', 'חקירה',
+        'اعتقال', 'مذكرة اعتقال', 'قضية جنائية', 'الحجز', 'سجن', 'ملاحقة قضائية'))
+    features.append(flag(                                                                            # 13: tech threat
+        'virus', 'malware', 'infected', 'spyware', 'ransomware',
+        'remote access', 'anydesk', 'teamviewer',
+        'вирус', 'вредоносное', 'заражён', 'взломан', 'хакер',
+        'удалённый доступ', 'шпионское по',
+        'וירוס', 'תוכנה זדונית', 'פרוץ', 'נגוע', 'גישה מרחוק',
+        'teamviewer', 'anydesk', 'להוריד תוכנה', 'תיקון מחשב',
+        'فيروس', 'برامج خبيثة', 'مخترق', 'وصول عن بعد'))
+    features.append(flag(                                                                            # 14: tech brand
+        'microsoft', 'windows', 'apple', 'computer', 'device',
+        'tech support', 'technical support',
+        'майкрософт', 'виндовс', 'эппл', 'компьютер', 'техподдержка', 'техническая поддержка',
+        'מיקרוסופט', 'חלונות', 'תמיכה טכנית', 'שירות לקוחות טכני', 'נציג תמיכה',
+        'مايكروسوفت', 'ويندوز', 'آبل', 'دعم فني', 'خدمة العملاء التقنية'))
+    features.append(flag(                                                                            # 15: banking
+        'bank', 'credit card', 'debit card', 'account number',
+        'routing number', 'wire transfer', 'pin',
+        'банк', 'кредитная карта', 'дебетовая карта', 'номер счёта',
+        'реквизиты', 'пин-код', 'перевод средств',
+        'בנק', 'כרטיס אשראי', 'מספר חשבון', 'פרטי בנק', 'פין', 'העברה בנקאית',
+        'חשבון בנק', 'כרטיס חיוב',
+        'بنك', 'بطاقة ائتمان', 'رقم الحساب', 'تحويل بنكي', 'بطاقة الخصم'))
+    features.append(flag(                                                                            # 16: lottery
+        'won', 'winner', 'prize', 'lottery', 'sweepstakes', 'congratulations', 'reward',
+        'выиграли', 'победитель', 'приз', 'лотерея', 'поздравляем', 'выигрыш', 'джекпот',
+        'זכית', 'הגרלה', 'פרס', 'מזל טוב', 'זוכה', 'זכייה', 'הגרלת',
+        'فزت', 'جائزة', 'يانصيب', 'مبروك', 'فائز', 'قرعة'))
+    features.append(flag(                                                                            # 17: SSN/identity
+        'social security', 'ssn', 'social security number', 'ss number', 'federal benefits',
+        'снилс', 'пенсионный фонд', 'страховой номер', 'инн', 'паспортные данные',
+        'תעודת זהות', 'מספר תעודת זהות', 'פרטים אישיים', 'מספר ביטוח לאומי', 'ת.ז',
+        'رقم الهوية', 'بطاقة هوية', 'الهوية الوطنية', 'رقم الضمان الاجتماعي'))
+    features.append(flag(                                                                            # 18: robocall
+        'press one', 'press 1', 'recorded message', 'automated', 'warranty', 'extended warranty',
+        'нажмите один', 'нажмите 1', 'записанное сообщение',
+        'автоматическое уведомление', 'гарантия на автомобиль',
+        'לחץ אחת', 'לחץ 1', 'הודעה מוקלטת', 'הודעה אוטומטית', 'אחריות מורחבת',
+        'اضغط واحد', 'اضغط 1', 'رسالة مسجلة', 'آلية', 'ضمان ممتد'))
+    features.append(flag(                                                                            # 19: phishing
+        'password', 'credentials', 'login', 'username', 'click', 'link', 'update your',
+        'пароль', 'логин', 'учётные данные', 'ссылка', 'обновите данные', 'войдите в систему',
+        'סיסמה', 'פרטי כניסה', 'לחץ כאן', 'קישור', 'עדכן פרטים', 'היכנס',
+        'פרטי משתמש', 'כניסה לחשבון',
+        'كلمة المرور', 'بيانات الدخول', 'انقر هنا', 'رابط', 'تسجيل الدخول'))
 
     # Features 20-26: More category signals
-    features.append(flag('insurance', 'medicare', 'medicaid', 'health plan',
-                         'health insurance', 'coverage', 'enrollment',
-                         'страховка', 'медицинская страховка', 'полис',
-                         'страхование', 'омс', 'дмс'))                                              # 20: insurance
-    features.append(flag('investment', 'trading', 'profit', 'returns',
-                         'broker', 'portfolio', 'invest', 'stock', 'crypto',
-                         'инвестиции', 'трейдинг', 'прибыль', 'доходность', 'брокер',
-                         'криптовалюта', 'акции', 'вложить', 'заработок',
-                         'пассивный доход'))                                                        # 21: investment
-    features.append(flag('gift card', 'bitcoin', 'western union', 'wire',
-                         'cryptocurrency', 'prepaid card',
-                         'биткоин', 'криптовалюта', 'вестерн юнион',
-                         'электронный кошелёк', 'предоплата', 'подарочная карта'))                  # 22: payment method
-    features.append(flag('free', 'no cost', 'no charge', 'at no cost',
-                         'qualify', 'eligible', 'complimentary',
-                         'бесплатно', 'без оплаты', 'имеете право',
-                         'подходите', 'бесплатная консультация'))                                   # 23: free offer
-    features.append(flag('call back', 'call now', 'call immediately',
-                         'call us', 'contact us', 'call this number',
-                         'перезвоните', 'позвоните сейчас', 'срочно позвоните',
-                         'свяжитесь с нами', 'звоните немедленно'))                                 # 24: callback pressure
-    features.append(flag('final notice', 'last chance', 'act now',
-                         'time is running out', 'do not delay', 'do not ignore',
-                         'last warning', 'failure to',
-                         'последнее уведомление', 'последний шанс', 'действуйте сейчас',
-                         'время истекает', 'не игнорируйте', 'финальное предупреждение'))           # 25: deadline pressure
-    features.append(flag('charity', 'donate', 'donation', 'help victims',
-                         'disaster relief', 'relief fund', 'humanitarian',
-                         'tax deductible', 'nonprofit', 'fundraising',
-                         'благотворительность', 'пожертвование', 'помогите жертвам',
-                         'гуманитарная помощь', 'фонд помощи', 'сбор средств'))                    # 26: donation fraud
+    features.append(flag(                                                                            # 20: insurance
+        'insurance', 'medicare', 'medicaid', 'health plan', 'health insurance', 'coverage', 'enrollment',
+        'страховка', 'медицинская страховка', 'полис', 'страхование', 'омс', 'дмс',
+        'ביטוח', 'ביטוח בריאות', 'פוליסה', 'כיסוי ביטוחי', 'ביטוח לאומי', 'מגן',
+        'تأمين', 'تأمين صحي', 'وثيقة تأمين', 'تغطية تأمينية'))
+    features.append(flag(                                                                            # 21: investment
+        'investment', 'trading', 'profit', 'returns',
+        'broker', 'portfolio', 'invest', 'stock', 'crypto',
+        'инвестиции', 'трейдинг', 'прибыль', 'доходность', 'брокер',
+        'криптовалюта', 'акции', 'вложить', 'заработок', 'пассивный доход',
+        'השקעה', 'מסחר', 'רווח', 'תשואה', 'ברוקר', 'קריפטו', 'ביטקוין',
+        'להשקיע', 'הכפלת כסף', 'פורקס', 'מניות',
+        'استثمار', 'تداول', 'ربح', 'عائد', 'وسيط', 'عملة مشفرة', 'بيتكوين'))
+    features.append(flag(                                                                            # 22: payment method
+        'gift card', 'bitcoin', 'western union', 'wire', 'cryptocurrency', 'prepaid card',
+        'биткоин', 'криптовалюта', 'вестерн юнион', 'электронный кошелёк',
+        'предоплата', 'подарочная карта',
+        'גיפט קארד', 'ביטקוין', 'קריפטו', 'כרטיס מתנה', 'ביט', 'פייבוקס', 'העברה מיידית',
+        'بطاقة هدية', 'بيتكوين', 'تحويل مالي', 'ويسترن يونيون'))
+    features.append(flag(                                                                            # 23: free offer
+        'free', 'no cost', 'no charge', 'at no cost', 'qualify', 'eligible', 'complimentary',
+        'бесплатно', 'без оплаты', 'имеете право', 'подходите', 'бесплатная консультация',
+        'חינם', 'ללא עלות', 'זכאי', 'מגיע לך', 'בחינם', 'ללא תשלום',
+        'مجاناً', 'مجاني', 'مؤهل', 'تستحق', 'بدون رسوم'))
+    features.append(flag(                                                                            # 24: callback pressure
+        'call back', 'call now', 'call immediately', 'call us', 'contact us', 'call this number',
+        'перезвоните', 'позвоните сейчас', 'срочно позвоните', 'свяжитесь с нами', 'звоните немедленно',
+        'התקשר עכשיו', 'חזור אלינו', 'התקשרו אלינו', 'צור קשר', 'התקשר למספר',
+        'اتصل الآن', 'اتصل بنا', 'تواصل معنا', 'اتصل بهذا الرقم'))
+    features.append(flag(                                                                            # 25: deadline pressure
+        'final notice', 'last chance', 'act now',
+        'time is running out', 'do not delay', 'do not ignore', 'last warning', 'failure to',
+        'последнее уведомление', 'последний шанс', 'действуйте сейчас',
+        'время истекает', 'не игнорируйте', 'финальное предупреждение',
+        'הודעה אחרונה', 'הזדמנות אחרונה', 'פג תוקף', 'תוך 24 שעות',
+        'תוך 48 שעות', 'עד מחר', 'ייחסם', 'יינתק', 'יבוטל', 'יימחק',
+        'إشعار نهائي', 'فرصة أخيرة', 'ينتهي', 'خلال 24 ساعة', 'آخر تحذير'))
+    features.append(flag(                                                                            # 26: donation fraud
+        'charity', 'donate', 'donation', 'help victims',
+        'disaster relief', 'relief fund', 'humanitarian', 'tax deductible', 'nonprofit', 'fundraising',
+        'благотворительность', 'пожертвование', 'помогите жертвам',
+        'гуманитарная помощь', 'фонд помощи', 'сбор средств',
+        'צדקה', 'תרומה', 'לתרום', 'קרן סיוע', 'עמותה', 'ארגון ללא מטרות רווח',
+        'خيرية', 'تبرع', 'صندوق مساعدة', 'إغاثة', 'منظمة غير ربحية'))
 
     # Features 27-31: Conversational behaviour (derived from transcript)
     features.append(_repetition_score(text_lower))                                        # 27: repeated phrases

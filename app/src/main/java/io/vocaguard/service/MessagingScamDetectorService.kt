@@ -10,7 +10,7 @@ import android.service.notification.StatusBarNotification
 import android.util.Log
 import io.vocaguard.alert.ScamAlertManager
 import io.vocaguard.data.DetectionSettings
-import io.vocaguard.detection.ScamPatternDetector
+import io.vocaguard.detection.HybridScamDetector
 import io.vocaguard.ui.ScamOverlayManager
 
 /**
@@ -56,17 +56,19 @@ class MessagingScamDetectorService : NotificationListenerService() {
         }
     }
 
-    private val detector = ScamPatternDetector()
+    private lateinit var detector: HybridScamDetector
     private lateinit var alertManager: ScamAlertManager
     private lateinit var overlayManager: ScamOverlayManager
 
     override fun onCreate() {
         super.onCreate()
+        detector = HybridScamDetector(this)
         alertManager = ScamAlertManager(this)
         overlayManager = ScamOverlayManager(this)
     }
 
     override fun onDestroy() {
+        detector.release()
         alertManager.shutdown()
         super.onDestroy()
     }

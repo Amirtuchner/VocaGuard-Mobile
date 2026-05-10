@@ -134,77 +134,197 @@ class TextPreprocessor {
         features.add(text.count { it.isUpperCase() }.toFloat() / len)
 
         // Features 7-10: Generic scam signals
-        features.add(flag("urgent", "immediately", "right now", "at once",
-            "срочно", "немедленно", "сейчас же", "прямо сейчас", "незамедлительно"))
-        features.add(flag("suspended", "locked", "frozen", "blocked",
-            "заблокирован", "заморожен", "приостановлен", "закрыт"))
-        features.add(flag("verify", "confirm", "validate",
-            "подтвердите", "верифицируйте", "проверьте", "подтверждение"))
-        features.add(flag("money", "payment", "funds", "cash", "pay",
-            "деньги", "оплата", "средства", "перевод", "платёж", "платеж"))
+        features.add(flag(
+            "urgent", "immediately", "right now", "at once",
+            // Russian
+            "срочно", "немедленно", "сейчас же", "прямо сейчас", "незамедлительно",
+            // Hebrew
+            "עכשיו", "מיד", "דחוף", "בדחיפות", "תוך שעה", "ללא דיחוי", "מהר",
+            // Arabic
+            "الآن", "عاجل", "فوراً", "على الفور", "بسرعة"))
+        features.add(flag(
+            "suspended", "locked", "frozen", "blocked",
+            // Russian
+            "заблокирован", "заморожен", "приостановлен", "закрыт",
+            // Hebrew
+            "חסום", "נחסם", "הוקפא", "מוקפא", "מושעה", "נחסמה", "הוקפאה", "נחסמת",
+            // Arabic
+            "محظور", "مجمد", "معلق", "موقوف", "مغلق"))
+        features.add(flag(
+            "verify", "confirm", "validate",
+            // Russian
+            "подтвердите", "верифицируйте", "проверьте", "подтверждение",
+            // Hebrew
+            "אמת", "אימות", "לאמת", "לאשר", "לוודא", "אישור", "קוד אימות", "קוד otp",
+            // Arabic
+            "تحقق", "أكد", "تأكيد", "التحقق", "رمز التحقق", "رمز otp"))
+        features.add(flag(
+            "money", "payment", "funds", "cash", "pay",
+            // Russian
+            "деньги", "оплата", "средства", "перевод", "платёж", "платеж",
+            // Hebrew
+            "כסף", "תשלום", "העברה", "לשלם", "ביט", "פייבוקס", "מזומן", "העברת כסף",
+            // Arabic
+            "المال", "دفع", "تحويل", "مبلغ", "أموال"))
 
         // Features 11-19: Category-specific keywords
-        features.add(flag("irs", "internal revenue", "tax department", "tax debt",
-            "back taxes", "unpaid tax",
-            "налоговая", "налоги", "налоговый долг", "задолженность", "налоговая служба", "фнс"))
-        features.add(flag("arrest", "warrant", "jail", "prison", "prosecution",
+        features.add(flag(
+            "irs", "internal revenue", "tax department", "tax debt", "back taxes", "unpaid tax",
+            // Russian
+            "налоговая", "налоги", "налоговый долг", "задолженность", "налоговая служба", "фнс",
+            // Hebrew
+            "מס הכנסה", "רשות המסים", "חוב מס", "חוב לרשות", "עיקול מס",
+            // Arabic
+            "الضريبة", "مصلحة الضرائب", "ديون ضريبية", "الإيرادات الداخلية"))
+        features.add(flag(
+            "arrest", "warrant", "jail", "prison", "prosecution",
             "charges", "law enforcement", "officer",
+            // Russian
             "арест", "ордер на арест", "тюрьма", "уголовное дело", "полиция",
-            "следствие", "обвинение", "прокуратура"))
-        features.add(flag("virus", "malware", "infected", "spyware", "ransomware",
+            "следствие", "обвинение", "прокуратура",
+            // Hebrew
+            "מעצר", "צו מעצר", "תיק פלילי", "כליאה", "עצור", "תביעה פלילית",
+            "הוצאה לפועל", "עיקול", "צו", "חקירה",
+            // Arabic
+            "اعتقال", "مذكرة اعتقال", "قضية جنائية", "الحجز", "سجن", "ملاحقة قضائية"))
+        features.add(flag(
+            "virus", "malware", "infected", "spyware", "ransomware",
             "remote access", "anydesk", "teamviewer",
+            // Russian
             "вирус", "вредоносное", "заражён", "взломан", "хакер",
-            "удалённый доступ", "шпионское по"))
-        features.add(flag("microsoft", "windows", "apple", "computer", "device",
+            "удалённый доступ", "шпионское по",
+            // Hebrew
+            "וירוס", "תוכנה זדונית", "פרוץ", "נגוע", "גישה מרחוק",
+            "teamviewer", "anydesk", "להוריד תוכנה", "תיקון מחשב",
+            // Arabic
+            "فيروس", "برامج خبيثة", "مخترق", "وصول عن بعد"))
+        features.add(flag(
+            "microsoft", "windows", "apple", "computer", "device",
             "tech support", "technical support",
-            "майкрософт", "виндовс", "эппл", "компьютер", "техподдержка", "техническая поддержка"))
-        features.add(flag("bank", "credit card", "debit card", "account number",
+            // Russian
+            "майкрософт", "виндовс", "эппл", "компьютер", "техподдержка", "техническая поддержка",
+            // Hebrew
+            "מיקרוסופט", "חלונות", "תמיכה טכנית", "שירות לקוחות טכני", "נציג תמיכה",
+            // Arabic
+            "مايكروسوفت", "ويندوز", "آبل", "دعم فني", "خدمة العملاء التقنية"))
+        features.add(flag(
+            "bank", "credit card", "debit card", "account number",
             "routing number", "wire transfer", "pin",
+            // Russian
             "банк", "кредитная карта", "дебетовая карта", "номер счёта",
-            "реквизиты", "пин-код", "перевод средств"))
-        features.add(flag("won", "winner", "prize", "lottery", "sweepstakes",
-            "congratulations", "reward",
-            "выиграли", "победитель", "приз", "лотерея", "поздравляем", "выигрыш", "джекпот"))
-        features.add(flag("social security", "ssn", "social security number",
-            "ss number", "federal benefits",
-            "снилс", "пенсионный фонд", "страховой номер", "инн", "паспортные данные"))
-        features.add(flag("press one", "press 1", "recorded message",
-            "automated", "warranty", "extended warranty",
+            "реквизиты", "пин-код", "перевод средств",
+            // Hebrew
+            "בנק", "כרטיס אשראי", "מספר חשבון", "פרטי בנק", "פין", "העברה בנקאית",
+            "חשבון בנק", "כרטיס חיוב",
+            // Arabic
+            "بنك", "بطاقة ائتمان", "رقم الحساب", "تحويل بنكي", "بطاقة الخصم"))
+        features.add(flag(
+            "won", "winner", "prize", "lottery", "sweepstakes", "congratulations", "reward",
+            // Russian
+            "выиграли", "победитель", "приз", "лотерея", "поздравляем", "выигрыш", "джекпот",
+            // Hebrew
+            "זכית", "הגרלה", "פרס", "מזל טוב", "זוכה", "זכייה", "הגרלת",
+            // Arabic
+            "فزت", "جائزة", "يانصيب", "مبروك", "فائز", "قرعة"))
+        features.add(flag(
+            "social security", "ssn", "social security number", "ss number", "federal benefits",
+            // Russian
+            "снилс", "пенсионный фонд", "страховой номер", "инн", "паспортные данные",
+            // Hebrew
+            "תעודת זהות", "מספר תעודת זהות", "פרטים אישיים", "מספר ביטוח לאומי", "ת.ז",
+            // Arabic
+            "رقم الهوية", "بطاقة هوية", "الهوية الوطنية", "رقم الضمان الاجتماعي"))
+        features.add(flag(
+            "press one", "press 1", "recorded message", "automated", "warranty", "extended warranty",
+            // Russian
             "нажмите один", "нажмите 1", "записанное сообщение",
-            "автоматическое уведомление", "гарантия на автомобиль"))
-        features.add(flag("password", "credentials", "login", "username",
-            "click", "link", "update your",
-            "пароль", "логин", "учётные данные", "ссылка", "обновите данные", "войдите в систему"))
+            "автоматическое уведомление", "гарантия на автомобиль",
+            // Hebrew
+            "לחץ אחת", "לחץ 1", "הודעה מוקלטת", "הודעה אוטומטית", "אחריות מורחבת",
+            // Arabic
+            "اضغط واحد", "اضغط 1", "رسالة مسجلة", "آلية", "ضمان ممتد"))
+        features.add(flag(
+            "password", "credentials", "login", "username", "click", "link", "update your",
+            // Russian
+            "пароль", "логин", "учётные данные", "ссылка", "обновите данные", "войдите в систему",
+            // Hebrew
+            "סיסמה", "פרטי כניסה", "לחץ כאן", "קישור", "עדכן פרטים", "היכנס",
+            "פרטי משתמש", "כניסה לחשבון",
+            // Arabic
+            "كلمة المرور", "بيانات الدخول", "انقر هنا", "رابط", "تسجيل الدخول"))
 
         // Features 20-26: More category signals
-        features.add(flag("insurance", "medicare", "medicaid", "health plan",
+        features.add(flag(
+            "insurance", "medicare", "medicaid", "health plan",
             "health insurance", "coverage", "enrollment",
-            "страховка", "медицинская страховка", "полис", "страхование", "омс", "дмс"))
-        features.add(flag("investment", "trading", "profit", "returns",
+            // Russian
+            "страховка", "медицинская страховка", "полис", "страхование", "омс", "дмс",
+            // Hebrew
+            "ביטוח", "ביטוח בריאות", "פוליסה", "כיסוי ביטוחי", "ביטוח לאומי", "מגן",
+            // Arabic
+            "تأمين", "تأمين صحي", "وثيقة تأمين", "تغطية تأمينية"))
+        features.add(flag(
+            "investment", "trading", "profit", "returns",
             "broker", "portfolio", "invest", "stock", "crypto",
+            // Russian
             "инвестиции", "трейдинг", "прибыль", "доходность", "брокер",
-            "криптовалюта", "акции", "вложить", "заработок", "пассивный доход"))
-        features.add(flag("gift card", "bitcoin", "western union", "wire",
+            "криптовалюта", "акции", "вложить", "заработок", "пассивный доход",
+            // Hebrew
+            "השקעה", "מסחר", "רווח", "תשואה", "ברוקר", "קריפטו", "ביטקוין",
+            "להשקיע", "הכפלת כסף", "פורקס", "מניות",
+            // Arabic
+            "استثمار", "تداول", "ربح", "عائد", "وسيط", "عملة مشفرة", "بيتكوين"))
+        features.add(flag(
+            "gift card", "bitcoin", "western union", "wire",
             "cryptocurrency", "prepaid card",
+            // Russian
             "биткоин", "криптовалюта", "вестерн юнион", "электронный кошелёк",
-            "предоплата", "подарочная карта"))
-        features.add(flag("free", "no cost", "no charge", "at no cost",
-            "qualify", "eligible", "complimentary",
-            "бесплатно", "без оплаты", "имеете право", "подходите", "бесплатная консультация"))
-        features.add(flag("call back", "call now", "call immediately",
-            "call us", "contact us", "call this number",
+            "предоплата", "подарочная карта",
+            // Hebrew
+            "גיפט קארד", "ביטקוין", "קריפטו", "כרטיס מתנה", "ביט", "פייבוקס",
+            "העברה מיידית",
+            // Arabic
+            "بطاقة هدية", "بيتكوين", "تحويل مالي", "ويسترن يونيون"))
+        features.add(flag(
+            "free", "no cost", "no charge", "at no cost", "qualify", "eligible", "complimentary",
+            // Russian
+            "бесплатно", "без оплаты", "имеете право", "подходите", "бесплатная консультация",
+            // Hebrew
+            "חינם", "ללא עלות", "זכאי", "מגיע לך", "בחינם", "ללא תשלום",
+            // Arabic
+            "مجاناً", "مجاني", "مؤهل", "تستحق", "بدون رسوم"))
+        features.add(flag(
+            "call back", "call now", "call immediately", "call us", "contact us", "call this number",
+            // Russian
             "перезвоните", "позвоните сейчас", "срочно позвоните",
-            "свяжитесь с нами", "звоните немедленно"))
-        features.add(flag("final notice", "last chance", "act now",
+            "свяжитесь с нами", "звоните немедленно",
+            // Hebrew
+            "התקשר עכשיו", "חזור אלינו", "התקשרו אלינו", "צור קשר", "התקשר למספר",
+            // Arabic
+            "اتصل الآن", "اتصل بنا", "تواصل معنا", "اتصل بهذا الرقم"))
+        features.add(flag(
+            "final notice", "last chance", "act now",
             "time is running out", "do not delay", "do not ignore",
             "last warning", "failure to",
+            // Russian
             "последнее уведомление", "последний шанс", "действуйте сейчас",
-            "время истекает", "не игнорируйте", "финальное предупреждение"))
-        features.add(flag("charity", "donate", "donation", "help victims",
+            "время истекает", "не игнорируйте", "финальное предупреждение",
+            // Hebrew
+            "הודעה אחרונה", "הזדמנות אחרונה", "פג תוקף", "תוך 24 שעות",
+            "תוך 48 שעות", "עד מחר", "ייחסם", "יינתק", "יבוטל", "יימחק",
+            // Arabic
+            "إشعار نهائي", "فرصة أخيرة", "ينتهي", "خلال 24 ساعة", "آخر تحذير"))
+        features.add(flag(
+            "charity", "donate", "donation", "help victims",
             "disaster relief", "relief fund", "humanitarian",
             "tax deductible", "nonprofit", "fundraising",
+            // Russian
             "благотворительность", "пожертвование", "помогите жертвам",
-            "гуманитарная помощь", "фонд помощи", "сбор средств"))
+            "гуманитарная помощь", "фонд помощи", "сбор средств",
+            // Hebrew
+            "צדקה", "תרומה", "לתרום", "קרן סיוע", "עמותה", "ארגון ללא מטרות רווח",
+            // Arabic
+            "خيرية", "تبرع", "صندوق مساعدة", "إغاثة", "منظمة غير ربحية"))
 
         // Features 27-31: Conversational behaviour
         features.add(repetitionScore(t))                           // 27: repeated phrases
@@ -257,8 +377,14 @@ class TextPreprocessor {
     private fun questionDensity(text: String): Float {
         val words = text.split(" ").filter { it.isNotEmpty() }
         if (words.isEmpty()) return 0f
-        val qWords = setOf("who", "what", "when", "where", "why", "how",
-            "can", "could", "would", "do", "are", "is")
+        val qWords = setOf(
+            // English
+            "who", "what", "when", "where", "why", "how", "can", "could", "would", "do", "are", "is",
+            // Hebrew
+            "מה", "מי", "מתי", "איפה", "למה", "איך", "האם", "כמה", "היכן",
+            // Arabic
+            "ما", "من", "متى", "أين", "لماذا", "كيف", "هل", "كم"
+        )
         return (words.count { it in qWords }.toFloat() / words.size).coerceIn(0f, 1f)
     }
 
@@ -271,8 +397,16 @@ class TextPreprocessor {
     private fun urgencyEscalates(text: String): Boolean {
         val words = text.split(" ")
         val mid = words.size / 2
-        val urgencyTerms = listOf("urgent", "immediately", "right now", "act now",
-            "final", "last chance", "failure to")
+        val urgencyTerms = listOf(
+            // English
+            "urgent", "immediately", "right now", "act now", "final", "last chance", "failure to",
+            // Russian
+            "срочно", "немедленно", "последний шанс", "действуйте сейчас",
+            // Hebrew
+            "דחוף", "עכשיו", "מיד", "תוך שעה", "הזדמנות אחרונה", "ייחסם", "יינתק",
+            // Arabic
+            "عاجل", "الآن", "فوراً", "فرصة أخيرة"
+        )
         val firstCount = urgencyTerms.count { words.take(mid).joinToString(" ").contains(it) }
         val secondCount = urgencyTerms.count { words.drop(mid).joinToString(" ").contains(it) }
         return secondCount > firstCount
