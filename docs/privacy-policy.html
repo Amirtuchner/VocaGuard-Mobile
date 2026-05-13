@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VocaGuard Privacy Policy</title>
+  <style>
+    body { font-family: sans-serif; max-width: 760px; margin: 0 auto; padding: 24px 16px; line-height: 1.7; color: #212121; }
+    h1 { font-size: 1.5em; }
+    h2 { font-size: 1.1em; margin-top: 1.6em; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; }
+    p, ul { margin: 0.5em 0; }
+    ul { padding-left: 1.4em; }
+    a { color: #1565C0; }
+  </style>
+</head>
+<body>
+
+<h1>VocaGuard Privacy Policy</h1>
+<p><em>Last updated: 2026-05-13</em></p>
+
+<h2>1. What VocaGuard Does</h2>
+<p>VocaGuard is a scam-call detection app for Android. It screens incoming calls, and with
+your permission, transcribes audio during active calls to detect scam patterns using an
+on-device machine-learning model.</p>
+
+<h2>2. Data Collected and How It Is Used</h2>
+<ul>
+  <li><strong>Phone numbers</strong> — incoming caller numbers are checked against a local
+  scam database and, if you provide an API key, an optional online reputation service.
+  Numbers you report or whitelist are stored locally.</li>
+  <li><strong>Call audio</strong> — transcribed in real time on your device using Android's
+  SpeechRecognizer API. Audio is <em>never</em> stored or sent off-device by VocaGuard.</li>
+  <li><strong>Call transcripts</strong> — the text output of speech recognition is stored
+  locally in a Room database (up to 500 recent transcripts). You can delete individual
+  transcripts or all transcripts at any time from the History tab.</li>
+  <li><strong>Caregiver contacts</strong> — if you enable Family Guard Mode, you choose
+  contacts to receive scam alerts. These contacts are stored locally and are never sent
+  to VocaGuard servers.</li>
+  <li><strong>Settings</strong> — sensitivity level, language preference, whitelist, and
+  API key are stored in SharedPreferences on your device.</li>
+  <li><strong>Crash reports</strong> — if crash reporting is enabled in your build,
+  anonymised crash data is sent to Firebase Crashlytics (Google). No call content or
+  transcripts are included in crash reports.</li>
+</ul>
+
+<h2>3. Data Shared With Third Parties</h2>
+<ul>
+  <li><strong>NumVerify API</strong> (optional) — if you enter an API key in Settings,
+  incoming phone numbers are sent to numverify.com over HTTPS for reputation lookup.
+  You can remove the key at any time to disable this.</li>
+  <li><strong>Community blocklist sync</strong> (optional) — tapping "Sync Now" downloads
+  a JSON blocklist from the configured server URL. No personal data is uploaded during
+  this download.</li>
+  <li><strong>Community scam reporting</strong> (optional, opt-in) — if you choose to
+  report a number as a scam, that phone number is submitted to the VocaGuard community
+  server over HTTPS. No transcript content is included.</li>
+  <li><strong>Family Guard alerts</strong> (optional) — when a scam is detected and Family
+  Guard Mode is enabled, an SMS alert and/or an HTTPS webhook notification is sent to
+  your chosen caregiver contacts or webhook URL. The alert contains the detected scam
+  type, confidence level, and timestamp. No call audio or transcript is included.</li>
+  <li><strong>Firebase Crashlytics</strong> (optional) — anonymised crash diagnostics are
+  sent to Google if crash reporting is enabled. See
+  <a href="https://firebase.google.com/support/privacy">Firebase Privacy</a>.</li>
+</ul>
+<p>VocaGuard does not use advertising networks or sell data to any third party.</p>
+
+<h2>4. Permissions Used</h2>
+<ul>
+  <li><strong>READ_PHONE_STATE, READ_CALL_LOG, ANSWER_PHONE_CALLS</strong> — required to
+  identify the caller and screen calls before they are answered.</li>
+  <li><strong>RECORD_AUDIO</strong> — required for in-call speech recognition. All audio
+  processing happens on-device.</li>
+  <li><strong>POST_NOTIFICATIONS</strong> — required to display scam alert notifications.</li>
+  <li><strong>ACCESSIBILITY SERVICE</strong> — detects when a phone call window is active.
+  VocaGuard reads no content from other apps.</li>
+  <li><strong>SYSTEM_ALERT_WINDOW</strong> (optional) — displays an on-screen warning
+  overlay during a detected scam call. Requires manual grant in Android Settings.</li>
+  <li><strong>SEND_SMS</strong> (optional) — sends caregiver alert SMS messages when
+  Family Guard Mode is enabled and a scam call is detected.</li>
+  <li><strong>INTERNET</strong> — used only for the optional NumVerify lookup, community
+  blocklist download, community scam reporting, Family Guard webhooks, and OTA model
+  updates.</li>
+  <li><strong>RECEIVE_BOOT_COMPLETED</strong> — restarts background protection
+  automatically after device reboot.</li>
+</ul>
+
+<h2>5. Data Retention and Deletion</h2>
+<p>All data is stored exclusively on your device. You can:</p>
+<ul>
+  <li>Delete individual transcripts from the History tab.</li>
+  <li>Export and then delete all transcripts using the Export button.</li>
+  <li>Remove your API key and caregiver contacts from the Settings tab.</li>
+</ul>
+<p>Uninstalling VocaGuard removes all locally stored data.</p>
+
+<h2>6. Data Security</h2>
+<p>All network communication uses HTTPS. Cleartext (HTTP) traffic is blocked by the
+app's network security policy. The local Room database uses Android's built-in
+storage encryption where available.</p>
+
+<h2>7. Children's Privacy</h2>
+<p>VocaGuard is not directed at children under 13 and does not knowingly collect
+data from children.</p>
+
+<h2>8. Changes to This Policy</h2>
+<p>Updates will be reflected on this page and in the app's Settings screen with a
+revised "last updated" date. Continued use of the app after an update constitutes
+acceptance of the revised policy.</p>
+
+<h2>9. Contact</h2>
+<p>For questions about this policy, open an issue at the VocaGuard project repository
+on GitHub.</p>
+
+</body>
+</html>
