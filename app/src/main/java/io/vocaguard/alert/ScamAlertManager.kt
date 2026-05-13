@@ -155,6 +155,9 @@ class ScamAlertManager(private val context: Context) {
             ScamType.INSURANCE -> "Warning! Insurance scam detected. Verify legitimacy before providing information."
             ScamType.INVESTMENT_SCAM -> "Warning! Investment scam detected. Guaranteed returns are a common fraud tactic."
             ScamType.DONATION_FRAUD -> "Warning! Donation scam detected. Research charities before donating."
+            ScamType.ROMANCE_SCAM -> "Warning! Romance or grandparent scam detected. Do not send money to someone you met online."
+            ScamType.DELIVERY_SCAM -> "Warning! Delivery scam detected. Legitimate couriers do not demand payment by phone."
+            ScamType.JOB_SCAM -> "Warning! Job scam detected. Legitimate employers never ask for upfront fees."
             ScamType.UNKNOWN -> "Warning! Suspicious activity detected. Be cautious with this call."
         }
 
@@ -231,6 +234,9 @@ class ScamAlertManager(private val context: Context) {
             ScamType.INSURANCE -> "Insurance Scam"
             ScamType.INVESTMENT_SCAM -> "Investment Scam"
             ScamType.DONATION_FRAUD -> "Donation Fraud"
+            ScamType.ROMANCE_SCAM -> "Romance Scam"
+            ScamType.DELIVERY_SCAM -> "Delivery Scam"
+            ScamType.JOB_SCAM -> "Job Scam"
             ScamType.UNKNOWN -> "Suspicious Call"
         }
     }

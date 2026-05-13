@@ -974,6 +974,9 @@ private fun ScamType.displayName(): String = when (this) {
     ScamType.INSURANCE -> "Insurance Scam"
     ScamType.INVESTMENT_SCAM -> "Investment Scam"
     ScamType.DONATION_FRAUD -> "Donation Fraud"
+    ScamType.ROMANCE_SCAM -> "Romance / Pig-Butchering Scam"
+    ScamType.DELIVERY_SCAM -> "Delivery / Package Scam"
+    ScamType.JOB_SCAM -> "Job / Recruitment Scam"
 }
 
 // ---------------------------------------------------------------------------
