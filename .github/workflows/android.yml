@@ -30,7 +30,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run unit tests
-        run: ./gradlew test --stacktrace
+        run: ./gradlew test --stacktrace --no-build-cache
 
       - name: Run lint
         run: ./gradlew lint --stacktrace
