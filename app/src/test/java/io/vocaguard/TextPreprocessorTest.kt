@@ -25,9 +25,9 @@ class TextPreprocessorTest {
     }
 
     @Test
-    fun `features array has exactly 42 elements`() {
+    fun `features array has exactly 45 elements`() {
         val features = preprocessor.extractFeatures("Hello world")
-        assertEquals(42, features.size)
+        assertEquals(45, features.size)
     }
 
     @Test
