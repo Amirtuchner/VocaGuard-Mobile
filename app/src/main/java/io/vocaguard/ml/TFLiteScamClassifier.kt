@@ -16,7 +16,7 @@ class TFLiteScamClassifier(private val context: Context) {
     companion object {
         private const val TAG = "TFLiteScamClassifier"
         private const val MODEL_FILENAME = "scam_detector.tflite"
-        private const val NUM_SCAM_TYPES = 11 // 1 legitimate (index 0) + 10 scam types (indices 1-10)
+        private const val NUM_SCAM_TYPES = 14 // 1 legitimate (index 0) + 13 scam types (indices 1-13)
     }
 
     private var interpreter: Interpreter? = null
@@ -24,7 +24,7 @@ class TFLiteScamClassifier(private val context: Context) {
     private val settings = DetectionSettings.getInstance(context)
     private var isModelLoaded = false
 
-    // Scam type labels — must match model training order exactly (11 output classes)
+    // Scam type labels — must match model training order exactly (14 output classes)
     private val scamTypeLabels = arrayOf(
         ScamType.UNKNOWN,         // 0: Legitimate call
         ScamType.IRS_SCAM,        // 1
@@ -36,7 +36,10 @@ class TFLiteScamClassifier(private val context: Context) {
         ScamType.PHISHING,        // 7
         ScamType.INSURANCE,       // 8
         ScamType.INVESTMENT_SCAM, // 9
-        ScamType.DONATION_FRAUD   // 10
+        ScamType.DONATION_FRAUD,  // 10
+        ScamType.ROMANCE_SCAM,    // 11
+        ScamType.DELIVERY_SCAM,   // 12
+        ScamType.JOB_SCAM         // 13
     )
 
     init {

@@ -20,5 +20,8 @@ enum class ScamType {
     PHISHING,
     INSURANCE,
     INVESTMENT_SCAM,
-    DONATION_FRAUD
+    DONATION_FRAUD,
+    ROMANCE_SCAM,
+    DELIVERY_SCAM,
+    JOB_SCAM
 }

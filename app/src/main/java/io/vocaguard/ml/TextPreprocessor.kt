@@ -14,8 +14,8 @@ class TextPreprocessor {
          * [extractFeatures] changes. A mismatch means the Android features no longer
          * align with the TFLite model's input expectations and predictions will be wrong.
          */
-        const val FEATURE_VERSION = 3
-        const val EXPECTED_FEATURE_COUNT = 42
+        const val FEATURE_VERSION = 4
+        const val EXPECTED_FEATURE_COUNT = 45
 
         // Common stop words to remove
         private val STOP_WORDS = setOf(
@@ -433,6 +433,67 @@ class TextPreprocessor {
         features.add((context?.speechRateWpm?.div(300f))?.coerceIn(0f, 1f) ?: 0f)     // 40: speech rate normalised (300 wpm max)
         features.add(if (context?.dtmfDetected == true) 1f else 0f)                   // 41: DTMF / IVR tones detected
         features.add(if ((context?.noiseFloorDb ?: 0f) > 1f) 1f else 0f)             // 42: elevated background noise flag
+
+        // Features 43-45: New scam category signals
+        features.add(flag(                                                             // 43: romance / pig-butchering / grandparent scam
+            "relationship", "dating", "met online", "fell in love", "soulmate", "long distance",
+            "my darling", "investment platform", "together we can", "i trust you",
+            "grandma", "grandpa", "it's me", "i'm in trouble", "bail money", "stuck abroad",
+            "don't tell mom", "don't tell dad", "wire me", "send me the money",
+            // Hebrew
+            "מערכת יחסים", "היכרויות", "נפגשנו אונליין", "סבתא", "סבא", "אני בצרות",
+            "תעזור לי", "אל תגיד לאמא", "שלח לי כסף", "ביחד נשקיע",
+            // Arabic
+            "علاقة", "مواعدة", "قابلتك عبر الإنترنت", "جدة", "جد", "أنا في ورطة",
+            "ساعدني", "أرسل لي المال", "لا تخبر أمي",
+            // Spanish
+            "relación", "citas en línea", "me enamoré", "alma gemela", "larga distancia",
+            "abuela", "abuelo", "estoy en problemas", "ayúdame", "mándame dinero",
+            // French
+            "relation amoureuse", "rencontre en ligne", "je suis tombé amoureux",
+            "grand-mère", "grand-père", "je suis dans le pétrin", "envoie-moi de l'argent",
+            // Russian
+            "отношения", "онлайн знакомства", "влюбился", "бабушка", "дедушка",
+            "я в беде", "помоги мне", "пришли деньги", "не говори маме"))
+        features.add(flag(                                                             // 44: delivery / package scam
+            "package", "parcel", "fedex", "dhl", "ups", "usps", "customs fee",
+            "held at customs", "delivery", "tracking", "shipment", "clearance fee",
+            "post office", "unable to deliver", "reschedule delivery", "pay to release",
+            // Hebrew
+            "חבילה", "משלוח", "מכס", "פדקס", "אגרת מכס", "לא הצלחנו לספק",
+            "שחרור חבילה", "תשלום מכס", "דואר ישראל",
+            // Arabic
+            "طرد", "شحنة", "جمارك", "فيدكس", "رسوم جمركية", "لم نتمكن من التسليم",
+            "الإفراج عن الطرد", "مكتب البريد",
+            // Spanish
+            "paquete", "envío", "aduana", "fedex", "dhl", "tarifa aduanera",
+            "no pudimos entregar", "entrega fallida", "correos",
+            // French
+            "colis", "livraison", "douane", "fedex", "dhl", "frais de douane",
+            "impossible de livrer", "bureau de poste", "libérer votre colis",
+            // Russian
+            "посылка", "доставка", "таможня", "федекс", "таможенный сбор",
+            "не удалось доставить", "почта", "получить посылку"))
+        features.add(flag(                                                             // 45: job / recruitment scam
+            "job offer", "work from home", "hiring", "recruitment", "per week", "per month",
+            "no experience", "part time", "remote work", "training fee", "start immediately",
+            "easy money", "money mule", "reshipping", "package forwarding",
+            "we found your resume", "earn from home",
+            // Hebrew
+            "הצעת עבודה", "עבודה מהבית", "גיוס עובדים", "להרוויח מהבית",
+            "ללא ניסיון", "עבודה גמישה", "משכורת מושכת", "דמי הכשרה",
+            // Arabic
+            "عرض عمل", "عمل من المنزل", "توظيف", "بدون خبرة", "دوام جزئي",
+            "اكسب من المنزل", "رسوم التدريب",
+            // Spanish
+            "oferta de trabajo", "trabajo desde casa", "contratación", "sin experiencia",
+            "medio tiempo", "ganar desde casa", "tarifa de capacitación",
+            // French
+            "offre d'emploi", "travail à domicile", "recrutement", "sans expérience",
+            "mi-temps", "gagner de chez soi", "frais de formation",
+            // Russian
+            "вакансия", "работа из дома", "найм", "без опыта", "подработка",
+            "заработать из дома", "обучающий взнос"))
 
         val result = features.toFloatArray()
         if (result.size != EXPECTED_FEATURE_COUNT) {
