@@ -47,6 +47,7 @@ import io.vocaguard.ui.PermissionsManager
 import io.vocaguard.ui.SeniorHomeScreen
 import io.vocaguard.ui.SettingsTab
 import io.vocaguard.ui.theme.VocaGuardTheme
+import io.vocaguard.service.VocaGuardFcmService
 import io.vocaguard.widget.VocaGuardWidget
 
 /** Holds deep-link parameters until the composable tree is ready to consume them. */
@@ -81,6 +82,7 @@ class MainActivity : ComponentActivity() {
         phoneStateMonitor = PhoneStateMonitor(this)
 
         CommunityScamSyncWorker.schedule(this)
+        VocaGuardFcmService.refreshToken()
         applyIntentTab(intent)
 
         setContent {
