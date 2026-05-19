@@ -29,6 +29,9 @@ jobs:
       - name: Grant execute permission for Gradlew
         run: chmod +x gradlew
 
+      - name: Write google-services.json
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
+
       - name: Run unit tests
         run: ./gradlew clean test --stacktrace
 
@@ -71,6 +74,9 @@ jobs:
       - name: Grant execute permission for Gradlew
         run: chmod +x gradlew
 
+      - name: Write google-services.json
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
 
@@ -109,6 +115,9 @@ jobs:
 
       - name: Grant execute permission for Gradlew
         run: chmod +x gradlew
+
+      - name: Write google-services.json
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
 
       - name: Decode keystore
         run: |
@@ -169,6 +178,9 @@ jobs:
 
       - name: Grant execute permission for Gradlew
         run: chmod +x gradlew
+
+      - name: Write google-services.json
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
 
       - name: Decode keystore
         run: |
