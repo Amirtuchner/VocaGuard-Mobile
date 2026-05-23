@@ -1005,6 +1005,7 @@ private fun ScamType.displayName(): String = when (this) {
     ScamType.ROMANCE_SCAM -> "Romance / Pig-Butchering Scam"
     ScamType.DELIVERY_SCAM -> "Delivery / Package Scam"
     ScamType.JOB_SCAM -> "Job / Recruitment Scam"
+    ScamType.SOCIAL_ENGINEERING -> "Social Engineering Scam"
 }
 
 // ---------------------------------------------------------------------------
