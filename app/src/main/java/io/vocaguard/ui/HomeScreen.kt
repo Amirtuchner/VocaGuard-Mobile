@@ -89,8 +89,9 @@ fun HomeTab(
                 onOpen = {
                     showSystemGuide = false
                     when (currentPerm) {
-                        "Draw Overlay" -> permissionsManager.openOverlaySettings()
-                        "Accessibility" -> permissionsManager.openAccessibilitySettings()
+                        "Draw Overlay"        -> permissionsManager.openOverlaySettings()
+                        "Accessibility"       -> permissionsManager.openAccessibilitySettings()
+                        "Notification Access" -> permissionsManager.openNotificationListenerSettings()
                     }
                     val remaining = pendingSystemPerms.drop(1)
                     pendingSystemPerms = remaining
@@ -201,10 +202,11 @@ fun HomeTab(
                     granted = granted,
                     onClick = if (granted) null else ({
                         when (name) {
-                            "Draw Overlay" -> permissionsManager.openOverlaySettings()
-                            "Accessibility" -> permissionsManager.openAccessibilitySettings()
-                            "Call Screening" -> permissionsManager.openCallScreeningSettings()
-                            else -> permissionsManager.openAppSettings()
+                            "Draw Overlay"       -> permissionsManager.openOverlaySettings()
+                            "Accessibility"      -> permissionsManager.openAccessibilitySettings()
+                            "Call Screening"     -> permissionsManager.openCallScreeningSettings()
+                            "Notification Access"-> permissionsManager.openNotificationListenerSettings()
+                            else                 -> permissionsManager.openAppSettings()
                         }
                     })
                 )
@@ -214,7 +216,36 @@ fun HomeTab(
         if (!allGranted) {
             item {
                 Button(
-                    onClick = { runtimePermLauncher.launch(PermissionsManager.REQUIRED_PERMISSIONS) },
+                    onClick = {
+                        val missingRuntime = PermissionsManager.REQUIRED_PERMISSIONS.filter {
+                            permissionsManager.checkAllPermissions().values.contains(false)
+                        }
+                        val anyRuntimeMissing = PermissionsManager.REQUIRED_PERMISSIONS.any {
+                            permissions.getOrDefault(
+                                when (it) {
+                                    android.Manifest.permission.READ_PHONE_STATE -> "Phone State"
+                                    android.Manifest.permission.READ_CALL_LOG -> "Call Log"
+                                    android.Manifest.permission.ANSWER_PHONE_CALLS -> "Answer Calls"
+                                    android.Manifest.permission.RECORD_AUDIO -> "Record Audio"
+                                    android.Manifest.permission.POST_NOTIFICATIONS -> "Notifications"
+                                    else -> it
+                                }, true
+                            ) == false
+                        }
+                        if (anyRuntimeMissing) {
+                            runtimePermLauncher.launch(PermissionsManager.REQUIRED_PERMISSIONS)
+                        } else {
+                            val sysPerms = mutableListOf<String>()
+                            if (permissions["Draw Overlay"] == false) sysPerms.add("Draw Overlay")
+                            if (permissions["Call Screening"] == false) sysPerms.add("Call Screening")
+                            if (permissions["Accessibility"] == false) sysPerms.add("Accessibility")
+                            if (permissions["Notification Access"] == false) sysPerms.add("Notification Access")
+                            if (sysPerms.isNotEmpty()) {
+                                pendingSystemPerms = sysPerms
+                                showSystemGuide = true
+                            }
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
@@ -422,20 +453,34 @@ private fun TrendChartCard(data: List<DailyCallCount>) {
     }
 }
 
-private val permissionIcons: Map<String, ImageVector> = mapOf(
-    "Phone State"    to Icons.Default.Phone,
-    "Call Log"       to Icons.Default.History,
-    "Answer Calls"   to Icons.Default.Call,
-    "Record Audio"   to Icons.Default.Mic,
-    "Notifications"  to Icons.Default.Notifications,
-    "Call Screening" to Icons.Default.Shield,
-    "Accessibility"  to Icons.Default.Accessibility,
-    "Draw Overlay"   to Icons.Default.Layers,
+private data class PermissionDef(
+    val key: String,
+    val label: String,
+    val description: String,
+    val icon: ImageVector,
+    val optional: Boolean = false
+)
+
+private val permissionDefs = listOf(
+    PermissionDef("Phone State",       "Phone Access",         "Detects incoming and outgoing calls",                Icons.Default.Phone),
+    PermissionDef("Call Log",          "Call History",         "Saves analyzed calls to your history",               Icons.Default.History),
+    PermissionDef("Answer Calls",      "Manage Calls",         "Can silence or reject detected scam calls",          Icons.Default.Call),
+    PermissionDef("Record Audio",      "Microphone",           "Analyzes call audio for scam patterns",              Icons.Default.Mic),
+    PermissionDef("Notifications",     "Notifications",        "Sends instant scam alerts to your screen",           Icons.Default.Notifications),
+    PermissionDef("Call Screening",    "Call Screening",       "Screens calls before your phone rings",              Icons.Default.Shield),
+    PermissionDef("Draw Overlay",      "Screen Overlay",       "Shows a warning banner during scam calls",           Icons.Default.Layers),
+    PermissionDef("Accessibility",     "Accessibility",        "Reads on-screen call info for real-time detection",  Icons.Default.Accessibility, optional = true),
+    PermissionDef("Notification Access","Message Scanning",   "Detects scams in WhatsApp & Telegram messages",      Icons.Default.Notifications, optional = true),
 )
 
 @Composable
 fun PermissionItem(name: String, granted: Boolean, onClick: (() -> Unit)? = null) {
-    val permIcon = permissionIcons[name] ?: Icons.Default.Shield
+    val def = permissionDefs.find { it.key == name }
+    val label = def?.label ?: name
+    val description = def?.description ?: ""
+    val icon = def?.icon ?: Icons.Default.Shield
+    val optional = def?.optional == true
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -452,7 +497,7 @@ fun PermissionItem(name: String, granted: Boolean, onClick: (() -> Unit)? = null
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = permIcon,
+                imageVector = icon,
                 contentDescription = null,
                 tint = if (granted) MaterialTheme.colorScheme.secondary
                        else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -460,17 +505,25 @@ fun PermissionItem(name: String, granted: Boolean, onClick: (() -> Unit)? = null
             )
             Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (optional) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Optional",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 Text(
-                    text = name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = if (granted) "Enabled"
-                           else if (onClick != null) "Tap to fix"
-                           else "Not granted",
+                    text = if (granted) description else "Tap to enable",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (granted) MaterialTheme.colorScheme.secondary
+                    color = if (granted) MaterialTheme.colorScheme.onSecondaryContainer
                             else MaterialTheme.colorScheme.error
                 )
             }
@@ -491,7 +544,9 @@ private val systemPermDescriptions = mapOf(
     "Accessibility" to "VocaGuard uses the Accessibility Service to read on-screen call content for real-time detection. " +
             "Please enable the VocaGuard service on the next screen.",
     "Call Screening" to "VocaGuard needs to be set as the default caller ID & spam app to screen incoming calls. " +
-            "Please select VocaGuard on the next screen."
+            "Please select VocaGuard on the next screen.",
+    "Notification Access" to "VocaGuard needs Notification Access to detect scams in WhatsApp and Telegram messages. " +
+            "Please enable VocaGuard on the next screen."
 )
 
 @Composable

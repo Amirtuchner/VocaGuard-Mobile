@@ -11,4 +11,8 @@
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+    <!-- Allow plain HTTP to our Hetzner VPS token server (internal, no sensitive data) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">178.105.164.91</domain>
+    </domain-config>
 </network-security-config>
