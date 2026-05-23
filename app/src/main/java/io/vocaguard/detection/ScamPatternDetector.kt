@@ -7,125 +7,134 @@ class ScamPatternDetector() {
 
     companion object {
         private const val TAG = "ScamPatternDetector"
-        private const val CONFIDENCE_THRESHOLD = 0.6f
+        private const val CONFIDENCE_THRESHOLD = 0.72f
+        private const val MIN_KEYWORD_MATCHES = 2
 
-        // Scam pattern keywords organized by type
+        // Scam pattern keywords organized by type.
+        // Only multi-word or highly specific phrases — single generic words removed to cut false positives.
         private val SCAM_PATTERNS = mapOf(
             ScamType.IRS_SCAM to listOf(
                 // English
-                "IRS", "internal revenue", "tax", "owe money", "arrest warrant",
-                "legal action", "tax refund", "tax fraud", "tax lien",
+                "IRS", "internal revenue", "owe money", "arrest warrant",
+                "legal action", "tax refund", "tax fraud", "tax lien", "back taxes",
                 // Russian
-                "налоговая", "налоговый долг", "задолженность", "фнс",
+                "налоговая служба", "налоговый долг", "задолженность по налогам", "фнс",
                 // Hebrew
                 "מס הכנסה", "רשות המסים", "חוב מס", "עיקול מס",
                 // Arabic
-                "مصلحة الضرائب", "ديون ضريبية", "الضريبة",
+                "مصلحة الضرائب", "ديون ضريبية", "مديونية ضريبية",
                 // Spanish
-                "servicio de impuestos", "hacienda", "deuda fiscal", "impuestos", "agencia tributaria",
+                "servicio de impuestos", "deuda fiscal", "agencia tributaria", "hacienda pública",
                 // French
-                "impôts", "service des impôts", "dette fiscale", "fisc", "direction générale des finances"
+                "service des impôts", "dette fiscale", "direction générale des finances publiques"
             ),
             ScamType.TECH_SUPPORT to listOf(
                 // English
                 "computer virus", "microsoft support", "windows support", "technical support",
-                "your computer", "infected", "malware", "remote access", "teamviewer",
+                "your computer", "malware detected", "remote access", "teamviewer",
                 "tech support", "apple support", "google support", "anydesk",
+                "your device is infected", "suspicious activity on your computer",
                 // Russian
-                "вирус", "техподдержка", "удалённый доступ", "взломан", "заражён",
+                "техподдержка", "удалённый доступ", "ваш компьютер взломан", "заражён вирусом",
                 // Hebrew
-                "וירוס", "תמיכה טכנית", "גישה מרחוק", "תוכנה זדונית", "נגוע",
+                "תמיכה טכנית", "גישה מרחוק", "תוכנה זדונית", "המחשב שלך נגוע",
                 // Arabic
-                "فيروس", "دعم فني", "وصول عن بعد", "برامج خبيثة",
+                "دعم فني", "وصول عن بعد", "برامج خبيثة", "جهازك مخترق",
                 // Spanish
-                "soporte técnico", "acceso remoto", "virus informático", "infectado", "software malicioso",
+                "soporte técnico", "acceso remoto", "virus informático", "software malicioso",
                 // French
-                "support technique", "accès à distance", "virus informatique", "infecté", "logiciel malveillant"
+                "support technique", "accès à distance", "virus informatique", "logiciel malveillant"
             ),
             ScamType.BANK_FRAUD to listOf(
                 // English
-                "bank account", "credit card", "suspended", "verify your account",
-                "unusual activity", "fraud alert", "unauthorized transaction",
-                "account locked", "security breach", "confirm your identity", "anydesk",
+                "verify your account", "unusual activity", "fraud alert",
+                "unauthorized transaction", "account locked", "security breach",
+                "confirm your identity", "anydesk", "your account has been",
+                "suspicious transaction", "your card has been",
                 // Russian
-                "банк", "кредитная карта", "счёт заблокирован", "подозрительная активность",
+                "счёт заблокирован", "подозрительная активность", "несанкционированная операция",
                 // Hebrew
-                "חשבון בנק", "כרטיס אשראי", "חשבון חסום", "פעילות חשודה", "הונאה",
+                "חשבון חסום", "פעילות חשודה", "עסקה לא מאושרת", "אמת את זהותך",
                 // Arabic
-                "حساب بنكي", "بطاقة ائتمان", "نشاط مشبوه", "احتيال",
+                "نشاط مشبوه", "معاملة غير مصرح بها", "حسابك محظور",
                 // Spanish
-                "cuenta bancaria", "tarjeta de crédito", "actividad sospechosa", "fraude bancario", "cuenta bloqueada",
+                "actividad sospechosa", "fraude bancario", "cuenta bloqueada", "transacción no autorizada",
                 // French
-                "compte bancaire", "carte de crédit", "activité suspecte", "fraude bancaire", "compte bloqué"
+                "activité suspecte", "fraude bancaire", "compte bloqué", "transaction non autorisée"
             ),
             ScamType.LOTTERY_PRIZE to listOf(
                 // English
-                "won", "lottery", "prize", "sweepstakes", "winner", "congratulations",
-                "claim your prize", "free vacation", "free cruise", "cash prize",
+                "lottery", "sweepstakes", "claim your prize", "free vacation",
+                "free cruise", "cash prize", "you have been selected",
+                "you are our winner", "collect your winnings",
                 // Russian
-                "выиграли", "лотерея", "приз", "поздравляем", "победитель",
+                "лотерея", "вы выиграли приз", "получите выигрыш",
                 // Hebrew
-                "זכית", "הגרלה", "פרס", "מזל טוב", "זוכה",
+                "הגרלה", "זכית בפרס", "תבע את הפרס שלך",
                 // Arabic
-                "فزت", "يانصيب", "جائزة", "مبروك", "فائز",
+                "يانصيب", "فزت بجائزة", "استلم جائزتك",
                 // Spanish
-                "ganaste", "lotería", "premio", "felicitaciones", "ganador", "reclamar su premio",
+                "lotería", "reclamar su premio", "usted ha ganado", "cobrar su premio",
                 // French
-                "gagné", "loterie", "prix", "félicitations", "gagnant", "réclamez votre prix"
+                "loterie", "réclamez votre prix", "vous avez gagné", "encaissez vos gains"
             ),
             ScamType.SOCIAL_SECURITY to listOf(
                 // English
-                "social security", "SSN", "social security number", "suspended",
-                "compromised", "illegal activity", "social security administration",
+                "social security", "SSN", "social security number",
+                "illegal activity", "social security administration",
+                "your SSN has been", "social security suspended",
                 // Russian
-                "снилс", "пенсионный фонд", "страховой номер", "паспортные данные",
+                "страховой номер снилс", "пенсионный фонд заблокирован", "паспортные данные украдены",
                 // Hebrew
-                "תעודת זהות", "מספר ביטוח לאומי", "פרטים אישיים", "ת.ז",
+                "מספר ביטוח לאומי", "ת.ז חסומה", "פרטים אישיים נגנבו",
                 // Arabic
-                "رقم الهوية", "الهوية الوطنية", "رقم الضمان الاجتماعي",
+                "رقم الضمان الاجتماعي", "الهوية الوطنية محظورة",
                 // Spanish
-                "seguridad social", "número de seguridad social", "actividad ilegal", "dni", "documentos de identidad",
+                "número de seguridad social", "actividad ilegal detectada", "documentos de identidad suspendidos",
                 // French
-                "sécurité sociale", "numéro de sécurité sociale", "activité illégale", "carte d'identité", "pièce d'identité"
+                "numéro de sécurité sociale", "activité illégale détectée", "pièce d'identité suspendue"
             ),
             ScamType.ROBOCALL to listOf(
                 // English
                 "this is a recorded message", "do not hang up", "press 1",
-                "call back immediately", "final notice", "last chance",
+                "call back immediately", "final notice", "this call may be recorded",
+                "you have been selected", "respond to this message",
                 // Russian
-                "нажмите один", "нажмите 1", "записанное сообщение",
+                "нажмите один", "нажмите 1", "это записанное сообщение",
                 // Hebrew
                 "לחץ 1", "הודעה מוקלטת", "הודעה אוטומטית",
                 // Arabic
-                "اضغط 1", "رسالة مسجلة", "لا تغلق",
+                "اضغط 1", "رسالة مسجلة", "لا تغلق الخط",
                 // Spanish
-                "presione 1", "mensaje grabado", "no cuelgue", "llame de vuelta", "aviso final",
+                "presione 1", "mensaje grabado", "no cuelgue", "aviso final",
                 // French
-                "appuyez sur 1", "message enregistré", "ne raccrochez pas", "rappeler", "avis final"
+                "appuyez sur 1", "message enregistré", "ne raccrochez pas", "avis final"
             ),
             ScamType.PHISHING to listOf(
                 // English
-                "verify", "confirm", "update your information", "account verification",
-                "password reset", "click the link", "provide your",
+                "update your information", "account verification",
+                "password reset", "click the link", "provide your details",
+                "verify your identity", "confirm your account", "log in immediately",
                 // Russian
-                "подтвердите", "обновите данные", "войдите в систему", "ссылка",
+                "обновите данные", "подтвердите свою личность", "войдите в систему немедленно",
                 // Hebrew
-                "אמת", "לחץ כאן", "קישור", "עדכן פרטים", "אישור",
+                "עדכן פרטים", "אמת את זהותך", "לחץ כאן לאישור",
                 // Arabic
-                "تحقق", "انقر هنا", "رابط", "تأكيد",
+                "تحديث معلوماتك", "تأكيد هويتك", "انقر هنا للتحقق",
                 // Spanish
-                "verifique", "confirme", "haga clic", "enlace", "actualice su información", "contraseña",
+                "actualice su información", "verifique su identidad", "haga clic en el enlace",
                 // French
-                "vérifiez", "confirmez", "cliquez", "lien", "mettez à jour vos informations", "mot de passe"
+                "mettez à jour vos informations", "vérifiez votre identité", "cliquez sur le lien"
             ),
             ScamType.INSURANCE to listOf(
                 // English
                 "health insurance", "medicare", "medicaid", "insurance plan",
-                "free insurance", "qualify for", "limited time offer",
+                "free insurance", "limited time offer", "you qualify for coverage",
+                "insurance expires", "your coverage will end",
                 // Russian
-                "страховка", "медицинская страховка", "полис",
+                "медицинская страховка", "ваш полис истекает",
                 // Hebrew
-                "ביטוח בריאות", "פוליסה", "כיסוי ביטוחי",
+                "ביטוח בריאות", "הפוליסה שלך פגה", "כיסוי ביטוחי",
                 // Arabic
                 "تأمين صحي", "وثيقة تأمين", "تغطية تأمينية",
                 // Spanish
@@ -136,35 +145,35 @@ class ScamPatternDetector() {
             ScamType.INVESTMENT_SCAM to listOf(
                 // English
                 "guaranteed returns", "high returns", "risk free", "double your money",
-                "investment opportunity", "limited slots", "exclusive offer", "crypto",
-                "bitcoin investment", "forex", "trading platform", "passive income",
-                "financial freedom", "get rich", "insider tip", "secret strategy", "anydesk",
+                "investment opportunity", "limited slots", "exclusive offer",
+                "bitcoin investment", "trading platform", "passive income",
+                "financial freedom", "get rich quick", "insider tip", "secret strategy",
                 // Russian
-                "инвестиции", "гарантированный доход", "криптовалюта", "пассивный доход",
+                "гарантированный доход", "криптовалютные инвестиции", "пассивный доход без риска",
                 // Hebrew
-                "השקעה", "תשואה מובטחת", "קריפטו", "הכפלת כסף", "פורקס",
+                "תשואה מובטחת", "השקעה בקריפטו", "הכפלת כסף", "פורקס",
                 // Arabic
-                "استثمار", "عائد مضمون", "عملة مشفرة", "بيتكوين", "تداول",
+                "عائد مضمون", "استثمار بعملة مشفرة", "مضاعفة الأموال",
                 // Spanish
-                "inversión garantizada", "ganancias altas", "criptomoneda", "trading", "ingresos pasivos",
+                "inversión garantizada", "ganancias altas sin riesgo", "criptomoneda",
                 // French
-                "investissement garanti", "rendements élevés", "cryptomonnaie", "trading", "revenus passifs"
+                "investissement garanti", "rendements élevés sans risque", "cryptomonnaie"
             ),
             ScamType.DONATION_FRAUD to listOf(
                 // English
-                "charity", "donate", "donation", "help victims", "disaster relief",
-                "make a contribution", "support our cause", "relief fund",
-                "humanitarian", "tax deductible donation", "nonprofit", "fundraising",
+                "help victims", "disaster relief", "make a contribution",
+                "support our cause", "relief fund", "tax deductible donation",
+                "donate now to help", "emergency fundraising",
                 // Russian
-                "благотворительность", "пожертвование", "гуманитарная помощь",
+                "гуманитарная помощь пострадавшим", "пожертвуйте сейчас",
                 // Hebrew
-                "צדקה", "תרומה", "לתרום", "עמותה", "קרן סיוע",
+                "קרן סיוע לנפגעים", "לתרום עכשיו", "עמותה לסיוע",
                 // Arabic
-                "خيرية", "تبرع", "إغاثة", "منظمة غير ربحية",
+                "إغاثة المتضررين", "تبرع الآن", "منظمة إغاثة",
                 // Spanish
-                "donación", "caridad", "víctimas", "ayuda humanitaria", "sin fines de lucro", "recaudación de fondos",
+                "ayuda a las víctimas", "donación de emergencia", "fondo de socorro",
                 // French
-                "don", "charité", "victimes", "aide humanitaire", "organisation à but non lucratif", "collecte de fonds"
+                "aide aux victimes", "don d'urgence", "fonds de secours"
             )
         )
 
@@ -252,11 +261,11 @@ class ScamPatternDetector() {
     fun analyzeText(text: String): DetectionResult {
         val lowerText = text.lowercase()
 
-        // Shared signal boosts (computed once)
-        val urgencyBoost = if (URGENCY_KEYWORDS.any { containsWord(lowerText, it) }) 0.2f else 0f
-        val threatBoost  = if (THREAT_KEYWORDS.any  { containsWord(lowerText, it) }) 0.25f else 0f
-        val paymentBoost = if (PAYMENT_KEYWORDS.any  { containsWord(lowerText, it) }) 0.2f else 0f
-        val infoBoost    = if (INFO_REQUEST_KEYWORDS.any { containsWord(lowerText, it) }) 0.15f else 0f
+        // Boost signals — computed once but only applied when keywords are matched (boost guard)
+        val hasUrgency = URGENCY_KEYWORDS.any { containsWord(lowerText, it) }
+        val hasThreat  = THREAT_KEYWORDS.any  { containsWord(lowerText, it) }
+        val hasPayment = PAYMENT_KEYWORDS.any  { containsWord(lowerText, it) }
+        val hasInfo    = INFO_REQUEST_KEYWORDS.any { containsWord(lowerText, it) }
 
         // Score every scam type and keep the best match
         var bestType: ScamType = ScamType.UNKNOWN
@@ -265,11 +274,18 @@ class ScamPatternDetector() {
 
         for ((scamType, keywords) in SCAM_PATTERNS) {
             val matched = keywords.filter { containsWord(lowerText, it) }
-            if (matched.isEmpty()) continue
 
-            // Each matched keyword contributes a fixed weight — prevents bias toward
-            // categories with fewer keywords (e.g. ROBOCALL has 6, TECH_SUPPORT has 14).
+            // Boost guard: require at least MIN_KEYWORD_MATCHES before boosts apply
+            if (matched.size < MIN_KEYWORD_MATCHES) continue
+
             val keywordScore = (matched.size * 0.12f).coerceAtMost(0.60f)
+
+            // Boosts only fire because keywords already matched — no free boost from tone alone
+            val urgencyBoost = if (hasUrgency) 0.15f else 0f
+            val threatBoost  = if (hasThreat)  0.20f else 0f
+            val paymentBoost = if (hasPayment) 0.15f else 0f
+            val infoBoost    = if (hasInfo)    0.10f else 0f
+
             val confidence = (keywordScore + urgencyBoost + threatBoost + paymentBoost + infoBoost)
                 .coerceAtMost(1.0f)
 
@@ -291,14 +307,14 @@ class ScamPatternDetector() {
             )
         }
 
-        // Check for generic suspicious patterns even if no specific type matched
+        // Last resort: all 4 signal categories must be simultaneously present
         val suspiciousScore = calculateSuspiciousScore(lowerText)
         if (suspiciousScore >= CONFIDENCE_THRESHOLD) {
             return DetectionResult(
                 isScam = true,
                 scamType = ScamType.UNKNOWN,
                 confidence = suspiciousScore,
-                reason = "High suspicious activity score"
+                reason = "Multiple simultaneous scam signals detected"
             )
         }
 
@@ -311,29 +327,21 @@ class ScamPatternDetector() {
     }
 
     private fun calculateSuspiciousScore(text: String): Float {
-        var score = 0f
-
-        // Check for multiple red flags
         val urgencyCount = URGENCY_KEYWORDS.count { containsWord(text, it) }
-        val threatCount = THREAT_KEYWORDS.count { containsWord(text, it) }
-        val paymentCount = PAYMENT_KEYWORDS.count { containsWord(text, it) }
-        val infoRequestCount = INFO_REQUEST_KEYWORDS.count { containsWord(text, it) }
+        val threatCount  = THREAT_KEYWORDS.count  { containsWord(text, it) }
+        val paymentCount = PAYMENT_KEYWORDS.count  { containsWord(text, it) }
+        val infoCount    = INFO_REQUEST_KEYWORDS.count { containsWord(text, it) }
 
-        // Weight different factors
-        score += urgencyCount * 0.15f
-        score += threatCount * 0.25f
-        score += paymentCount * 0.2f
-        score += infoRequestCount * 0.3f
-
-        // If multiple categories are present, it's more suspicious
-        val categoriesPresent = listOf(urgencyCount, threatCount, paymentCount, infoRequestCount)
+        // All 4 signal categories must be present — prevents false positives from tone alone
+        val categoriesPresent = listOf(urgencyCount, threatCount, paymentCount, infoCount)
             .count { it > 0 }
+        if (categoriesPresent < 4) return 0f
 
-        if (categoriesPresent >= 3) {
-            score += 0.3f
-        } else if (categoriesPresent >= 2) {
-            score += 0.15f
-        }
+        var score = 0f
+        score += urgencyCount * 0.12f
+        score += threatCount  * 0.18f
+        score += paymentCount * 0.15f
+        score += infoCount    * 0.20f
 
         return score.coerceAtMost(1.0f)
     }
