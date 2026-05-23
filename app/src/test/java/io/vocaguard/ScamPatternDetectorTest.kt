@@ -206,6 +206,80 @@ class ScamPatternDetectorTest {
         assertFalse(result.isScam)
     }
 
+    // --- Social Engineering ---
+
+    @Test
+    fun `detects safe account social engineering scam`() {
+        val result = detector.analyzeText(
+            "This is the fraud department at your bank. We've detected suspicious activity. " +
+            "To protect your money, I need you to move your funds to a safe account right away. " +
+            "Do not tell anyone about this call — this is a private investigation."
+        )
+        assertTrue(result.isScam)
+        assertEquals(ScamType.SOCIAL_ENGINEERING, result.scamType)
+    }
+
+    @Test
+    fun `detects calm professional impersonation without urgency language`() {
+        // No "urgent", no "arrest" — scammer sounds helpful and official
+        val result = detector.analyzeText(
+            "I'm calling from the fraud department. We are trying to protect your funds. " +
+            "Your identity has been stolen and we have caught the criminal. " +
+            "Please transfer your savings to a protected account and keep this confidential."
+        )
+        assertTrue(result.isScam)
+        assertEquals(ScamType.SOCIAL_ENGINEERING, result.scamType)
+    }
+
+    @Test
+    fun `detects secrecy demand raising confidence`() {
+        val withSecrecy = detector.analyzeText(
+            "Fraud department calling. Move your funds to a safe account. " +
+            "Do not tell anyone about this call — keep this confidential."
+        )
+        val withoutSecrecy = detector.analyzeText(
+            "Fraud department calling. Move your funds to a safe account."
+        )
+        assertTrue(withSecrecy.confidence >= withoutSecrecy.confidence)
+    }
+
+    // --- Romance Scam ---
+
+    @Test
+    fun `detects romance scam`() {
+        val result = detector.analyzeText(
+            "I am stranded abroad and cannot access my funds. Military deployment has left me stuck overseas. " +
+            "Please send me money via wire transfer — I will pay you back as soon as I return."
+        )
+        assertTrue(result.isScam)
+        assertEquals(ScamType.ROMANCE_SCAM, result.scamType)
+    }
+
+    // --- Delivery Scam ---
+
+    @Test
+    fun `detects delivery scam`() {
+        val result = detector.analyzeText(
+            "Your package is on hold at our facility. A customs clearance fee is required " +
+            "before we can release your shipment. Delivery fee required to reschedule your delivery."
+        )
+        assertTrue(result.isScam)
+        assertEquals(ScamType.DELIVERY_SCAM, result.scamType)
+    }
+
+    // --- Job Scam ---
+
+    @Test
+    fun `detects job scam`() {
+        val result = detector.analyzeText(
+            "Exciting work from home opportunity — no experience required! " +
+            "Guaranteed daily earnings with no registration fee. " +
+            "Process payments for us and keep a commission. Be your own boss."
+        )
+        assertTrue(result.isScam)
+        assertEquals(ScamType.JOB_SCAM, result.scamType)
+    }
+
     // --- Confidence boosts ---
 
     @Test

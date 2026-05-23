@@ -174,6 +174,128 @@ class ScamPatternDetector() {
                 "ayuda a las víctimas", "donación de emergencia", "fondo de socorro",
                 // French
                 "aide aux victimes", "don d'urgence", "fonds de secours"
+            ),
+
+            // ── Social Engineering ────────────────────────────────────────────────
+            // Calm, professional impersonation scams: "safe account" transfers,
+            // fake authority (bank fraud dept, federal agents), secrecy demands,
+            // and step-by-step guidance toward dangerous actions.
+            ScamType.SOCIAL_ENGINEERING to listOf(
+                // English — "safe account" / fund-transfer tactics
+                "safe account", "protected account", "security account",
+                "move your funds", "transfer your savings", "withdraw your savings",
+                "move your money to safety", "transfer to a safe",
+                // English — fake authority / impersonation
+                "fraud department", "federal investigation", "under investigation",
+                "you are being investigated", "I can give you my badge number",
+                "I'll give you my employee ID", "we have caught the criminal",
+                "you are the victim here", "we are protecting your funds",
+                "your identity has been stolen", "we are trying to protect you",
+                // English — secrecy / isolation demands (strongest signal)
+                "do not tell anyone", "don't tell anyone",
+                "keep this confidential", "don't discuss this",
+                "keep this between us", "do not contact your bank",
+                "don't call the police", "do not call anyone",
+                "this is a private investigation",
+                // English — step-by-step guidance tactics
+                "stay on the line with me", "I'll walk you through this",
+                "scratch the numbers on the back", "read me the numbers",
+                "gift card to protect", "buy gift cards for security",
+                // Russian
+                "безопасный счёт", "никому не рассказывайте", "переведите деньги",
+                "мы пытаемся вас защитить", "ваша личность похищена",
+                "федеральное расследование", "держите в тайне", "не звоните в полицию",
+                // Hebrew
+                "חשבון בטוח", "אל תספר לאף אחד", "שמור בסוד",
+                "חקירה פדרלית", "העבר את הכסף", "אנחנו מגנים עליך",
+                "הזהות שלך נגנבה", "שמור על סודיות", "אל תתקשר למשטרה",
+                // Arabic
+                "حساب آمن", "لا تخبر أحداً", "قيد التحقيق",
+                "حوّل أموالك", "نحن نحاول حمايتك", "هويتك مسروقة",
+                "اكتم هذا الأمر", "لا تتصل بالشرطة",
+                // Spanish
+                "cuenta segura", "no se lo diga a nadie", "bajo investigación",
+                "transfiera sus fondos", "estamos intentando protegerle",
+                "su identidad ha sido robada", "mantenga esto en secreto",
+                "no llame a la policía",
+                // French
+                "compte sécurisé", "n'en parlez à personne", "sous enquête",
+                "transférez vos fonds", "nous essayons de vous protéger",
+                "votre identité a été volée", "gardez cela confidentiel",
+                "n'appelez pas la police"
+            ),
+
+            // ── Romance Scam ──────────────────────────────────────────────────────
+            ScamType.ROMANCE_SCAM to listOf(
+                // English
+                "I am stranded", "stranded abroad", "stuck overseas", "stuck abroad",
+                "military deployment", "military service overseas",
+                "send me money", "I need money urgently", "wire me the money",
+                "medical emergency abroad", "cannot access my funds",
+                "visa problem", "customs fee", "release fee",
+                "I will pay you back", "I just need this one time",
+                // Russian
+                "я застрял за границей", "военная командировка",
+                "пришли мне деньги", "срочно нужны деньги",
+                // Hebrew
+                "תקוע בחו\"ל", "שלח לי כסף", "צריך כסף דחוף", "פריסה צבאית",
+                // Arabic
+                "عالق في الخارج", "أرسل لي مالاً", "أحتاج مالاً بشكل عاجل",
+                "نشر عسكري",
+                // Spanish
+                "atrapado en el extranjero", "envíame dinero",
+                "necesito dinero urgente", "despliegue militar",
+                // French
+                "coincé à l'étranger", "envoyez-moi de l'argent",
+                "besoin d'argent urgent", "déploiement militaire"
+            ),
+
+            // ── Delivery Scam ─────────────────────────────────────────────────────
+            ScamType.DELIVERY_SCAM to listOf(
+                // English
+                "package on hold", "shipment held", "customs clearance fee",
+                "delivery fee required", "pay to release your package",
+                "failed delivery attempt", "redelivery fee",
+                "your parcel is held", "reschedule your delivery",
+                "pay customs duty",
+                // Russian
+                "посылка задержана", "оплатите доставку", "таможенный сбор",
+                // Hebrew
+                "חבילה עצורה", "תשלום למכס", "דמי שחרור", "משלוח עצור",
+                // Arabic
+                "الطرد محتجز", "رسوم جمركية", "رسوم الاستلام",
+                // Spanish
+                "paquete retenido", "arancel aduanero",
+                "tasa de entrega", "intento de entrega fallido",
+                // French
+                "colis retenu", "droits de douane",
+                "frais de livraison", "tentative de livraison échouée"
+            ),
+
+            // ── Job Scam ──────────────────────────────────────────────────────────
+            ScamType.JOB_SCAM to listOf(
+                // English
+                "work from home opportunity", "earn from home",
+                "no experience required", "training fee", "registration fee",
+                "starter kit fee", "process payments for us",
+                "keep a commission", "package reshipping",
+                "mystery shopper", "guaranteed daily earnings",
+                "be your own boss", "easy money from home",
+                // Russian
+                "работа из дома без опыта", "регистрационный взнос",
+                "обработка платежей", "ежедневный заработок гарантирован",
+                // Hebrew
+                "עבודה מהבית", "דמי הרשמה", "הכנסה יומית מובטחת",
+                "לא נדרש ניסיון",
+                // Arabic
+                "عمل من المنزل", "رسوم تسجيل",
+                "دخل يومي مضمون", "لا يلزم خبرة",
+                // Spanish
+                "trabajar desde casa", "tarifa de registro",
+                "ingresos diarios garantizados", "sin experiencia necesaria",
+                // French
+                "travailler depuis chez soi", "frais d'inscription",
+                "revenus quotidiens garantis", "sans expérience requise"
             )
         )
 
@@ -212,11 +334,34 @@ class ScamPatternDetector() {
             "arrestation", "police", "poursuites judiciaires", "suspendu", "gelé", "mandat d'arrêt"
         )
 
+        // Secrecy / isolation demands — almost never made by a legitimate caller.
+        // Even one instance alongside any scam keyword is a very strong signal.
+        private val SECRECY_KEYWORDS = listOf(
+            // English
+            "do not tell anyone", "don't tell anyone",
+            "keep this confidential", "keep this between us",
+            "don't discuss this with anyone", "this is confidential",
+            "do not contact your bank", "don't call the police",
+            "do not call anyone else", "this is a private investigation",
+            // Russian
+            "никому не говорите", "держите в тайне", "не звоните в полицию",
+            // Hebrew
+            "אל תספר לאף אחד", "שמור על סודיות", "אל תתקשר למשטרה",
+            // Arabic
+            "لا تخبر أحداً", "اكتم هذا الأمر", "لا تتصل بالشرطة",
+            // Spanish
+            "no se lo diga a nadie", "mantenga esto en secreto",
+            "no llame a la policía",
+            // French
+            "n'en parlez à personne", "gardez cela confidentiel",
+            "n'appelez pas la police"
+        )
+
         // Payment request keywords
         private val PAYMENT_KEYWORDS = listOf(
             // English
             "gift card", "bitcoin", "wire transfer", "cash", "prepaid card",
-            "money order", "western union", "zelle", "venmo", "cashapp",
+            "money order", "western union", "moneygram", "zelle", "venmo", "cashapp",
             "pay now", "payment required", "send money",
             // Russian
             "подарочная карта", "биткоин", "перевод средств", "вестерн юнион",
@@ -262,10 +407,12 @@ class ScamPatternDetector() {
         val lowerText = text.lowercase()
 
         // Boost signals — computed once but only applied when keywords are matched (boost guard)
-        val hasUrgency = URGENCY_KEYWORDS.any { containsWord(lowerText, it) }
-        val hasThreat  = THREAT_KEYWORDS.any  { containsWord(lowerText, it) }
-        val hasPayment = PAYMENT_KEYWORDS.any  { containsWord(lowerText, it) }
-        val hasInfo    = INFO_REQUEST_KEYWORDS.any { containsWord(lowerText, it) }
+        val hasUrgency  = URGENCY_KEYWORDS.any  { containsWord(lowerText, it) }
+        val hasThreat   = THREAT_KEYWORDS.any   { containsWord(lowerText, it) }
+        val hasPayment  = PAYMENT_KEYWORDS.any  { containsWord(lowerText, it) }
+        val hasInfo     = INFO_REQUEST_KEYWORDS.any { containsWord(lowerText, it) }
+        // Secrecy demands: legitimate callers never ask you to hide the call from others.
+        val hasSecrecy  = SECRECY_KEYWORDS.any  { containsWord(lowerText, it) }
 
         // Score every scam type and keep the best match
         var bestType: ScamType = ScamType.UNKNOWN
@@ -281,12 +428,14 @@ class ScamPatternDetector() {
             val keywordScore = (matched.size * 0.12f).coerceAtMost(0.60f)
 
             // Boosts only fire because keywords already matched — no free boost from tone alone
-            val urgencyBoost = if (hasUrgency) 0.15f else 0f
-            val threatBoost  = if (hasThreat)  0.20f else 0f
-            val paymentBoost = if (hasPayment) 0.15f else 0f
-            val infoBoost    = if (hasInfo)    0.10f else 0f
+            val urgencyBoost  = if (hasUrgency)  0.15f else 0f
+            val threatBoost   = if (hasThreat)   0.20f else 0f
+            val paymentBoost  = if (hasPayment)  0.15f else 0f
+            val infoBoost     = if (hasInfo)     0.10f else 0f
+            // Secrecy demand: unusually strong signal — legitimate callers never ask for silence
+            val secrecyBoost  = if (hasSecrecy)  0.25f else 0f
 
-            val confidence = (keywordScore + urgencyBoost + threatBoost + paymentBoost + infoBoost)
+            val confidence = (keywordScore + urgencyBoost + threatBoost + paymentBoost + infoBoost + secrecyBoost)
                 .coerceAtMost(1.0f)
 
             if (confidence > bestConfidence) {
@@ -327,21 +476,26 @@ class ScamPatternDetector() {
     }
 
     private fun calculateSuspiciousScore(text: String): Float {
-        val urgencyCount = URGENCY_KEYWORDS.count { containsWord(text, it) }
-        val threatCount  = THREAT_KEYWORDS.count  { containsWord(text, it) }
-        val paymentCount = PAYMENT_KEYWORDS.count  { containsWord(text, it) }
-        val infoCount    = INFO_REQUEST_KEYWORDS.count { containsWord(text, it) }
+        val urgencyCount  = URGENCY_KEYWORDS.count       { containsWord(text, it) }
+        val threatCount   = THREAT_KEYWORDS.count        { containsWord(text, it) }
+        val paymentCount  = PAYMENT_KEYWORDS.count       { containsWord(text, it) }
+        val infoCount     = INFO_REQUEST_KEYWORDS.count  { containsWord(text, it) }
+        val secrecyCount  = SECRECY_KEYWORDS.count       { containsWord(text, it) }
 
-        // All 4 signal categories must be present — prevents false positives from tone alone
         val categoriesPresent = listOf(urgencyCount, threatCount, paymentCount, infoCount)
             .count { it > 0 }
-        if (categoriesPresent < 4) return 0f
+
+        // A secrecy demand lowers the bar from 4 signal categories to 3 — isolation is
+        // a defining tactic of social-engineering scams even when urgency/threat is absent.
+        val required = if (secrecyCount > 0) 3 else 4
+        if (categoriesPresent < required) return 0f
 
         var score = 0f
-        score += urgencyCount * 0.12f
-        score += threatCount  * 0.18f
-        score += paymentCount * 0.15f
-        score += infoCount    * 0.20f
+        score += urgencyCount  * 0.12f
+        score += threatCount   * 0.18f
+        score += paymentCount  * 0.15f
+        score += infoCount     * 0.20f
+        score += secrecyCount  * 0.25f
 
         return score.coerceAtMost(1.0f)
     }

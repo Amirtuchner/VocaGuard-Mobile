@@ -23,5 +23,6 @@ enum class ScamType {
     DONATION_FRAUD,
     ROMANCE_SCAM,
     DELIVERY_SCAM,
-    JOB_SCAM
+    JOB_SCAM,
+    SOCIAL_ENGINEERING
 }

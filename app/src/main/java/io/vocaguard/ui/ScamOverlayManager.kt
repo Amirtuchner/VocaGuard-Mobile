@@ -114,6 +114,7 @@ class ScamOverlayManager(private val context: Context) {
         ScamType.ROMANCE_SCAM -> "Romance Scam"
         ScamType.DELIVERY_SCAM -> "Delivery Scam"
         ScamType.JOB_SCAM -> "Job Scam"
+        ScamType.SOCIAL_ENGINEERING -> "Social Engineering"
         ScamType.UNKNOWN -> "Suspicious Call"
     }
 }

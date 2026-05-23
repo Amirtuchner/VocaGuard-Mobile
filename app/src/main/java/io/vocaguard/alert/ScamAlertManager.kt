@@ -158,6 +158,7 @@ class ScamAlertManager(private val context: Context) {
             ScamType.ROMANCE_SCAM -> "Warning! Romance or grandparent scam detected. Do not send money to someone you met online."
             ScamType.DELIVERY_SCAM -> "Warning! Delivery scam detected. Legitimate couriers do not demand payment by phone."
             ScamType.JOB_SCAM -> "Warning! Job scam detected. Legitimate employers never ask for upfront fees."
+            ScamType.SOCIAL_ENGINEERING -> "Warning! Social engineering scam detected. Do not transfer money or share information — hang up and call your bank directly."
             ScamType.UNKNOWN -> "Warning! Suspicious activity detected. Be cautious with this call."
         }
 
@@ -237,6 +238,7 @@ class ScamAlertManager(private val context: Context) {
             ScamType.ROMANCE_SCAM -> "Romance Scam"
             ScamType.DELIVERY_SCAM -> "Delivery Scam"
             ScamType.JOB_SCAM -> "Job Scam"
+            ScamType.SOCIAL_ENGINEERING -> "Social Engineering Scam"
             ScamType.UNKNOWN -> "Suspicious Call"
         }
     }
