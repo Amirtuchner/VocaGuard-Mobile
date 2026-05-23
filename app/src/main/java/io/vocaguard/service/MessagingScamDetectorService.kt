@@ -40,6 +40,8 @@ class MessagingScamDetectorService : NotificationListenerService() {
             "org.telegram.messenger",
             "org.telegram.messenger.web",
             "org.telegram.messenger.beta",
+            "com.facebook.orca",              // Facebook Messenger
+            "com.facebook.mlite",             // Messenger Lite
         )
 
         /**
