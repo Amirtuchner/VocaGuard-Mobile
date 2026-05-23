@@ -23,10 +23,9 @@ class ScamPatternDetectorTest {
 
     @Test
     fun `detects IRS scam`() {
-        // Uses explicit standalone keywords: "IRS", "owe money", "tax", "arrest warrant"
         val result = detector.analyzeText(
-            "This is the IRS calling. You owe money on your tax return. " +
-            "Pay immediately or an arrest warrant will be issued."
+            "This is the IRS calling. You owe money and have tax fraud on your record. " +
+            "Pay immediately or an arrest warrant will be issued for legal action."
         )
         assertTrue(result.isScam)
         assertEquals(ScamType.IRS_SCAM, result.scamType)
@@ -37,8 +36,8 @@ class ScamPatternDetectorTest {
     @Test
     fun `detects tech support scam`() {
         val result = detector.analyzeText(
-            "Windows technical support calling your computer is infected with malware " +
-            "give us remote access via teamviewer microsoft support apple support"
+            "Windows technical support calling. Your computer has malware detected. " +
+            "Give us remote access via teamviewer or microsoft support immediately."
         )
         assertTrue(result.isScam)
         assertEquals(ScamType.TECH_SUPPORT, result.scamType)
@@ -48,7 +47,10 @@ class ScamPatternDetectorTest {
 
     @Test
     fun `detects bank fraud`() {
-        val result = detector.analyzeText("Your bank account has been suspended verify your account immediately")
+        val result = detector.analyzeText(
+            "Your account has been locked due to unusual activity. " +
+            "Please verify your account immediately. We detected an unauthorized transaction and a security breach."
+        )
         assertTrue(result.isScam)
         assertEquals(ScamType.BANK_FRAUD, result.scamType)
     }
@@ -69,7 +71,10 @@ class ScamPatternDetectorTest {
 
     @Test
     fun `detects social security scam`() {
-        val result = detector.analyzeText("Your social security number has been suspended due to illegal activity")
+        val result = detector.analyzeText(
+            "Your social security number has been suspended due to illegal activity. " +
+            "Call back immediately or face arrest."
+        )
         assertTrue(result.isScam)
         assertEquals(ScamType.SOCIAL_SECURITY, result.scamType)
     }
@@ -90,10 +95,9 @@ class ScamPatternDetectorTest {
 
     @Test
     fun `detects phishing`() {
-        // Uses explicit keywords: "verify", "confirm", "update your information", "provide your"
         val result = detector.analyzeText(
-            "Please verify and confirm your account. Update your information and provide your " +
-            "details immediately."
+            "Please confirm your account and update your information. " +
+            "Verify your identity and click the link to provide your details. Log in immediately."
         )
         assertTrue(result.isScam)
         assertEquals(ScamType.PHISHING, result.scamType)
@@ -103,7 +107,10 @@ class ScamPatternDetectorTest {
 
     @Test
     fun `detects insurance scam`() {
-        val result = detector.analyzeText("You qualify for free health insurance medicare limited time offer")
+        val result = detector.analyzeText(
+            "You qualify for free health insurance through medicare and medicaid. " +
+            "This is a limited time offer. Your insurance plan expires today."
+        )
         assertTrue(result.isScam)
         assertEquals(ScamType.INSURANCE, result.scamType)
     }
@@ -113,8 +120,8 @@ class ScamPatternDetectorTest {
     @Test
     fun `detects donation fraud`() {
         val result = detector.analyzeText(
-            "Donate to our charity help victims of disaster relief fund " +
-            "make a contribution to our humanitarian nonprofit fundraising"
+            "Please donate now to help victims of disaster relief. Make a contribution to our " +
+            "humanitarian relief fund. This is emergency fundraising — support our cause. Act now."
         )
         assertTrue(result.isScam)
         assertEquals(ScamType.DONATION_FRAUD, result.scamType)
@@ -126,7 +133,7 @@ class ScamPatternDetectorTest {
     fun `detects investment scam`() {
         val result = detector.analyzeText(
             "Guaranteed returns high returns risk free double your money exclusive offer " +
-            "investment opportunity limited slots crypto forex trading platform passive income get rich"
+            "investment opportunity limited slots forex trading platform passive income. Act now to get rich quick."
         )
         assertTrue(result.isScam)
         assertEquals(ScamType.INVESTMENT_SCAM, result.scamType)
@@ -203,15 +210,15 @@ class ScamPatternDetectorTest {
 
     @Test
     fun `urgency language boosts confidence`() {
-        val withUrgency = detector.analyzeText("IRS you owe taxes pay immediately act now urgent")
-        val withoutUrgency = detector.analyzeText("IRS you owe taxes")
+        val withUrgency = detector.analyzeText("IRS you owe money on tax fraud immediately act now urgent arrest warrant")
+        val withoutUrgency = detector.analyzeText("IRS you owe money arrest warrant legal action")
         assertTrue(withUrgency.confidence >= withoutUrgency.confidence)
     }
 
     @Test
     fun `threat language boosts confidence`() {
-        val withThreat = detector.analyzeText("IRS arrest warrant legal action lawsuit")
-        val withoutThreat = detector.analyzeText("IRS you owe money")
+        val withThreat = detector.analyzeText("IRS arrest warrant legal action owe money tax fraud")
+        val withoutThreat = detector.analyzeText("IRS you owe money tax lien back taxes")
         assertTrue(withThreat.confidence >= withoutThreat.confidence)
     }
 

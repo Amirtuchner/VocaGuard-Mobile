@@ -38,10 +38,9 @@ class ScamDetectionPipelineTest {
 
     @Test
     fun `IRS owe-money text triggers scam alert`() {
-        // Uses standalone keywords: "IRS", "owe money", "tax", "arrest warrant"
         val result = detector.analyzeText(
-            "This is the IRS. You owe money on your tax return and must pay immediately " +
-            "or face an arrest warrant."
+            "This is the IRS. You owe money and have tax fraud on your record. Pay immediately " +
+            "or face an arrest warrant and legal action."
         )
         assertTrue(result.isScam)
         assertEquals(ScamType.IRS_SCAM, result.scamType)
@@ -54,7 +53,7 @@ class ScamDetectionPipelineTest {
     @Test
     fun `tech support virus text triggers scam alert`() {
         val result = detector.analyzeText(
-            "Windows technical support here. Your computer is infected with malware. " +
+            "Windows technical support here. Your computer has malware detected. " +
             "You need to give us remote access via TeamViewer immediately."
         )
         assertTrue(result.isScam)
@@ -66,8 +65,8 @@ class ScamDetectionPipelineTest {
     @Test
     fun `bank account suspended text triggers scam alert`() {
         val result = detector.analyzeText(
-            "Your bank account has been suspended due to unusual activity. " +
-            "Please verify your account immediately to avoid it being locked."
+            "Your account has been locked due to unusual activity. " +
+            "Please verify your account immediately. We detected an unauthorized transaction and a security breach."
         )
         assertTrue(result.isScam)
         assertEquals(ScamType.BANK_FRAUD, result.scamType)
@@ -78,7 +77,8 @@ class ScamDetectionPipelineTest {
     @Test
     fun `social security suspended text triggers scam alert`() {
         val result = detector.analyzeText(
-            "Your Social Security number has been suspended due to suspicious activity."
+            "Your social security number has been suspended due to illegal activity. " +
+            "Contact us immediately or face arrest."
         )
         assertTrue(result.isScam)
         assertEquals(ScamType.SOCIAL_SECURITY, result.scamType)

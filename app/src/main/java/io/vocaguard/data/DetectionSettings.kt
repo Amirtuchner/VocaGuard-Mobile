@@ -24,9 +24,9 @@ class DetectionSettings private constructor(context: Context) {
         get() = prefs.getInt(KEY_SENSITIVITY, DEFAULT_SENSITIVITY)
         set(value) = prefs.edit().putInt(KEY_SENSITIVITY, value.coerceIn(0, 100)).apply()
 
-    /** Confidence threshold derived from sensitivity (0.47 – 0.97). */
+    /** Confidence threshold derived from sensitivity (0.40 – 0.90). */
     val confidenceThreshold: Float
-        get() = 0.97f - (sensitivity / 100f) * 0.50f
+        get() = 0.90f - (sensitivity / 100f) * 0.50f
 
     /** BCP-47 locale tag for TTS and SpeechRecognizer (e.g. "en-US", "es-ES"). */
     var locale: String

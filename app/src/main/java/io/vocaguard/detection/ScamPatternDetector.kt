@@ -7,7 +7,7 @@ class ScamPatternDetector() {
 
     companion object {
         private const val TAG = "ScamPatternDetector"
-        private const val CONFIDENCE_THRESHOLD = 0.72f
+        private const val CONFIDENCE_THRESHOLD = 0.65f
         private const val MIN_KEYWORD_MATCHES = 2
 
         // Scam pattern keywords organized by type.
