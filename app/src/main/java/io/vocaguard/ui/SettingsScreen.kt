@@ -65,6 +65,7 @@ fun SettingsTab(
     var showPrivacyPolicy by remember { mutableStateOf(false) }
     var alertTypeExpanded by remember { mutableStateOf(false) }
     var reportEndpointInput by remember(reportEndpointUrl) { mutableStateOf(reportEndpointUrl) }
+    var showMessengerTipDialog by remember { mutableStateOf(false) }
 
     // Family Guard local state
     var familyWebhookInput by remember(familyWebhookUrl) { mutableStateOf(familyWebhookUrl) }
@@ -259,9 +260,33 @@ fun SettingsTab(
             }
         }
 
-        // ── Message Scanning (WhatsApp / Telegram) ──────────────────────────────
+        // ── Message Scanning (WhatsApp / Telegram / Messenger) ──────────────────
         item {
             val hasAccess = permissionsManager.hasNotificationListenerAccess()
+
+            if (showMessengerTipDialog) {
+                AlertDialog(
+                    onDismissRequest = { showMessengerTipDialog = false },
+                    title = { Text("Enable Messenger Previews") },
+                    text = {
+                        Text(
+                            "VocaGuard scans your Facebook Messenger notifications to detect scam " +
+                            "messages before you open them.\n\n" +
+                            "For this to work, Messenger must show message previews in notifications:\n\n" +
+                            "1. Open Facebook Messenger\n" +
+                            "2. Tap your profile picture (top left)\n" +
+                            "3. Scroll down and tap Notifications & Sounds\n" +
+                            "4. Make sure Preview in notifications is turned ON"
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showMessengerTipDialog = false }) {
+                            Text("Got it")
+                        }
+                    }
+                )
+            }
+
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -271,18 +296,21 @@ fun SettingsTab(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Scans WhatsApp and Telegram message notifications for scam patterns. " +
-                            "When a scam is detected the notification is dismissed and you receive a " +
-                            "VocaGuard warning instead. Requires Notification Access.",
+                        text = "Scans WhatsApp, Telegram, and Facebook Messenger notifications for " +
+                            "scam patterns. When a scam is detected the notification is dismissed and " +
+                            "you receive a VocaGuard warning instead. Requires Notification Access.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     AlertToggleRow(
                         label = "Scan messages",
-                        description = "WhatsApp, Telegram",
+                        description = "WhatsApp, Telegram, Messenger",
                         checked = messageScanEnabled,
-                        onCheckedChange = { viewModel.setMessageScanEnabled(it) }
+                        onCheckedChange = { enabled ->
+                            viewModel.setMessageScanEnabled(enabled)
+                            if (enabled) showMessengerTipDialog = true
+                        }
                     )
                     if (!hasAccess) {
                         Spacer(modifier = Modifier.height(8.dp))
