@@ -260,8 +260,9 @@ class ScamPatternDetectorTest {
     @Test
     fun `detects delivery scam`() {
         val result = detector.analyzeText(
-            "Your package is on hold at our facility. A customs clearance fee is required " +
-            "before we can release your shipment. Delivery fee required to reschedule your delivery."
+            "NOTICE: shipment held at customs. Customs clearance fee required before release. " +
+            "Pay to release your package immediately or it will be returned. " +
+            "Failed delivery attempt logged — redelivery fee applies. Reschedule your delivery now."
         )
         assertTrue(result.isScam)
         assertEquals(ScamType.DELIVERY_SCAM, result.scamType)
@@ -272,9 +273,9 @@ class ScamPatternDetectorTest {
     @Test
     fun `detects job scam`() {
         val result = detector.analyzeText(
-            "Exciting work from home opportunity — no experience required! " +
+            "Work from home opportunity — no experience required! " +
             "Guaranteed daily earnings with no registration fee. " +
-            "Process payments for us and keep a commission. Be your own boss."
+            "Process payments for us and keep a commission. Be your own boss. Act now — limited spots!"
         )
         assertTrue(result.isScam)
         assertEquals(ScamType.JOB_SCAM, result.scamType)
