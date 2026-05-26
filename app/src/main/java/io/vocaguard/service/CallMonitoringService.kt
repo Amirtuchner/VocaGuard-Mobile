@@ -41,7 +41,7 @@ class CallMonitoringService : Service() {
         private const val CHANNEL_ID = "call_monitoring_channel"
         private const val MAX_SPEECH_RESTARTS = 10
         /** Max time to wait for a single STT session to produce a result or error (ms). */
-        private const val STT_SESSION_TIMEOUT_MS = 30_000L
+        private const val STT_SESSION_TIMEOUT_MS = 8_000L
 
         // VAD (Voice Activity Detection) constants
         /** RMS dB below which the mic is considered silent. */
@@ -284,7 +284,7 @@ class CallMonitoringService : Service() {
                         return
                     }
 
-                    serviceScope.launch {
+                    serviceScope.launch(Dispatchers.Main) {
                         delay(delayMs)
                         if (isActive && isMonitoring) startSpeechRecognition()
                     }
@@ -297,7 +297,7 @@ class CallMonitoringService : Service() {
                     handleSpeechResults(results)
                     // Continue recognition
                     if (isMonitoring) {
-                        serviceScope.launch {
+                        serviceScope.launch(Dispatchers.Main) {
                             delay(SPEECH_RESTART_DELAY_MS)
                             if (isActive && isMonitoring) {
                                 startSpeechRecognition()
@@ -333,7 +333,7 @@ class CallMonitoringService : Service() {
 
             // Watchdog: if STT neither completes nor errors within the timeout, force a restart
             // to prevent the foreground service from hanging indefinitely.
-            sttTimeoutJob = serviceScope.launch {
+            sttTimeoutJob = serviceScope.launch(Dispatchers.Main) {
                 delay(STT_SESSION_TIMEOUT_MS)
                 if (isActive && isMonitoring) {
                     Log.w(TAG, "STT session timed out — forcing restart")
@@ -434,7 +434,7 @@ class CallMonitoringService : Service() {
     }
 
     private fun analyzeForScamPatterns(text: String) {
-        val detectionResult = scamDetector.analyzeText(text, buildCallContext())
+        val detectionResult = scamDetector.analyzeText(text, buildCallContext(), allowMlOverride = true)
 
         if (!detectionResult.isScam) return
 

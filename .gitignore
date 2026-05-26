@@ -24,3 +24,4 @@ ml_training/*.pyc
 google-services.json
 *.keystore
 *.jks
+app/google-services.json

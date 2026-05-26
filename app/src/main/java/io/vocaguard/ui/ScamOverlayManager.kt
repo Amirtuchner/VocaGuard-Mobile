@@ -5,11 +5,13 @@ import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.telecom.TelecomManager
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.TextView
 import io.vocaguard.R
 import io.vocaguard.data.ScamType
@@ -33,6 +35,7 @@ class ScamOverlayManager(private val context: Context) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var overlayView: View? = null
     private val autoDismissRunnable = Runnable { dismiss() }
+    private var incomingCallView: View? = null
 
     /** True if the app has the SYSTEM_ALERT_WINDOW permission. */
     fun canShowOverlay(): Boolean = Settings.canDrawOverlays(context)
@@ -88,6 +91,7 @@ class ScamOverlayManager(private val context: Context) {
         mainHandler.post {
             mainHandler.removeCallbacks(autoDismissRunnable)
             removeOverlayView()
+            removeIncomingCallView()
         }
     }
 
@@ -97,6 +101,65 @@ class ScamOverlayManager(private val context: Context) {
                 windowManager.removeView(it)
             } catch (_: Exception) { /* already removed */ }
             overlayView = null
+        }
+    }
+
+    /** Show an incoming-call overlay with the caller's number and optional scam warning. */
+    fun showIncomingCall(phoneNumber: String, isScam: Boolean, scamType: ScamType?) {
+        if (!canShowOverlay()) {
+            Log.w(TAG, "SYSTEM_ALERT_WINDOW not granted — incoming call overlay skipped")
+            return
+        }
+        mainHandler.post {
+            removeIncomingCallView()
+            val view = LayoutInflater.from(context).inflate(R.layout.overlay_incoming_call, null)
+            view.findViewById<TextView>(R.id.incoming_number)?.text =
+                phoneNumber.ifBlank { "Unknown Number" }
+            val warningView = view.findViewById<TextView>(R.id.incoming_scam_warning)
+            if (isScam && scamType != null) {
+                warningView?.text = "⚠ SCAM CALL DETECTED\n${formatScamType(scamType)}\nDo not answer!"
+                warningView?.visibility = View.VISIBLE
+            } else {
+                warningView?.visibility = View.GONE
+            }
+            view.findViewById<Button>(R.id.btn_decline_incoming)?.setOnClickListener {
+                try {
+                    val tm = context.getSystemService(TelecomManager::class.java)
+                    @Suppress("DEPRECATION")
+                    tm.endCall()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to decline call", e)
+                }
+                dismissIncomingCall()
+            }
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+                PixelFormat.TRANSLUCENT
+            ).apply { gravity = Gravity.TOP or Gravity.FILL_HORIZONTAL }
+            try {
+                windowManager.addView(view, params)
+                incomingCallView = view
+                Log.d(TAG, "Incoming call overlay shown: $phoneNumber isScam=$isScam")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to add incoming call overlay", e)
+            }
+        }
+    }
+
+    /** Remove the incoming call overlay (call when the call is answered, declined, or ends). */
+    fun dismissIncomingCall() {
+        mainHandler.post { removeIncomingCallView() }
+    }
+
+    private fun removeIncomingCallView() {
+        incomingCallView?.let {
+            try { windowManager.removeView(it) } catch (_: Exception) { /* already removed */ }
+            incomingCallView = null
         }
     }
 

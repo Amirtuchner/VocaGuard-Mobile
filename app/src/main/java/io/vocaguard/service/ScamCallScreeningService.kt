@@ -1,10 +1,15 @@
 package io.vocaguard.service
 
 import android.content.Intent
+import android.os.Build
 import android.telecom.Call
 import android.telecom.CallScreeningService
+import android.telephony.PhoneStateListener
+import android.telephony.TelephonyCallback
+import android.telephony.TelephonyManager
 import android.util.Log
 import io.vocaguard.data.ScamDatabaseManager
+import io.vocaguard.ui.ScamOverlayManager
 
 class ScamCallScreeningService : CallScreeningService() {
 
@@ -12,68 +17,92 @@ class ScamCallScreeningService : CallScreeningService() {
         private const val TAG = "ScamCallScreening"
     }
 
+    private val overlayManager by lazy { ScamOverlayManager(applicationContext) }
+    private var telephonyCallback: TelephonyCallback? = null
+    @Suppress("DEPRECATION")
+    private var phoneStateListener: PhoneStateListener? = null
+
     override fun onScreenCall(callDetails: Call.Details) {
-        Log.d(TAG, "Screening call from: ${callDetails.handle}")
-
         val phoneNumber = callDetails.handle?.schemeSpecificPart ?: ""
+        Log.d(TAG, "Screening call from: $phoneNumber")
 
-        // Block calls with no caller ID (hidden, restricted, or truly unknown number).
-        // When a caller withholds their number Android sets handle to null, so phoneNumber is blank.
-        val isUnknownCaller = phoneNumber.isBlank()
-
-        // Check against scam database
         val scamDatabaseManager = ScamDatabaseManager.getInstance(applicationContext)
         val scamInfo = scamDatabaseManager.checkNumber(phoneNumber)
 
-        val response = CallResponse.Builder()
+        // Always allow the call to ring — we warn via overlay instead of silent blocking
+        respondToCall(
+            callDetails,
+            CallResponse.Builder()
+                .setDisallowCall(false)
+                .setRejectCall(false)
+                .build()
+        )
 
-        when {
-            isUnknownCaller -> {
-                // Block calls with no caller ID
-                Log.w(TAG, "Blocking unknown/hidden caller")
-                response
-                    .setDisallowCall(true)
-                    .setRejectCall(true)
-                    .setSkipCallLog(false)
-                    .setSkipNotification(false)
-            }
-            scamInfo.isKnownScammer -> {
-                // Block known scammers
-                Log.w(TAG, "Blocking known scammer: $phoneNumber")
-                response
-                    .setDisallowCall(true)
-                    .setRejectCall(true)
-                    .setSkipCallLog(false)
-                    .setSkipNotification(false)
-            }
-            scamInfo.isSuspicious -> {
-                // Allow but mark as suspicious for monitoring
-                Log.i(TAG, "Allowing suspicious number: $phoneNumber")
-                response
-                    .setDisallowCall(false)
-                    .setRejectCall(false)
-                    .setSkipCallLog(false)
-                    .setSkipNotification(false)
-                    .setSilenceCall(false)
-            }
-            else -> {
-                // Allow normal calls
-                Log.d(TAG, "Allowing normal call: $phoneNumber")
-                response
-                    .setDisallowCall(false)
-                    .setRejectCall(false)
-            }
+        // Show the incoming call overlay with scam status
+        if (phoneNumber.isNotBlank()) {
+            overlayManager.showIncomingCall(
+                phoneNumber = phoneNumber,
+                isScam = scamInfo.isKnownScammer,
+                scamType = if (scamInfo.isKnownScammer) scamInfo.scamType else null
+            )
+            registerCallEndListener()
         }
 
-        respondToCall(callDetails, response.build())
-
-        // If suspicious or allowed (and not unknown), start monitoring service
-        if (!isUnknownCaller && !scamInfo.isKnownScammer) {
+        // Start audio monitoring for non-scammer calls (unknown / suspicious)
+        if (!scamInfo.isKnownScammer) {
             scamDatabaseManager.markCallForMonitoring(phoneNumber, scamInfo.isSuspicious)
-            val monitoringIntent = Intent(applicationContext, CallMonitoringService::class.java).apply {
-                action = CallMonitoringService.ACTION_START_MONITORING
+            startForegroundService(
+                Intent(applicationContext, CallMonitoringService::class.java).apply {
+                    action = CallMonitoringService.ACTION_START_MONITORING
+                }
+            )
+        }
+    }
+
+    /** Registers a one-shot listener that dismisses the overlay when the call ends. */
+    private fun registerCallEndListener() {
+        val tm = getSystemService(TelephonyManager::class.java)
+        unregisterCallEndListener(tm)  // clean up any previous listener
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val callback = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
+                override fun onCallStateChanged(state: Int) {
+                    if (state == TelephonyManager.CALL_STATE_IDLE) {
+                        overlayManager.dismissIncomingCall()
+                        tm.unregisterTelephonyCallback(this)
+                        telephonyCallback = null
+                    }
+                }
             }
-            startForegroundService(monitoringIntent)
+            telephonyCallback = callback
+            tm.registerTelephonyCallback(mainExecutor, callback)
+        } else {
+            @Suppress("DEPRECATION")
+            val listener = object : PhoneStateListener() {
+                @Deprecated("Deprecated in API 31")
+                override fun onCallStateChanged(state: Int, number: String?) {
+                    if (state == TelephonyManager.CALL_STATE_IDLE) {
+                        overlayManager.dismissIncomingCall()
+                        @Suppress("DEPRECATION")
+                        tm.listen(this, PhoneStateListener.LISTEN_NONE)
+                        phoneStateListener = null
+                    }
+                }
+            }
+            phoneStateListener = listener
+            @Suppress("DEPRECATION")
+            tm.listen(listener, PhoneStateListener.LISTEN_CALL_STATE)
+        }
+    }
+
+    private fun unregisterCallEndListener(tm: TelephonyManager) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            telephonyCallback?.let { tm.unregisterTelephonyCallback(it) }
+            telephonyCallback = null
+        } else {
+            @Suppress("DEPRECATION")
+            phoneStateListener?.let { tm.listen(it, PhoneStateListener.LISTEN_NONE) }
+            phoneStateListener = null
         }
     }
 }

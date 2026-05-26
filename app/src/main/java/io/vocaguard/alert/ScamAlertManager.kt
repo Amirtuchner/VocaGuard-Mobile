@@ -36,6 +36,7 @@ class ScamAlertManager(private val context: Context) {
 
     private var textToSpeech: TextToSpeech? = null
     private var ttsInitialized = false
+    private var pendingTtsScamType: ScamType? = null
     private val vibrator: Vibrator? = context.getSystemService(Vibrator::class.java)
     private val alertScope = CoroutineScope(Dispatchers.IO + Job())
     private val familyAlertSender = FamilyAlertSender(context)
@@ -57,6 +58,8 @@ class ScamAlertManager(private val context: Context) {
                 }
                 ttsInitialized = true
                 Log.d(TAG, "TTS initialized with locale $localeTag")
+                pendingTtsScamType?.let { speakAlert(it) }
+                pendingTtsScamType = null
             } else {
                 Log.e(TAG, "TTS initialization failed")
                 ttsInitialized = false
@@ -140,7 +143,8 @@ class ScamAlertManager(private val context: Context) {
 
     private fun speakAlert(scamType: ScamType) {
         if (!ttsInitialized) {
-            Log.w(TAG, "TTS not initialized, skipping speech alert")
+            Log.d(TAG, "TTS not ready yet, queuing speech for $scamType")
+            pendingTtsScamType = scamType
             return
         }
 

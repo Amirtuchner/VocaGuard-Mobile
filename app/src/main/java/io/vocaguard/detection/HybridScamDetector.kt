@@ -17,7 +17,7 @@ class HybridScamDetector(private val context: Context) {
     private val mlClassifier = TFLiteScamClassifier(context)
     private val settings = DetectionSettings.getInstance(context)
 
-    fun analyzeText(text: String, context: CallContext? = null): DetectionResult {
+    fun analyzeText(text: String, context: CallContext? = null, allowMlOverride: Boolean = false): DetectionResult {
         // Get rule-based detection result
         val ruleBasedResult = ruleBasedDetector.analyzeText(text)
 
@@ -31,13 +31,14 @@ class HybridScamDetector(private val context: Context) {
         }
 
         // Ensemble: Combine both approaches
-        return ensembleResults(ruleBasedResult, mlResult, text)
+        return ensembleResults(ruleBasedResult, mlResult, text, allowMlOverride)
     }
 
     private fun ensembleResults(
         ruleResult: DetectionResult,
         mlResult: io.vocaguard.ml.MLDetectionResult,
-        text: String
+        text: String,
+        allowMlOverride: Boolean = false
     ): DetectionResult {
         // Weighted ensemble: 40% rule-based, 60% ML
         val ruleWeight = 0.4f
@@ -45,8 +46,11 @@ class HybridScamDetector(private val context: Context) {
 
         val combinedConfidence = (ruleResult.confidence * ruleWeight) + (mlResult.confidence * mlWeight)
 
-        // Determine if it's a scam — threshold comes from user-configurable sensitivity
-        val isScam = combinedConfidence >= settings.confidenceThreshold
+        // Determine if it's a scam — threshold comes from user-configurable sensitivity.
+        // allowMlOverride: for live calls where STT noise can zero out the rule-based score,
+        // trust ML alone if it is ≥90% confident. Not used for message scanning.
+        val isScam = combinedConfidence >= settings.confidenceThreshold ||
+                     (allowMlOverride && mlResult.confidence >= 0.9f)
 
         // Choose scam type
         val scamType = when {
