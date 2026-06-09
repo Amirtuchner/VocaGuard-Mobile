@@ -1,6 +1,7 @@
 package io.vocaguard.ui
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
@@ -13,6 +14,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import io.vocaguard.R
 import io.vocaguard.data.ScamType
 
@@ -133,12 +135,17 @@ class ScamOverlayManager(private val context: Context) {
                 warningView?.visibility = View.GONE
             }
             view.findViewById<Button>(R.id.btn_decline_incoming)?.setOnClickListener {
-                try {
-                    val tm = context.getSystemService(TelecomManager::class.java)
-                    @Suppress("DEPRECATION")
-                    tm.endCall()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to decline call", e)
+                if (ContextCompat.checkSelfPermission(
+                        context, android.Manifest.permission.ANSWER_PHONE_CALLS
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    try {
+                        val tm = context.getSystemService(TelecomManager::class.java)
+                        @Suppress("DEPRECATION")
+                        tm.endCall()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to decline call", e)
+                    }
                 }
                 dismissIncomingCall()
             }
