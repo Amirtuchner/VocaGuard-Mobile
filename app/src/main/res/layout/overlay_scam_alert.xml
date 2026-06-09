@@ -24,4 +24,32 @@
         android:textSize="13sp"
         android:textColor="#DDFFFFFF" />
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp"
+        android:gravity="end">
+
+        <Button
+            android:id="@+id/btn_not_a_scam"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="Not a scam"
+            android:backgroundTint="#44FFFFFF"
+            android:textColor="#DDFFFFFF"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btn_dismiss_overlay"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:text="Dismiss"
+            android:backgroundTint="#44FFFFFF"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
 </LinearLayout>

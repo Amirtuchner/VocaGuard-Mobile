@@ -14,6 +14,8 @@ import androidx.compose.material.icons.filled.Accessibility
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
@@ -109,6 +111,7 @@ fun HomeTab(
     }
 
     val allGranted = permissions.values.all { it }
+    var permissionsExpanded by remember { mutableStateOf(!allGranted) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -186,73 +189,87 @@ fun HomeTab(
             }
         }
 
+        // Permissions section header — tappable toggle
         item {
-            Text(
-                text = "Permissions",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-        }
-
-        items(permissions.toList()) { (name, granted) ->
-            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                PermissionItem(
-                    name = name,
-                    granted = granted,
-                    onClick = if (granted) null else ({
-                        when (name) {
-                            "Draw Overlay"       -> permissionsManager.openOverlaySettings()
-                            "Accessibility"      -> permissionsManager.openAccessibilitySettings()
-                            "Call Screening"     -> permissionsManager.openCallScreeningSettings()
-                            "Notification Access"-> permissionsManager.openNotificationListenerSettings()
-                            else                 -> permissionsManager.openAppSettings()
-                        }
-                    })
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { permissionsExpanded = !permissionsExpanded }
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Permissions",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = if (permissionsExpanded) Icons.Default.KeyboardArrowUp
+                                  else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (permissionsExpanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        if (!allGranted) {
-            item {
-                Button(
-                    onClick = {
-                        val missingRuntime = PermissionsManager.REQUIRED_PERMISSIONS.filter {
-                            permissionsManager.checkAllPermissions().values.contains(false)
-                        }
-                        val anyRuntimeMissing = PermissionsManager.REQUIRED_PERMISSIONS.any {
-                            permissions.getOrDefault(
-                                when (it) {
-                                    android.Manifest.permission.READ_PHONE_STATE -> "Phone State"
-                                    android.Manifest.permission.READ_CALL_LOG -> "Call Log"
-                                    android.Manifest.permission.ANSWER_PHONE_CALLS -> "Answer Calls"
-                                    android.Manifest.permission.RECORD_AUDIO -> "Record Audio"
-                                    android.Manifest.permission.POST_NOTIFICATIONS -> "Notifications"
-                                    else -> it
-                                }, true
-                            ) == false
-                        }
-                        if (anyRuntimeMissing) {
-                            runtimePermLauncher.launch(PermissionsManager.REQUIRED_PERMISSIONS)
-                        } else {
-                            val sysPerms = mutableListOf<String>()
-                            if (permissions["Draw Overlay"] == false) sysPerms.add("Draw Overlay")
-                            if (permissions["Call Screening"] == false) sysPerms.add("Call Screening")
-                            if (permissions["Accessibility"] == false) sysPerms.add("Accessibility")
-                            if (permissions["Notification Access"] == false) sysPerms.add("Notification Access")
-                            if (sysPerms.isNotEmpty()) {
-                                pendingSystemPerms = sysPerms
-                                showSystemGuide = true
+        if (permissionsExpanded) {
+            items(permissions.toList()) { (name, granted) ->
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    PermissionItem(
+                        name = name,
+                        granted = granted,
+                        onClick = if (granted) null else ({
+                            when (name) {
+                                "Draw Overlay"       -> permissionsManager.openOverlaySettings()
+                                "Accessibility"      -> permissionsManager.openAccessibilitySettings()
+                                "Call Screening"     -> permissionsManager.openCallScreeningSettings()
+                                "Notification Access"-> permissionsManager.openNotificationListenerSettings()
+                                else                 -> permissionsManager.openAppSettings()
                             }
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                ) {
-                    Icon(Icons.Default.Shield, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Set Up Protection")
+                        })
+                    )
+                }
+            }
+
+            if (!allGranted) {
+                item {
+                    Button(
+                        onClick = {
+                            val anyRuntimeMissing = PermissionsManager.REQUIRED_PERMISSIONS.any {
+                                permissions.getOrDefault(
+                                    when (it) {
+                                        android.Manifest.permission.READ_PHONE_STATE -> "Phone State"
+                                        android.Manifest.permission.READ_CALL_LOG -> "Call Log"
+                                        android.Manifest.permission.ANSWER_PHONE_CALLS -> "Answer Calls"
+                                        android.Manifest.permission.RECORD_AUDIO -> "Record Audio"
+                                        android.Manifest.permission.POST_NOTIFICATIONS -> "Notifications"
+                                        else -> it
+                                    }, true
+                                ) == false
+                            }
+                            if (anyRuntimeMissing) {
+                                runtimePermLauncher.launch(PermissionsManager.REQUIRED_PERMISSIONS)
+                            } else {
+                                val sysPerms = mutableListOf<String>()
+                                if (permissions["Draw Overlay"] == false) sysPerms.add("Draw Overlay")
+                                if (permissions["Call Screening"] == false) sysPerms.add("Call Screening")
+                                if (permissions["Accessibility"] == false) sysPerms.add("Accessibility")
+                                if (permissions["Notification Access"] == false) sysPerms.add("Notification Access")
+                                if (sysPerms.isNotEmpty()) {
+                                    pendingSystemPerms = sysPerms
+                                    showSystemGuide = true
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Set Up Protection")
+                    }
                 }
             }
         }

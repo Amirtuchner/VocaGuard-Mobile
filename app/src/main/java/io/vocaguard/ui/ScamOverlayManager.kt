@@ -60,6 +60,16 @@ class ScamOverlayManager(private val context: Context) {
             view.findViewById<TextView>(R.id.overlay_subtitle)?.text =
                 "${(confidence * 100).toInt()}% confidence — do not share personal info"
 
+            view.findViewById<Button>(R.id.btn_dismiss_overlay)?.setOnClickListener {
+                mainHandler.removeCallbacks(autoDismissRunnable)
+                removeOverlayView()
+            }
+            view.findViewById<Button>(R.id.btn_not_a_scam)?.setOnClickListener {
+                Log.i(TAG, "User marked as false positive: $scamType (${(confidence * 100).toInt()}%)")
+                mainHandler.removeCallbacks(autoDismissRunnable)
+                removeOverlayView()
+            }
+
             val params = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,

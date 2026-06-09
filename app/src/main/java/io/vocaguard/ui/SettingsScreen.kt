@@ -66,6 +66,7 @@ fun SettingsTab(
     var alertTypeExpanded by remember { mutableStateOf(false) }
     var reportEndpointInput by remember(reportEndpointUrl) { mutableStateOf(reportEndpointUrl) }
     var showMessengerTipDialog by remember { mutableStateOf(false) }
+    var advancedExpanded by remember { mutableStateOf(false) }
 
     // Family Guard local state
     var familyWebhookInput by remember(familyWebhookUrl) { mutableStateOf(familyWebhookUrl) }
@@ -460,44 +461,17 @@ fun SettingsTab(
             }
         }
 
-        // ── Community report submission endpoint ───────────────────────────────
+        // ── Advanced settings toggle ───────────────────────────────────────────
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Report Aggregation",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Optional: enter an HTTPS endpoint to contribute your scam reports to a community database. Only the phone number and scam type are sent — no transcript or personal data.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = reportEndpointInput,
-                        onValueChange = {
-                            reportEndpointInput = it
-                            viewModel.updateReportEndpointUrl(it)
-                        },
-                        label = { Text("Endpoint URL (https://…)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = { viewModel.saveReportEndpointUrl() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(if (reportEndpointSaved) "Saved!" else "Save Endpoint")
-                    }
-                }
+            OutlinedButton(
+                onClick = { advancedExpanded = !advancedExpanded },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (advancedExpanded) "Hide Advanced Settings" else "Advanced Settings")
             }
         }
 
-        item {
+        if (advancedExpanded) item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -541,7 +515,43 @@ fun SettingsTab(
             }
         }
 
-        item {
+        if (advancedExpanded) item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Report Aggregation",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Optional: enter an HTTPS endpoint to contribute your scam reports to a community database. Only the phone number and scam type are sent — no transcript or personal data.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = reportEndpointInput,
+                        onValueChange = {
+                            reportEndpointInput = it
+                            viewModel.updateReportEndpointUrl(it)
+                        },
+                        label = { Text("Endpoint URL (https://…)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { viewModel.saveReportEndpointUrl() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (reportEndpointSaved) "Saved!" else "Save Endpoint")
+                    }
+                }
+            }
+        }
+
+        if (advancedExpanded) item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -574,29 +584,7 @@ fun SettingsTab(
             }
         }
 
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "About VocaGuard",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "VocaGuard protects you from scam calls by:\n\n" +
-                                "• Pre-screening calls against scam databases\n" +
-                                "• Real-time audio analysis during calls\n" +
-                                "• Detecting common scam patterns\n" +
-                                "• Alerting you with audio and visual warnings\n\n" +
-                                "Version ${BuildConfig.VERSION_NAME}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-        }
-
-        item {
+        if (advancedExpanded) item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -643,7 +631,7 @@ fun SettingsTab(
             }
         }
 
-        item {
+        if (advancedExpanded) item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
