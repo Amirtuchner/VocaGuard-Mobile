@@ -8,7 +8,7 @@ class ScamPatternDetector() {
     companion object {
         private const val TAG = "ScamPatternDetector"
         private const val CONFIDENCE_THRESHOLD = 0.65f
-        private const val MIN_KEYWORD_MATCHES = 2
+        private const val MIN_KEYWORD_MATCHES = 3
 
         // Scam pattern keywords organized by type.
         // Only multi-word or highly specific phrases — single generic words removed to cut false positives.
@@ -299,29 +299,33 @@ class ScamPatternDetector() {
             )
         )
 
-        // High-priority urgent language patterns
+        // High-priority urgent language patterns.
+        // Single generic words ("urgent", "now") removed — they appear in normal conversation
+        // and only become meaningful when already surrounded by 3+ scam-type keywords.
         private val URGENCY_KEYWORDS = listOf(
             // English
-            "immediately", "urgent", "right now", "within 24 hours",
+            "immediately", "right now", "within 24 hours",
             "today only", "expires today", "last chance", "final notice",
             "act now", "time sensitive", "limited time",
             // Russian
             "срочно", "немедленно", "последний шанс", "действуйте сейчас",
             // Hebrew
-            "דחוף", "עכשיו", "מיד", "הזדמנות אחרונה", "תוך 24 שעות",
+            "דחוף", "מיד", "הזדמנות אחרונה", "תוך 24 שעות",
             // Arabic
-            "عاجل", "الآن", "فوراً", "فرصة أخيرة", "خلال 24 ساعة",
+            "عاجل", "فوراً", "فرصة أخيرة", "خلال 24 ساعة",
             // Spanish
             "urgente", "inmediatamente", "ahora mismo", "última oportunidad", "solo hoy", "tiempo limitado",
             // French
             "immédiatement", "maintenant", "dernière chance", "aujourd'hui seulement", "temps limité"
         )
 
-        // Threat/pressure keywords
+        // Threat/pressure keywords.
+        // Generic English words ("police", "cancelled", "locked", "frozen", "suspended") removed —
+        // they appear routinely in news, notifications, and normal chat. Only terms that are
+        // rarely used outside a threat context are kept.
         private val THREAT_KEYWORDS = listOf(
             // English
-            "arrest", "police", "lawsuit", "legal action", "suspended",
-            "cancelled", "locked", "frozen", "seized", "warrant",
+            "arrest", "lawsuit", "legal action", "seized", "warrant",
             // Russian
             "арест", "полиция", "уголовное дело", "заблокирован", "заморожен",
             // Hebrew
@@ -357,7 +361,7 @@ class ScamPatternDetector() {
             "n'appelez pas la police"
         )
 
-        // Payment request keywords
+        // Payment request keywords.
         private val PAYMENT_KEYWORDS = listOf(
             // English
             "gift card", "bitcoin", "wire transfer", "cash", "prepaid card",

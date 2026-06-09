@@ -31,18 +31,21 @@ class HybridScamDetector(private val context: Context) {
         }
 
         // Ensemble: Combine both approaches
-        return ensembleResults(ruleBasedResult, mlResult, text, allowMlOverride)
+        return ensembleResults(ruleBasedResult, mlResult, hasCallContext = context != null, allowMlOverride)
     }
 
     private fun ensembleResults(
         ruleResult: DetectionResult,
         mlResult: io.vocaguard.ml.MLDetectionResult,
-        text: String,
+        hasCallContext: Boolean,
         allowMlOverride: Boolean = false
     ): DetectionResult {
-        // Weighted ensemble: 40% rule-based, 60% ML
-        val ruleWeight = 0.4f
-        val mlWeight = 0.6f
+        // When a CallContext is available (live calls), the ML model has 11 audio/prosody
+        // features to work with in addition to text features — trust it more.
+        // When there is no context (message scanning, text-only), those 11 features are
+        // always 0, so the ML has less signal; give the rule-based detector more weight.
+        val ruleWeight = if (hasCallContext) 0.4f else 0.6f
+        val mlWeight   = if (hasCallContext) 0.6f else 0.4f
 
         val combinedConfidence = (ruleResult.confidence * ruleWeight) + (mlResult.confidence * mlWeight)
 

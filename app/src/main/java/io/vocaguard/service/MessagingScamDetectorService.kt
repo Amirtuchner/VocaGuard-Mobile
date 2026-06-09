@@ -34,6 +34,20 @@ class MessagingScamDetectorService : NotificationListenerService() {
     companion object {
         private const val TAG = "MessagingScamDetector"
 
+        /**
+         * Minimum confidence required to fire an alert for a scanned message, regardless of
+         * the user's sensitivity setting. Messages are scanned far more frequently than calls
+         * (every incoming WhatsApp/Telegram notification), so we apply a stricter floor to
+         * prevent low-confidence ensemble results from causing false-positive alerts.
+         */
+        private const val MIN_MESSAGE_CONFIDENCE = 0.70f
+
+        /**
+         * Minimum message text length to bother analysing. Very short messages (greetings,
+         * emoji, one-word replies) cannot contain enough signal to reliably detect a scam.
+         */
+        private const val MIN_TEXT_LENGTH = 30
+
         private val WATCHED_PACKAGES = setOf(
             "com.whatsapp",
             "com.whatsapp.w4b",               // WhatsApp Business
@@ -61,12 +75,16 @@ class MessagingScamDetectorService : NotificationListenerService() {
          * Extracts the most informative text string from a notification, trying
          * several extras in priority order. Exposed as internal so it can be
          * unit-tested without a live service instance.
+         *
+         * For MessagingStyle (WhatsApp / Telegram), only the **last** (most recent)
+         * message is returned. Joining all messages in the bundle risks accumulating
+         * keywords across the entire conversation history and inflating the scam score.
          */
         internal fun extractText(notification: Notification): String? {
             val extras: Bundle = notification.extras
 
             // MessagingStyle — used by WhatsApp and Telegram for individual/group chats.
-            // Each message is a Bundle with a "text" key.
+            // Each message is a Bundle with a "text" key; the last entry is the newest message.
             val messages = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                 extras.getParcelableArray(Notification.EXTRA_MESSAGES, Bundle::class.java)
             } else {
@@ -74,10 +92,11 @@ class MessagingScamDetectorService : NotificationListenerService() {
                 extras.getParcelableArray(Notification.EXTRA_MESSAGES)
             }
             if (messages != null) {
-                val joined = messages.mapNotNull { msg ->
+                // Only analyse the most recent message to avoid keyword accumulation across history.
+                val lastText = messages.lastOrNull()?.let { msg ->
                     (msg as? Bundle)?.getCharSequence("text")?.toString()
-                }.joinToString(" ")
-                if (joined.isNotBlank()) return joined
+                }
+                if (!lastText.isNullOrBlank()) return lastText
             }
 
             // BigTextStyle fallback (long single message).
@@ -114,10 +133,13 @@ class MessagingScamDetectorService : NotificationListenerService() {
         if (sbn.packageName !in WATCHED_PACKAGES) return
 
         val text = extractText(sbn.notification) ?: return
-        if (text.isBlank()) return
+        if (text.length < MIN_TEXT_LENGTH) return
 
         val result = detector.analyzeText(text)
-        if (!result.isScam) return
+        // Require isScam AND a confidence above the message-scanning floor.
+        // The ensemble threshold (user sensitivity) may be as low as 0.40; for messages we
+        // enforce a stricter minimum to avoid false-positive alerts on normal chat.
+        if (!result.isScam || result.confidence < MIN_MESSAGE_CONFIDENCE) return
 
         Log.w(
             TAG,

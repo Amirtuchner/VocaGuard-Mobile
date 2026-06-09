@@ -6,113 +6,14 @@ class TextPreprocessor {
 
     companion object {
         private const val TAG = "TextPreprocessor"
-        private const val MAX_SEQUENCE_LENGTH = 128
-        private const val VOCAB_SIZE = 10000
 
         /**
          * Bump this constant AND the matching version in train_model.py whenever
          * [extractFeatures] changes. A mismatch means the Android features no longer
          * align with the TFLite model's input expectations and predictions will be wrong.
          */
-        const val FEATURE_VERSION = 4
-        const val EXPECTED_FEATURE_COUNT = 45
-
-        // Common stop words to remove
-        private val STOP_WORDS = setOf(
-            "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-            "have", "has", "had", "do", "does", "did", "will", "would", "could",
-            "should", "may", "might", "must", "can", "i", "you", "he", "she",
-            "it", "we", "they", "me", "him", "her", "us", "them", "my", "your",
-            "his", "her", "its", "our", "their", "this", "that", "these", "those"
-        )
-    }
-
-    private val vocabulary = mutableMapOf<String, Int>()
-    private var isInitialized = false
-
-    init {
-        buildVocabulary()
-    }
-
-    private fun buildVocabulary() {
-        // Build a simple vocabulary based on common words and scam keywords
-        val commonWords = listOf(
-            "call", "phone", "number", "account", "bank", "card", "credit", "social",
-            "security", "irs", "tax", "fraud", "scam", "money", "payment", "urgent",
-            "immediate", "now", "today", "suspended", "locked", "verify", "confirm",
-            "computer", "virus", "windows", "microsoft", "apple", "support", "technical",
-            "tech", "infected", "malware", "fix", "repair", "access", "remote",
-            "teamviewer", "anydesk", "password", "username", "pin", "code", "verify",
-            "lottery", "prize", "won", "winner", "congratulations", "free", "claim",
-            "refund", "arrest", "warrant", "police", "lawsuit", "legal", "action",
-            "lawsuit", "court", "judge", "gift", "card", "bitcoin", "wire", "transfer",
-            "western", "union", "paypal", "venmo", "zelle", "cashapp", "donation",
-            "charity", "help", "victims", "disaster", "relief", "contribute",
-            "insurance", "medicare", "medicaid", "health", "qualify", "eligible",
-            "robocall", "recorded", "message", "press", "one", "callback"
-        )
-
-        vocabulary["<PAD>"] = 0
-        vocabulary["<UNK>"] = 1
-        vocabulary["<START>"] = 2
-        vocabulary["<END>"] = 3
-
-        var index = 4
-        for (word in commonWords) {
-            vocabulary[word.lowercase()] = index++
-        }
-
-        isInitialized = true
-        Log.d(TAG, "Vocabulary initialized with ${vocabulary.size} words")
-    }
-
-    fun preprocessText(text: String): IntArray {
-        val cleanedText = cleanText(text)
-        val tokens = tokenize(cleanedText)
-        val sequence = tokensToSequence(tokens)
-        return padSequence(sequence)
-    }
-
-    private fun cleanText(text: String): String {
-        // Convert to lowercase and remove special characters
-        return text.lowercase()
-            .replace(Regex("[^a-z0-9\\s]"), " ")
-            .replace(Regex("\\s+"), " ")
-            .trim()
-    }
-
-    private fun tokenize(text: String): List<String> {
-        return text.split(" ")
-            .filter { it.isNotEmpty() && !STOP_WORDS.contains(it) }
-    }
-
-    private fun tokensToSequence(tokens: List<String>): List<Int> {
-        val sequence = mutableListOf<Int>()
-        sequence.add(vocabulary["<START>"] ?: 2)
-
-        for (token in tokens.take(MAX_SEQUENCE_LENGTH - 2)) {
-            val index = vocabulary[token] ?: vocabulary["<UNK>"] ?: 1
-            sequence.add(index)
-        }
-
-        sequence.add(vocabulary["<END>"] ?: 3)
-        return sequence
-    }
-
-    private fun padSequence(sequence: List<Int>): IntArray {
-        val padded = IntArray(MAX_SEQUENCE_LENGTH)
-        val padValue = vocabulary["<PAD>"] ?: 0
-
-        // Fill with padding
-        padded.fill(padValue)
-
-        // Copy sequence
-        val copyLength = minOf(sequence.size, MAX_SEQUENCE_LENGTH)
-        for (i in 0 until copyLength) {
-            padded[i] = sequence[i]
-        }
-
-        return padded
+        const val FEATURE_VERSION = 5
+        const val EXPECTED_FEATURE_COUNT = 46
     }
 
     fun extractFeatures(text: String, context: CallContext? = null): FloatArray {
@@ -494,6 +395,43 @@ class TextPreprocessor {
             // Russian
             "вакансия", "работа из дома", "найм", "без опыта", "подработка",
             "заработать из дома", "обучающий взнос"))
+        features.add(flag(                                                             // 46: social engineering / impersonation scam
+            // "safe account" fund-transfer tactics
+            "safe account", "protected account", "security account",
+            "move your funds", "transfer your savings", "withdraw your savings",
+            "move your money to safety",
+            // fake authority / impersonation
+            "fraud department", "federal investigation", "under investigation",
+            "your identity has been stolen", "we are protecting your funds",
+            "we have caught the criminal", "you are the victim here",
+            "we are trying to protect you",
+            // secrecy / isolation demands — almost never said by legitimate callers
+            "do not tell anyone", "don't tell anyone",
+            "keep this confidential", "keep this between us",
+            "do not contact your bank", "don't call the police",
+            "this is a private investigation",
+            // step-by-step guidance toward dangerous actions
+            "stay on the line", "gift card to protect", "buy gift cards for security",
+            // Russian
+            "безопасный счёт", "никому не рассказывайте", "переведите деньги",
+            "мы пытаемся вас защитить", "ваша личность похищена",
+            "федеральное расследование", "держите в тайне", "не звоните в полицию",
+            // Hebrew
+            "חשבון בטוח", "אל תספר לאף אחד", "שמור בסוד",
+            "חקירה פדרלית", "העבר את הכסף", "הזהות שלך נגנבה",
+            "אל תתקשר למשטרה",
+            // Arabic
+            "حساب آمن", "لا تخبر أحداً", "قيد التحقيق",
+            "حوّل أموالك", "نحن نحاول حمايتك", "هويتك مسروقة",
+            "اكتم هذا الأمر", "لا تتصل بالشرطة",
+            // Spanish
+            "cuenta segura", "no se lo diga a nadie", "bajo investigación",
+            "transfiera sus fondos", "su identidad ha sido robada",
+            "mantenga esto en secreto", "no llame a la policía",
+            // French
+            "compte sécurisé", "n'en parlez à personne", "sous enquête",
+            "transférez vos fonds", "votre identité a été volée",
+            "gardez cela confidentiel", "n'appelez pas la police"))
 
         val result = features.toFloatArray()
         if (result.size != EXPECTED_FEATURE_COUNT) {

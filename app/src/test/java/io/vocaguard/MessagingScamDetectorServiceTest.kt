@@ -28,7 +28,9 @@ class MessagingScamDetectorServiceTest {
     // --- MessagingStyle (EXTRA_MESSAGES) ---
 
     @Test
-    fun `extracts text from MessagingStyle messages`() {
+    fun `extracts only the last message from MessagingStyle`() {
+        // Only the newest (last) message should be analysed to prevent keyword accumulation
+        // across conversation history from inflating the scam score (false positives).
         val msg1 = Bundle().apply { putCharSequence("text", "Hello there") }
         val msg2 = Bundle().apply { putCharSequence("text", "Send me gift cards") }
         val notification = notificationWithExtras {
@@ -36,7 +38,7 @@ class MessagingScamDetectorServiceTest {
         }
 
         val result = MessagingScamDetectorService.extractText(notification)
-        assertEquals("Hello there Send me gift cards", result)
+        assertEquals("Send me gift cards", result)
     }
 
     @Test
