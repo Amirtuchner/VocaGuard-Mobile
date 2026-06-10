@@ -8,10 +8,12 @@ import android.app.Service
 import android.content.Intent
 import android.os.Bundle
 import android.os.IBinder
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.util.Log
+import org.json.JSONObject
+import org.vosk.Recognizer
 import androidx.core.app.NotificationCompat
 import io.vocaguard.MainActivity
 import io.vocaguard.R
@@ -23,6 +25,7 @@ import io.vocaguard.data.TranscriptRepository
 import io.vocaguard.ui.ScamOverlayManager
 import io.vocaguard.detection.HybridScamDetector
 import io.vocaguard.ml.CallContext
+import io.vocaguard.ml.VoskModelManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -39,19 +42,14 @@ class CallMonitoringService : Service() {
         const val ACTION_STOP_MONITORING = "io.vocaguard.STOP_MONITORING"
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "call_monitoring_channel"
-        private const val MAX_SPEECH_RESTARTS = 10
-        /** Max time to wait for a single STT session to produce a result or error (ms). */
-        private const val STT_SESSION_TIMEOUT_MS = 8_000L
-
         // VAD (Voice Activity Detection) constants
-        /** RMS dB below which the mic is considered silent. */
-        private const val SILENCE_THRESHOLD_DB = 2.0f
+        /**
+         * Raw PCM RMS amplitude below which the mic is considered silent.
+         * At 16-bit / 16 kHz, amplitude 1585 ≈ -26 dBFS — typical quiet room floor.
+         */
+        private const val SILENCE_THRESHOLD_DB = 1585f
         /** How many consecutive below-threshold RMS readings constitute silence. */
         private const val SILENCE_CONSECUTIVE_COUNT = 6
-        /** Restart delay used during confirmed silence — avoids battery drain from tight polling. */
-        private const val SILENCE_RESTART_DELAY_MS = 2_000L
-        /** Fast restart delay when there is active speech. */
-        private const val SPEECH_RESTART_DELAY_MS = 100L
 
         /** Consecutive silence readings that count as a "long silence" for the CallContext. */
         const val LONG_SILENCE_THRESHOLD = 30  // ~30 RMS callbacks ≈ 3 s of silence
@@ -77,11 +75,11 @@ class CallMonitoringService : Service() {
         private val DTMF_COL_FREQS = listOf(1209f, 1336f, 1477f, 1633f)
     }
 
-    private var speechRecognizer: SpeechRecognizer? = null
+    private var audioRecord: AudioRecord? = null
+    private var voskRecognizer: Recognizer? = null
+    private var audioLoopJob: kotlinx.coroutines.Job? = null
     private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
     private var isMonitoring = false
-    /** Cancels the running STT session and restarts it if no result arrives in time. */
-    private var sttTimeoutJob: Job? = null
     private var lastNotificationUpdate = 0L
     private lateinit var scamDetector: HybridScamDetector
     private lateinit var alertManager: ScamAlertManager
@@ -91,7 +89,6 @@ class CallMonitoringService : Service() {
     private val transcriptBuilder = StringBuilder()
     private val detectedScamTypes = mutableSetOf<String>()
     private var activePhoneNumber: String = ""
-    private var speechRestartCount = 0
 
     // VAD state — tracks consecutive low-RMS readings to detect silence periods
     @Volatile private var consecutiveLowRmsCount = 0
@@ -155,7 +152,6 @@ class CallMonitoringService : Service() {
     private fun startMonitoring() {
         Log.i(TAG, "Starting call monitoring")
         isMonitoring = true
-        speechRestartCount = 0
         activePhoneNumber = scamDatabaseManager.activeCallPhoneNumber
 
         // Reset all per-call accumulators
@@ -178,189 +174,132 @@ class CallMonitoringService : Service() {
         val notification = createNotification("Monitoring call for scam patterns...")
         startForeground(NOTIFICATION_ID, notification)
 
-        // Initialize speech recognition
-        initializeSpeechRecognition()
-
-        // Start speech recognition — callbacks restart it automatically
-        startSpeechRecognition()
+        // Start Vosk offline speech recognition via AudioRecord
+        startVoskRecognition()
     }
 
-    private fun initializeSpeechRecognition() {
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Log.e(TAG, "Speech recognition not available on this device")
-            updateNotification("⚠️ Scam detection limited — speech recognition unavailable on this device")
-            return
-        }
+    private fun startVoskRecognition() {
+        audioLoopJob = serviceScope.launch(Dispatchers.IO) {
+            val model = VoskModelManager.getModel(this@CallMonitoringService)
+            if (model == null) {
+                Log.e(TAG, "Vosk model unavailable")
+                updateNotification("Downloading language model — scam detection will start shortly...")
+                return@launch
+            }
 
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
-            setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    Log.d(TAG, "Ready for speech")
+            val sampleRate = 16_000
+            val minBuf = AudioRecord.getMinBufferSize(
+                sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
+            )
+            val bufSize = minBuf.coerceAtLeast(8192)
+
+            val record = AudioRecord(
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+                sampleRate,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                bufSize
+            )
+
+            if (record.state != AudioRecord.STATE_INITIALIZED) {
+                Log.e(TAG, "AudioRecord failed to initialize")
+                updateNotification("⚠️ Scam detection limited — mic unavailable during call")
+                record.release()
+                return@launch
+            }
+
+            val recognizer = Recognizer(model, sampleRate.toFloat())
+            audioRecord = record
+            voskRecognizer = recognizer
+            val shortBuf = ShortArray(bufSize / 2)
+
+            record.startRecording()
+            Log.i(TAG, "Vosk audio loop started")
+            updateNotification("Monitoring call for scam patterns...")
+
+            while (isActive && isMonitoring) {
+                val read = record.read(shortBuf, 0, shortBuf.size)
+                if (read <= 0) continue
+
+                // Update RMS / prosody accumulators from raw PCM
+                updateRmsFromPcm(shortBuf, read)
+
+                // DTMF detection via Goertzel (only until first hit to save CPU)
+                if (!dtmfDetected && detectDtmf(shortBuf.copyOf(read))) {
+                    dtmfDetected = true
+                    Log.d(TAG, "DTMF tone detected")
                 }
 
-                override fun onBeginningOfSpeech() {
-                    Log.d(TAG, "Beginning of speech")
-                }
-
-                override fun onRmsChanged(rmsdB: Float) {
-                    totalRmsReadings++
-                    if (rmsdB < SILENCE_THRESHOLD_DB) {
-                        consecutiveLowRmsCount++
-                        silentRmsReadings++
-                        if (consecutiveLowRmsCount >= LONG_SILENCE_THRESHOLD) hadLongSilence = true
-
-                        // Noise floor: collect quiet-but-non-zero readings as background noise evidence
-                        if (rmsdB >= NOISE_FLOOR_MIN_DB && noiseFloorReadings.size < MAX_RMS_SAMPLES) {
-                            noiseFloorReadings.add(rmsdB)
-                        }
-
-                        // Speaker-switch: close out the current speech segment
-                        if (inSpeechSegment) {
-                            inSpeechSegment = false
-                            if (curSegmentRmsCount >= MIN_SEGMENT_SAMPLES) {
-                                val segAvg = curSegmentRmsSum / curSegmentRmsCount
-                                if (prevSpeechSegmentAvgRms >= 0 &&
-                                    kotlin.math.abs(segAvg - prevSpeechSegmentAvgRms) > SPEAKER_SWITCH_DB_THRESHOLD) {
-                                    speakerSwitchCount++
-                                }
-                                prevSpeechSegmentAvgRms = segAvg
-                            }
-                            curSegmentRmsSum = 0f
-                            curSegmentRmsCount = 0
-                        }
-                    } else {
+                // Feed to Vosk
+                if (recognizer.acceptWaveForm(shortBuf, read)) {
+                    val text = JSONObject(recognizer.result).optString("text").trim()
+                    if (text.isNotEmpty()) {
+                        Log.d(TAG, "Vosk result: $text")
+                        transcriptBuilder.append(text).append(" ")
+                        totalWordsRecognized += text.split(" ").count { it.isNotEmpty() }
+                        throttledUpdateNotification("Listening: ${text.take(50)}...")
+                        analyzeForScamPatterns(text)
                         consecutiveLowRmsCount = 0
-                        if (rmsReadings.size < MAX_RMS_SAMPLES) rmsReadings.add(rmsdB)
-
-                        // Speaker-switch: accumulate active speech segment
-                        if (!inSpeechSegment) inSpeechSegment = true
-                        curSegmentRmsSum += rmsdB
-                        curSegmentRmsCount++
                     }
+                } else {
+                    val partial = JSONObject(recognizer.partialResult).optString("partial").trim()
+                    if (partial.isNotEmpty()) analyzeForScamPatterns(partial)
                 }
+            }
 
-                override fun onBufferReceived(buffer: ByteArray?) {
-                    // Run Goertzel DTMF detection on raw PCM — only until first detection to save CPU
-                    if (buffer != null && buffer.size >= 80 && !dtmfDetected) {
-                        val samples = ShortArray(buffer.size / 2) { i ->
-                            ((buffer[i * 2 + 1].toInt() shl 8) or (buffer[i * 2].toInt() and 0xFF)).toShort()
-                        }
-                        if (detectDtmf(samples)) {
-                            dtmfDetected = true
-                            Log.d(TAG, "DTMF tone detected")
-                        }
-                    }
-                }
+            // Flush final result
+            val finalText = JSONObject(recognizer.finalResult).optString("text").trim()
+            if (finalText.isNotEmpty()) {
+                transcriptBuilder.append(finalText).append(" ")
+                analyzeForScamPatterns(finalText)
+            }
 
-                override fun onEndOfSpeech() {
-                    Log.d(TAG, "End of speech")
-                }
-
-                override fun onError(error: Int) {
-                    sttTimeoutJob?.cancel()
-                    Log.w(TAG, "Speech recognition error: $error")
-                    if (!isMonitoring) return
-
-                    // Silence-related errors: no speech detected or recognition timed out.
-                    // These happen constantly during quiet call segments — treat them as
-                    // normal silence rather than actual errors to preserve the restart budget
-                    // and avoid rapid battery-draining polling.
-                    val isSilenceError = error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
-                                         error == SpeechRecognizer.ERROR_NO_MATCH
-                    val isCurrentlySilent = consecutiveLowRmsCount >= SILENCE_CONSECUTIVE_COUNT
-
-                    val delayMs: Long
-                    if (isSilenceError || isCurrentlySilent) {
-                        // Don't burn through the restart budget for silence — just wait 2 s.
-                        delayMs = SILENCE_RESTART_DELAY_MS
-                        Log.d(TAG, "Silence detected, pausing STT for ${delayMs}ms")
-                    } else if (speechRestartCount < MAX_SPEECH_RESTARTS) {
-                        delayMs = 500L shl speechRestartCount.coerceAtMost(4) // 500ms…8s
-                        speechRestartCount++
-                        Log.w(TAG, "STT error restart ${speechRestartCount}/$MAX_SPEECH_RESTARTS")
-                    } else {
-                        Log.e(TAG, "Speech recognition restart limit reached, detection degraded")
-                        updateNotification("⚠️ Scam detection limited — speech recognition unavailable")
-                        return
-                    }
-
-                    serviceScope.launch(Dispatchers.Main) {
-                        delay(delayMs)
-                        if (isActive && isMonitoring) startSpeechRecognition()
-                    }
-                }
-
-                override fun onResults(results: Bundle?) {
-                    sttTimeoutJob?.cancel()
-                    speechRestartCount = 0
-                    consecutiveLowRmsCount = 0 // reset VAD counter — speech was heard
-                    handleSpeechResults(results)
-                    // Continue recognition
-                    if (isMonitoring) {
-                        serviceScope.launch(Dispatchers.Main) {
-                            delay(SPEECH_RESTART_DELAY_MS)
-                            if (isActive && isMonitoring) {
-                                startSpeechRecognition()
-                            }
-                        }
-                    }
-                }
-
-                override fun onPartialResults(partialResults: Bundle?) {
-                    handleSpeechResults(partialResults, isPartial = true)
-                }
-
-                override fun onEvent(eventType: Int, params: Bundle?) {
-                    // Custom events
-                }
-            })
+            record.stop()
+            record.release()
+            recognizer.close()
+            audioRecord = null
+            voskRecognizer = null
+            Log.i(TAG, "Vosk audio loop ended")
         }
     }
 
-    private fun startSpeechRecognition() {
-        // Cancel any running timeout watchdog before starting a new session.
-        sttTimeoutJob?.cancel()
-        try {
-            val locale = DetectionSettings.getInstance(this).locale
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-                putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
-            }
-            speechRecognizer?.startListening(intent)
+    /**
+     * Computes RMS amplitude from [read] samples of [buffer] and updates all
+     * prosody / VAD accumulators (silence ratio, speaker-switch, noise floor).
+     * Uses raw amplitude (0–32768) instead of dB since we have direct PCM access.
+     */
+    private fun updateRmsFromPcm(buffer: ShortArray, read: Int) {
+        var sumSq = 0.0
+        for (i in 0 until read) sumSq += buffer[i].toDouble() * buffer[i]
+        val rms = kotlin.math.sqrt(sumSq / read).toFloat()
 
-            // Watchdog: if STT neither completes nor errors within the timeout, force a restart
-            // to prevent the foreground service from hanging indefinitely.
-            sttTimeoutJob = serviceScope.launch(Dispatchers.Main) {
-                delay(STT_SESSION_TIMEOUT_MS)
-                if (isActive && isMonitoring) {
-                    Log.w(TAG, "STT session timed out — forcing restart")
-                    speechRecognizer?.stopListening()
-                    startSpeechRecognition()
+        totalRmsReadings++
+        if (rms < SILENCE_THRESHOLD_DB) {
+            consecutiveLowRmsCount++
+            silentRmsReadings++
+            if (consecutiveLowRmsCount >= LONG_SILENCE_THRESHOLD) hadLongSilence = true
+            if (rms >= NOISE_FLOOR_MIN_DB * 1000f && noiseFloorReadings.size < MAX_RMS_SAMPLES) {
+                noiseFloorReadings.add(rms / 1000f)
+            }
+            if (inSpeechSegment) {
+                inSpeechSegment = false
+                if (curSegmentRmsCount >= MIN_SEGMENT_SAMPLES) {
+                    val segAvg = curSegmentRmsSum / curSegmentRmsCount
+                    if (prevSpeechSegmentAvgRms >= 0 &&
+                        kotlin.math.abs(segAvg - prevSpeechSegmentAvgRms) > SPEAKER_SWITCH_DB_THRESHOLD * 1000f) {
+                        speakerSwitchCount++
+                    }
+                    prevSpeechSegmentAvgRms = segAvg
                 }
+                curSegmentRmsSum = 0f
+                curSegmentRmsCount = 0
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error starting speech recognition", e)
-        }
-    }
-
-    private fun handleSpeechResults(results: Bundle?, isPartial: Boolean = false) {
-        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-        if (!matches.isNullOrEmpty()) {
-            val text = matches[0]
-            Log.d(TAG, "Recognized${if (isPartial) " (partial)" else ""}: $text")
-
-            if (!isPartial) {
-                // Only append final results — partials are cumulative prefixes that cause transcript bloat
-                transcriptBuilder.append(text).append(" ")
-                throttledUpdateNotification("Listening: ${text.take(50)}...")
-                totalWordsRecognized += text.split(" ").count { it.isNotEmpty() }
-            }
-
-            // Analyze current segment for scam patterns regardless of partial/final
-            analyzeForScamPatterns(text)
+        } else {
+            consecutiveLowRmsCount = 0
+            if (rmsReadings.size < MAX_RMS_SAMPLES) rmsReadings.add(rms / 1000f)
+            if (!inSpeechSegment) inSpeechSegment = true
+            curSegmentRmsSum += rms
+            curSegmentRmsCount++
         }
     }
 
@@ -495,11 +434,13 @@ class CallMonitoringService : Service() {
         Log.i(TAG, "Stopping call monitoring")
         isMonitoring = false
 
-        speechRecognizer?.apply {
-            stopListening()
-            destroy()
-        }
-        speechRecognizer = null
+        audioLoopJob?.cancel()
+        audioLoopJob = null
+        audioRecord?.stop()
+        audioRecord?.release()
+        audioRecord = null
+        voskRecognizer?.close()
+        voskRecognizer = null
 
         // Save transcript for review
         saveTranscript()

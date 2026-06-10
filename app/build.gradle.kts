@@ -125,6 +125,7 @@ dependencies {
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.messaging)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.alphacephei:vosk-android:0.3.47")
 
     testImplementation(libs.junit)
     testImplementation("org.robolectric:robolectric:4.11.1")
