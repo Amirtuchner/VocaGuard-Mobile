@@ -5,9 +5,13 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import io.vocaguard.alert.ScamAlertManager
+import io.vocaguard.data.CallTranscript
 import io.vocaguard.data.ScamType
+import io.vocaguard.data.TranscriptRepository
+import io.vocaguard.ui.ScamOverlayManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -58,17 +62,35 @@ class VocaGuardFcmService : FirebaseMessagingService() {
 
         val keywords = message.data["keywords"] ?: "unknown"
         val transcript = message.data["transcript"] ?: ""
+        val callerNumber = message.data["caller_number"] ?: ""
+        val confidence = message.data["confidence"]?.toFloatOrNull() ?: 0.9f
+        val scamType = inferScamType(keywords)
 
-        Log.w(TAG, "Scam alert from server! Keywords: $keywords")
+        Log.w(TAG, "Scam alert from server! Keywords: $keywords, caller: $callerNumber, confidence: $confidence")
 
-        // Trigger the existing alert system
+        // Notification + TTS + vibration
         val alertManager = ScamAlertManager(applicationContext)
         alertManager.triggerScamAlert(
-            scamType = inferScamType(keywords),
+            scamType = scamType,
             transcript = transcript,
-            confidence = 0.9f,
-            phoneNumber = ""
+            confidence = confidence,
+            phoneNumber = callerNumber
         )
+
+        // In-call overlay (requires SYSTEM_ALERT_WINDOW)
+        val overlayManager = ScamOverlayManager(applicationContext)
+        overlayManager.show(scamType, confidence)
+
+        // Persist to history so the History tab shows server-detected scams
+        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+            TranscriptRepository.getInstance(applicationContext).save(
+                CallTranscript(
+                    text = "[Server] $transcript",
+                    detectedScamTypes = listOf(scamType.name),
+                    phoneNumber = callerNumber
+                )
+            )
+        }
     }
 
     private fun inferScamType(keywords: String): ScamType {

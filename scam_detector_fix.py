@@ -45,16 +45,24 @@ def agi_send(cmd):
     sys.stdout.flush()
 
 def agi_init():
+    agi_vars = {}
     while True:
         line = sys.stdin.readline()
         if line.strip() == "": break
+        if ":" in line:
+            key, _, value = line.partition(":")
+            agi_vars[key.strip()] = value.strip()
+    return agi_vars
 
 def detect_scam(text):
     text_lower = text.lower()
     matched = [kw for kw in SCAM_KEYWORDS if kw in text_lower]
-    return (True, ", ".join(matched[:3])) if len(matched) >= 2 else (False, "")
+    if len(matched) >= 2:
+        confidence = min(0.99, 0.5 + 0.1 * len(matched))
+        return True, ", ".join(matched[:3]), confidence
+    return False, "", 0.0
 
-def send_fcm_alert(keywords, transcript):
+def send_fcm_alert(keywords, transcript, caller_number="", confidence=0.9):
     try:
         if not os.path.exists(FCM_TOKEN_FILE):
             log.warning("No FCM token file found")
@@ -65,8 +73,13 @@ def send_fcm_alert(keywords, transcript):
             log.warning("FCM token is empty")
             return
         message = messaging.Message(
-            data={"type": "scam_alert", "keywords": keywords,
-                  "transcript": transcript[:200]},
+            data={
+                "type": "scam_alert",
+                "keywords": keywords,
+                "transcript": transcript[:200],
+                "caller_number": caller_number,
+                "confidence": str(round(confidence, 2)),
+            },
             android=messaging.AndroidConfig(priority="high"),
             token=token,
         )
@@ -76,7 +89,9 @@ def send_fcm_alert(keywords, transcript):
         log.error(f"FCM error: {e}")
 
 def main():
-    agi_init()
+    agi_vars = agi_init()
+    caller_number = agi_vars.get("agi_callerid", "")
+    log.info(f"Call from: {caller_number}")
     # No agi_recv() — don't block waiting for Asterisk's VERBOSE response
     agi_send('VERBOSE "VocaGuard scam detector started" 1')
 
@@ -110,10 +125,10 @@ def main():
                     log.info(f"STT: {text}")
                     full_transcript += " " + text
                     if not alerted:
-                        is_scam, keywords = detect_scam(full_transcript)
+                        is_scam, keywords, confidence = detect_scam(full_transcript)
                         if is_scam:
-                            log.warning(f"SCAM DETECTED: {keywords}")
-                            send_fcm_alert(keywords, full_transcript.strip())
+                            log.warning(f"SCAM DETECTED: {keywords} (confidence={confidence:.2f})")
+                            send_fcm_alert(keywords, full_transcript.strip(), caller_number, confidence)
                             alerted = True
     except OSError as e:
         log.info(f"Audio fd closed: {e}")
@@ -125,10 +140,10 @@ def main():
         log.info(f"STT final: {final}")
         full_transcript += " " + final
         if not alerted:
-            is_scam, keywords = detect_scam(full_transcript)
+            is_scam, keywords, confidence = detect_scam(full_transcript)
             if is_scam:
-                log.warning(f"SCAM DETECTED (final): {keywords}")
-                send_fcm_alert(keywords, full_transcript.strip())
+                log.warning(f"SCAM DETECTED (final): {keywords} (confidence={confidence:.2f})")
+                send_fcm_alert(keywords, full_transcript.strip(), caller_number, confidence)
 
     log.info(f"Call ended. Transcript: {full_transcript.strip()}")
 
