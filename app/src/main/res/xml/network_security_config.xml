@@ -11,8 +11,11 @@
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-    <!-- Allow plain HTTP to our Hetzner VPS token server (internal, no sensitive data) -->
-    <domain-config cleartextTrafficPermitted="true">
+    <!-- Trust the self-signed TLS cert on our Hetzner VPS token server -->
+    <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="false">178.105.164.91</domain>
+        <trust-anchors>
+            <certificates src="@raw/token_server_cert"/>
+        </trust-anchors>
     </domain-config>
 </network-security-config>

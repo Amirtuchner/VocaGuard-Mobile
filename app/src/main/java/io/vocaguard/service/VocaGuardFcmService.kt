@@ -4,6 +4,7 @@ import android.util.Log
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import io.vocaguard.BuildConfig
 import io.vocaguard.alert.ScamAlertManager
 import io.vocaguard.data.CallTranscript
 import io.vocaguard.data.ScamType
@@ -23,14 +24,15 @@ class VocaGuardFcmService : FirebaseMessagingService() {
     companion object {
         private const val TAG = "VocaGuardFCM"
 
-        // Upload current device token to the Asterisk server
+        // Upload current device token to the Asterisk server over HTTPS
         fun uploadToken(token: String) {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val client = OkHttpClient()
                     val body = token.toRequestBody("text/plain".toMediaType())
                     val request = Request.Builder()
-                        .url("http://178.105.164.91:8080/register-token")
+                        .url("https://178.105.164.91:8080/register-token")
+                        .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
                         .post(body)
                         .build()
                     client.newCall(request).execute().use { response ->

@@ -1,9 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
     alias(libs.plugins.firebase.crashlytics.plugin)
+}
+
+val localProperties = Properties().also { props ->
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { props.load(it) }
 }
 
 android {
@@ -18,6 +25,11 @@ android {
         versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val secret = localProperties.getProperty("token_server_secret")
+            ?: System.getenv("TOKEN_SERVER_SECRET")
+            ?: ""
+        buildConfigField("String", "TOKEN_SERVER_SECRET", "\"$secret\"")
     }
 
     // Signing config for CI — reads from environment variables set by the workflow.
