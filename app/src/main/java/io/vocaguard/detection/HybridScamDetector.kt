@@ -53,7 +53,7 @@ class HybridScamDetector(private val context: Context) {
         // allowMlOverride: for live calls where STT noise can zero out the rule-based score,
         // trust ML alone if it is ≥90% confident. Not used for message scanning.
         val isScam = combinedConfidence >= settings.confidenceThreshold ||
-                     (allowMlOverride && mlResult.confidence >= 0.9f)
+                     (allowMlOverride && mlResult.confidence >= 0.95f)
 
         // Choose scam type
         val scamType = when {

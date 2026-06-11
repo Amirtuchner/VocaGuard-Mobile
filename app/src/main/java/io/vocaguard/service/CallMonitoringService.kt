@@ -25,6 +25,7 @@ import io.vocaguard.data.TranscriptRepository
 import io.vocaguard.ui.ScamOverlayManager
 import io.vocaguard.detection.HybridScamDetector
 import io.vocaguard.ml.CallContext
+import io.vocaguard.data.ContactsHelper
 import io.vocaguard.ml.VoskModelManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -180,6 +181,14 @@ class CallMonitoringService : Service() {
 
     private fun startVoskRecognition() {
         audioLoopJob = serviceScope.launch(Dispatchers.IO) {
+            // Skip detection for known contacts — scammers are never in the victim's contact list.
+            if (activePhoneNumber.isNotBlank() &&
+                ContactsHelper.isKnownContact(this@CallMonitoringService, activePhoneNumber)) {
+                Log.i(TAG, "Known contact ($activePhoneNumber) — scam detection skipped")
+                updateNotification("Call with known contact — monitoring inactive")
+                return@launch
+            }
+
             val model = VoskModelManager.getModel(this@CallMonitoringService)
             if (model == null) {
                 Log.e(TAG, "Vosk model unavailable")
@@ -241,9 +250,6 @@ class CallMonitoringService : Service() {
                         analyzeForScamPatterns(text)
                         consecutiveLowRmsCount = 0
                     }
-                } else {
-                    val partial = JSONObject(recognizer.partialResult).optString("partial").trim()
-                    if (partial.isNotEmpty()) analyzeForScamPatterns(partial)
                 }
             }
 

@@ -66,7 +66,10 @@ class VocaGuardFcmService : FirebaseMessagingService() {
         val transcript = message.data["transcript"] ?: ""
         val callerNumber = message.data["caller_number"] ?: ""
         val confidence = message.data["confidence"]?.toFloatOrNull() ?: 0.9f
-        val scamType = inferScamType(keywords)
+        // Server v2 sends scam_type directly; fall back to keyword inference for v1 payloads
+        val scamType = message.data["scam_type"]
+            ?.let { runCatching { ScamType.valueOf(it) }.getOrNull() }
+            ?: inferScamType(keywords)
 
         Log.w(TAG, "Scam alert from server! Keywords: $keywords, caller: $callerNumber, confidence: $confidence")
 

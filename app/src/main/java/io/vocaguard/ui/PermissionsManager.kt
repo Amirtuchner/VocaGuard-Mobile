@@ -18,7 +18,8 @@ class PermissionsManager(private val context: Context) {
             Manifest.permission.READ_CALL_LOG,
             Manifest.permission.ANSWER_PHONE_CALLS,
             Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.POST_NOTIFICATIONS
+            Manifest.permission.POST_NOTIFICATIONS,
+            Manifest.permission.READ_CONTACTS
         )
     }
 
@@ -30,6 +31,7 @@ class PermissionsManager(private val context: Context) {
         permissions["Answer Calls"] = hasPermission(Manifest.permission.ANSWER_PHONE_CALLS)
         permissions["Record Audio"] = hasPermission(Manifest.permission.RECORD_AUDIO)
         permissions["Notifications"] = hasPermission(Manifest.permission.POST_NOTIFICATIONS)
+        permissions["Contacts"] = hasPermission(Manifest.permission.READ_CONTACTS)
         permissions["Call Screening"] = isCallScreeningEnabled()
         permissions["Accessibility"] = isAccessibilityEnabled()
         permissions["Draw Overlay"] = Settings.canDrawOverlays(context)

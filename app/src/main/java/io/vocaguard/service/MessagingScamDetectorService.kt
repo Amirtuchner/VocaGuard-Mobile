@@ -3,12 +3,14 @@ package io.vocaguard.service
 import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import io.vocaguard.alert.ScamAlertManager
+import io.vocaguard.data.ContactsHelper
 import io.vocaguard.data.DetectionSettings
 import io.vocaguard.detection.HybridScamDetector
 import io.vocaguard.ui.ScamOverlayManager
@@ -127,10 +129,41 @@ class MessagingScamDetectorService : NotificationListenerService() {
         super.onDestroy()
     }
 
+    /**
+     * Extracts the sender's display name from a MessagingStyle notification.
+     * Returns the last message's sender name if available, otherwise the notification title.
+     * For group chats where the title is the group name, this returns the group name —
+     * group-chat messages are still scanned since the individual sender is unknown.
+     */
+    private fun extractSender(sbn: StatusBarNotification): String {
+        val extras = sbn.notification.extras
+        val messages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            extras.getParcelableArray(Notification.EXTRA_MESSAGES, Bundle::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+        }
+        if (messages != null && messages.isNotEmpty()) {
+            val lastMsg = (messages.last() as? Bundle)
+            val senderName = lastMsg?.getCharSequence("sender")?.toString()
+            if (!senderName.isNullOrBlank()) return senderName
+        }
+        return extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val settings = DetectionSettings.getInstance(this)
         if (!settings.messageScanEnabled) return
         if (sbn.packageName !in WATCHED_PACKAGES) return
+
+        // Skip known contacts — scammers are never saved in the victim's contact list.
+        val sender = extractSender(sbn)
+        if (sender.isNotBlank() &&
+            (ContactsHelper.isKnownContactByName(this, sender) ||
+             ContactsHelper.isKnownContact(this, sender))) {
+            Log.d(TAG, "Skipping scam check — sender '$sender' is a known contact")
+            return
+        }
 
         val text = extractText(sbn.notification) ?: return
         if (text.length < MIN_TEXT_LENGTH) return
