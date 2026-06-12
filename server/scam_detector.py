@@ -20,6 +20,12 @@ from collections import deque
 # replaces any non-alphanumeric/non-space char with a space (handles punctuation,
 # Hebrew geresh/gershayim, ASCII quotes) so "ביטוח" never matches keyword "ביט".
 _WORD_SEP = re.compile(r"[^\w\s]", re.UNICODE)
+
+# Hebrew single-letter grammatical prefixes that attach directly to the
+# following word without a space (ב=in/at, מ=from, ל=to, ה=the, ו=and,
+# כ=as, ש=that, ד=of). A keyword may appear in speech as "מהבנק הפועלים"
+# instead of "הבנק הפועלים" — the prefix-aware check handles this.
+_HE_PREFIXES = "במלהוכשד"
 import numpy as np
 from vosk import Model, KaldiRecognizer
 from faster_whisper import WhisperModel
@@ -251,15 +257,24 @@ def detect_scam(window_text: str):
     Matching is whole-word: punctuation/gershayim are normalised to spaces so
     that e.g. "ביט" (payment app) does not match inside "ביטוח לאומי".
     """
-    # Normalise: punctuation → space, collapse runs, pad with spaces
+    # Normalise: punctuation → space, pad with spaces for boundary matching
     normed_text = " " + _WORD_SEP.sub(" ", window_text.lower()) + " "
     score = 0
     matched = []
     has_high_signal = False
     for table in ALL_KEYWORD_TABLES:
         for kw, weight in table:
-            kw_norm = " " + _WORD_SEP.sub(" ", kw.lower()) + " "
-            if kw_norm in normed_text and kw not in matched:
+            kw_s = _WORD_SEP.sub(" ", kw.lower()).strip()  # normalised keyword, no padding
+            # Standard word-boundary match
+            found = f" {kw_s} " in normed_text
+            # Hebrew prefix match: keyword may be preceded by a single
+            # grammatical prefix letter (מבנק הפועלים, לביטוח לאומי, etc.)
+            if not found:
+                for pfx in _HE_PREFIXES:
+                    if f" {pfx}{kw_s} " in normed_text:
+                        found = True
+                        break
+            if found and kw not in matched:
                 score += weight
                 matched.append(kw)
                 if weight >= 2:
