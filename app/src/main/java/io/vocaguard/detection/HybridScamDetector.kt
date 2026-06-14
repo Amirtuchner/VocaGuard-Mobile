@@ -31,7 +31,7 @@ class HybridScamDetector(private val context: Context) {
         }
 
         // Ensemble: Combine both approaches
-        return ensembleResults(ruleBasedResult, mlResult, hasCallContext = context != null, allowMlOverride)
+        return ensembleResults(ruleBasedResult, mlResult, hasCallContext = context != null, allowMlOverride = allowMlOverride)
     }
 
     private fun ensembleResults(
@@ -52,8 +52,9 @@ class HybridScamDetector(private val context: Context) {
         // Determine if it's a scam — threshold comes from user-configurable sensitivity.
         // allowMlOverride: for live calls where STT noise can zero out the rule-based score,
         // trust ML alone if it is ≥90% confident. Not used for message scanning.
+        Log.d(TAG, "  allowMlOverride=$allowMlOverride, threshold=${settings.confidenceThreshold}, combined=$combinedConfidence")
         val isScam = combinedConfidence >= settings.confidenceThreshold ||
-                     (allowMlOverride && mlResult.confidence >= 0.95f)
+                     (allowMlOverride && mlResult.confidence >= 0.80f)
 
         // Choose scam type
         val scamType = when {

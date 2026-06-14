@@ -37,6 +37,7 @@ import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.FamilyGuardSettings
 import io.vocaguard.data.ScamType
 import io.vocaguard.monitor.PhoneStateMonitor
+import io.vocaguard.service.PhoneMonitorService
 import io.vocaguard.ui.CrashReporter
 import io.vocaguard.ui.FamilyDashboard
 import io.vocaguard.ui.FamilyDashboardViewModel
@@ -80,6 +81,10 @@ class MainActivity : ComponentActivity() {
 
         permissionsManager = PermissionsManager(this)
         phoneStateMonitor = PhoneStateMonitor(this)
+
+        // Keep TelephonyCallback-based call detection alive in background
+        // (fallback for Samsung devices where CallScreeningService is not invoked)
+        startForegroundService(Intent(this, PhoneMonitorService::class.java))
 
         CommunityScamSyncWorker.schedule(this)
         VocaGuardFcmService.refreshToken()

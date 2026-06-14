@@ -3,12 +3,14 @@
 package io.vocaguard.monitor
 
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import android.util.Log
 import io.vocaguard.data.ScamDatabaseManager
+import io.vocaguard.service.CallMonitoringService
 
 @Suppress("DEPRECATION") // PhoneStateListener used only on API < 31; TelephonyCallback used on 31+
 class PhoneStateMonitor(private val context: Context) {
@@ -93,15 +95,19 @@ class PhoneStateMonitor(private val context: Context) {
     }
 
     private fun onIncomingCall(phoneNumber: String?) {
-        // This is already handled by CallScreeningService
-        // But we can use it as a backup or for additional logging
-        Log.d(TAG, "Incoming call detected via PhoneStateMonitor: $phoneNumber")
+        Log.i(TAG, "Incoming call ringing: $phoneNumber — waiting for answer before monitoring")
     }
 
     private fun onCallActive() {
-        // Call is now active
-        // The AccessibilityService will handle starting the monitoring
-        Log.d(TAG, "Call is now active")
+        // Call answered (OFFHOOK) — start audio monitoring now so we capture call audio,
+        // not the ringing silence. Primary fallback on Samsung where
+        // CallScreeningService.onScreenCall() is not invoked by the firmware.
+        Log.i(TAG, "Call answered — starting audio monitoring")
+        context.startForegroundService(
+            Intent(context, CallMonitoringService::class.java).apply {
+                action = CallMonitoringService.ACTION_START_MONITORING
+            }
+        )
     }
 
     private fun onCallEnded() {

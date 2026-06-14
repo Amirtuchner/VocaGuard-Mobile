@@ -391,20 +391,18 @@ class CallMonitoringService : Service() {
             lastDetectedConfidence = detectionResult.confidence
         }
 
-        // Always alert the senior in real time
-        alertManager.triggerScamAlert(
-            scamType = detectionResult.scamType,
-            transcript = text,
-            confidence = detectionResult.confidence,
-            phoneNumber = activePhoneNumber
-        )
-        overlayManager.show(detectionResult.scamType, detectionResult.confidence)
-        updateNotification("⚠️ SCAM ALERT: ${detectionResult.scamType}")
-
-        // On first confirmed scam: end the scam call and immediately alert the family.
-        // Guard prevents the sequence running again if more scam phrases are detected.
+        // Alert once per call — guard with scamActionTaken to prevent a loop when
+        // Vosk produces multiple positive segments from the same call.
         if (!scamActionTaken) {
             scamActionTaken = true
+            alertManager.triggerScamAlert(
+                scamType = detectionResult.scamType,
+                transcript = text,
+                confidence = detectionResult.confidence,
+                phoneNumber = activePhoneNumber
+            )
+            overlayManager.show(detectionResult.scamType, detectionResult.confidence)
+            updateNotification("⚠️ SCAM ALERT: ${detectionResult.scamType}")
             val scamType = detectionResult.scamType
             val confidence = detectionResult.confidence
             serviceScope.launch {

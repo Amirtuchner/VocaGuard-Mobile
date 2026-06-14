@@ -38,12 +38,13 @@ class ScamCallScreeningService : CallScreeningService() {
                 .build()
         )
 
-        // Show the incoming call overlay with scam status
-        if (phoneNumber.isNotBlank()) {
+        // Only show the incoming call overlay for known scammers — showing it for every
+        // call blocks Samsung's Answer button and confuses the user.
+        if (phoneNumber.isNotBlank() && scamInfo.isKnownScammer) {
             overlayManager.showIncomingCall(
                 phoneNumber = phoneNumber,
-                isScam = scamInfo.isKnownScammer,
-                scamType = if (scamInfo.isKnownScammer) scamInfo.scamType else null
+                isScam = true,
+                scamType = scamInfo.scamType
             )
             registerCallEndListener()
         }
