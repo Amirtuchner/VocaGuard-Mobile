@@ -20,7 +20,7 @@ EPOCHS = 100
 BATCH_SIZE = 32
 VALIDATION_SPLIT = 0.2
 
-NUM_FEATURES = 45  # 26 keyword/text + 5 conversational behaviour + 6 audio/metadata + 5 call-centre signals + 3 new scam category signals
+NUM_FEATURES = 46  # 26 keyword/text + 5 conversational behaviour + 6 audio/metadata + 5 call-centre signals + 4 new scam category signals
 
 
 # ---------------------------------------------------------------------------
@@ -377,6 +377,43 @@ def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
         # Russian
         "вакансия", "работа из дома", "найм", "без опыта", "подработка",
         "заработать из дома", "обучающий взнос"))
+    features.append(flag(                                                                          # 46: social engineering / impersonation scam
+        # "safe account" fund-transfer tactics
+        "safe account", "protected account", "security account",
+        "move your funds", "transfer your savings", "withdraw your savings",
+        "move your money to safety",
+        # fake authority / impersonation
+        "fraud department", "federal investigation", "under investigation",
+        "your identity has been stolen", "we are protecting your funds",
+        "we have caught the criminal", "you are the victim here",
+        "we are trying to protect you",
+        # secrecy / isolation demands
+        "do not tell anyone", "don't tell anyone",
+        "keep this confidential", "keep this between us",
+        "do not contact your bank", "don't call the police",
+        "this is a private investigation",
+        # step-by-step guidance toward dangerous actions
+        "stay on the line", "gift card to protect", "buy gift cards for security",
+        # Russian
+        "безопасный счёт", "никому не рассказывайте", "переведите деньги",
+        "мы пытаемся вас защитить", "ваша личность похищена",
+        "федеральное расследование", "держите в тайне", "не звоните в полицию",
+        # Hebrew
+        "חשבון בטוח", "אל תספר לאף אחד", "שמור בסוד",
+        "חקירה פדרלית", "העבר את הכסף", "הזהות שלך נגנבה",
+        "אל תתקשר למשטרה",
+        # Arabic
+        "حساب آمن", "لا تخبر أحداً", "قيد التحقيق",
+        "حوّل أموالك", "نحن نحاول حمايتك", "هويتك مسروقة",
+        "اكتم هذا الأمر", "لا تتصل بالشرطة",
+        # Spanish
+        "cuenta segura", "no se lo diga a nadie", "bajo investigación",
+        "transfiera sus fondos", "su identidad ha sido robada",
+        "mantenga esto en secreto", "no llame a la policía",
+        # French
+        "compte sécurisé", "n'en parlez à personne", "sous enquête",
+        "transférez vos fonds", "votre identité a été volée",
+        "gardez cela confidentiel", "n'appelez pas la police"))
 
     return features
 
