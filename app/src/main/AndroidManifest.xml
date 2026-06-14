@@ -16,6 +16,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Optional: shows an on-screen warning overlay during detected scam calls -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Family Guard Mode: sends SMS alerts to caregivers when a scam is detected -->
     <uses-permission android:name="android.permission.SEND_SMS" />
     <!-- Family Guard Mode: makes an outgoing call to the primary caregiver after a scam call ends -->
@@ -35,6 +36,13 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.VocaGuard">
+        <activity
+            android:name=".ui.IncomingCallActivity"
+            android:exported="true"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.VocaGuard" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

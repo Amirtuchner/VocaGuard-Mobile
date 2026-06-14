@@ -1,10 +1,19 @@
 package io.vocaguard.service
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import io.vocaguard.BuildConfig
+import io.vocaguard.MainActivity
+import io.vocaguard.R
 import io.vocaguard.alert.ScamAlertManager
 import io.vocaguard.data.CallTranscript
 import io.vocaguard.data.ScamType
@@ -60,7 +69,15 @@ class VocaGuardFcmService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         Log.i(TAG, "FCM message received: ${message.data}")
 
-        if (message.data["type"] != "scam_alert") return
+        when (message.data["type"]) {
+            "incoming_call" -> {
+                val callerNumber = message.data["caller_number"] ?: ""
+                showIncomingCallNotification(callerNumber)
+                return
+            }
+            "scam_alert" -> { /* handled below */ }
+            else -> return
+        }
 
         val keywords = message.data["keywords"] ?: "unknown"
         val transcript = message.data["transcript"] ?: ""
@@ -96,6 +113,50 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                 )
             )
         }
+    }
+
+    private fun showIncomingCallNotification(callerNumber: String) {
+        val channelId = "incoming_call_channel"
+        val nm = getSystemService(NotificationManager::class.java)
+
+        if (nm.getNotificationChannel(channelId) == null) {
+            val channel = NotificationChannel(channelId, "Incoming Call", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Alert when a monitored call arrives"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 500, 300, 500)
+            }
+            nm.createNotificationChannel(channel)
+        }
+
+        val fullScreenIntent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, io.vocaguard.ui.IncomingCallActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(io.vocaguard.ui.IncomingCallActivity.EXTRA_CALLER_NUMBER, callerNumber)
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setContentTitle("Incoming Call")
+            .setContentText("From: $displayNumber")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setFullScreenIntent(fullScreenIntent, true)
+            .setAutoCancel(true)
+            .build()
+
+        nm.notify(io.vocaguard.ui.IncomingCallActivity.NOTIFICATION_ID, notification)
+
+        // Also launch the activity directly so it shows immediately
+        startActivity(Intent(this, io.vocaguard.ui.IncomingCallActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(io.vocaguard.ui.IncomingCallActivity.EXTRA_CALLER_NUMBER, callerNumber)
+        })
+
+        Log.i(TAG, "Incoming call screen launched for $displayNumber")
     }
 
     private fun inferScamType(keywords: String): ScamType {
