@@ -72,6 +72,7 @@ SCAM_KEYWORDS_EN = [
     ("virus", 1), ("microsoft", 1), ("computer infected", 1), ("tech support", 1),
     ("suspicious activity", 1), ("account frozen", 1), ("verify your account", 1),
     ("bank transfer", 1), ("account compromised", 1),
+    ("you have won", 2), ("you've won", 2), ("you are a winner", 2), ("you won a prize", 2),
     ("won", 1), ("lottery", 1), ("prize", 1), ("congratulations", 1),
     ("ssn", 1), ("suspended", 1),
     ("press 1", 1), ("press one", 1), ("do not hang up", 1),

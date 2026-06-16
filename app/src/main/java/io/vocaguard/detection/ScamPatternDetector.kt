@@ -67,16 +67,24 @@ class ScamPatternDetector() {
                 "lottery", "sweepstakes", "claim your prize", "free vacation",
                 "free cruise", "cash prize", "you have been selected",
                 "you are our winner", "collect your winnings",
+                "you have won", "you've won", "won the prize", "won a prize",
+                "your prize", "take your prize", "million dollar", "million dollars",
+                "you are a winner", "profits are guaranteed",
                 // Russian
                 "лотерея", "вы выиграли приз", "получите выигрыш",
+                "вы выиграли", "ваш приз", "миллион долларов",
                 // Hebrew
                 "הגרלה", "זכית בפרס", "תבע את הפרס שלך",
+                "זכית", "הפרס שלך", "מיליון דולר",
                 // Arabic
                 "يانصيب", "فزت بجائزة", "استلم جائزتك",
+                "جائزتك", "فزت في", "مليون دولار",
                 // Spanish
                 "lotería", "reclamar su premio", "usted ha ganado", "cobrar su premio",
+                "ha ganado", "su premio", "un millón de dólares",
                 // French
-                "loterie", "réclamez votre prix", "vous avez gagné", "encaissez vos gains"
+                "loterie", "réclamez votre prix", "vous avez gagné", "encaissez vos gains",
+                "votre prix", "vous avez remporté", "un million de dollars"
             ),
             ScamType.SOCIAL_SECURITY to listOf(
                 // English
