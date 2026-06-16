@@ -2,6 +2,17 @@
 <issues format="6" by="lint 9.1.0" type="baseline" client="gradle" dependencies="false" name="AGP (9.1.0)" variant="all" version="9.1.0">
 
     <issue
+        id="MissingPermission"
+        message="Call requires permission which may be rejected by user: code should explicitly check to see if permission is available (with `checkPermission`) or explicitly handle a potential `SecurityException`"
+        errorLine1="            val record = AudioRecord("
+        errorLine2="                         ^">
+        <location
+            file="src/main/java/io/vocaguard/service/CallMonitoringService.kt"
+            line="205"
+            column="26"/>
+    </issue>
+
+    <issue
         id="ApplySharedPref"
         message="Consider using `apply()` instead; `commit` writes its data to persistent storage immediately, whereas `apply` will handle it in the background"
         errorLine1="        whitelistPrefs.edit().clear().commit() // commit() for synchronous clear in tests"
@@ -15,7 +26,7 @@
     <issue
         id="InlinedApi"
         message="Field requires API level 33 (current min is 29): `android.Manifest.permission#POST_NOTIFICATIONS`"
-        errorLine1="            Manifest.permission.POST_NOTIFICATIONS"
+        errorLine1="            Manifest.permission.POST_NOTIFICATIONS,"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/io/vocaguard/ui/PermissionsManager.kt"
@@ -30,7 +41,7 @@
         errorLine2="                                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/io/vocaguard/ui/PermissionsManager.kt"
-            line="32"
+            line="33"
             column="54"/>
     </issue>
 
@@ -41,7 +52,7 @@
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="16"
+            line="23"
             column="9"/>
     </issue>
 
@@ -52,18 +63,29 @@
         errorLine2="                                                                                         ~~~~">
         <location
             file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
-            line="54"
+            line="59"
             column="90"/>
     </issue>
 
     <issue
+        id="InflateParams"
+        message="Avoid passing `null` as the view root (needed to resolve layout parameters on the inflated layout&apos;s root element)"
+        errorLine1="            val view = LayoutInflater.from(context).inflate(R.layout.overlay_incoming_call, null)"
+        errorLine2="                                                                                            ~~~~">
+        <location
+            file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
+            line="127"
+            column="93"/>
+    </issue>
+
+    <issue
         id="InvalidFragmentVersionForActivityResult"
         message="Upgrade Fragment version to at least 1.3.0."
         errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -74,7 +96,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -85,7 +107,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -96,7 +118,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -107,7 +129,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -118,7 +140,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -129,7 +151,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -140,7 +162,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -151,7 +173,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -162,7 +184,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -173,7 +195,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -184,7 +206,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -195,7 +217,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -206,7 +228,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -217,7 +239,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -228,7 +250,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -239,7 +261,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -250,7 +272,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -261,7 +283,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -272,7 +294,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -283,7 +305,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -294,7 +316,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -305,7 +327,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -316,7 +338,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -327,7 +349,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -338,7 +360,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -349,7 +371,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -360,7 +382,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -371,7 +393,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -382,7 +404,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -393,7 +415,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -404,7 +426,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -415,7 +437,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -426,7 +448,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -437,7 +459,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -448,7 +470,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -459,7 +481,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -470,7 +492,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -481,7 +503,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -492,7 +514,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -503,7 +525,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -514,7 +536,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -525,7 +547,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -536,7 +558,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -547,7 +569,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -558,7 +580,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -569,7 +591,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -580,7 +602,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -591,7 +613,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -602,7 +624,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -613,7 +635,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -624,7 +646,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -635,7 +657,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -646,7 +668,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -657,7 +679,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -668,7 +690,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -679,7 +701,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -690,7 +712,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -701,7 +723,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -712,7 +734,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -723,7 +745,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -734,7 +756,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -745,7 +767,7 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
             column="46"/>
     </issue>
 
@@ -756,7 +778,18 @@
         errorLine2="                                             ^">
         <location
             file="src/main/java/io/vocaguard/MainActivity.kt"
-            line="72"
+            line="73"
+            column="46"/>
+    </issue>
+
+    <issue
+        id="InvalidFragmentVersionForActivityResult"
+        message="Upgrade Fragment version to at least 1.3.0."
+        errorLine1="    private val requestPermissionsLauncher = registerForActivityResult("
+        errorLine2="                                             ^">
+        <location
+            file="src/main/java/io/vocaguard/MainActivity.kt"
+            line="73"
             column="46"/>
     </issue>
 
@@ -767,7 +800,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/AndroidManifest.xml"
-            line="38"
+            line="49"
             column="13"/>
     </issue>
 
@@ -789,7 +822,7 @@
         errorLine2="    ~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="11"
+            line="18"
             column="5"/>
     </issue>
 
@@ -800,7 +833,7 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="83"
+            line="95"
             column="20"/>
     </issue>
 
@@ -811,7 +844,7 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="86"
+            line="98"
             column="20"/>
     </issue>
 
@@ -822,13 +855,13 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="119"
+            line="132"
             column="24"/>
     </issue>
 
     <issue
         id="GradleDependency"
-        message="A newer version of androidx.core:core-ktx than 1.10.1 is available: 1.18.0"
+        message="A newer version of androidx.core:core-ktx than 1.10.1 is available: 1.19.0"
         errorLine1="coreKtx = &quot;1.10.1&quot;"
         errorLine2="          ~~~~~~~~">
         <location
@@ -883,7 +916,7 @@
 
     <issue
         id="GradleDependency"
-        message="A newer version of androidx.compose:compose-bom than 2024.09.00 is available: 2026.05.00"
+        message="A newer version of androidx.compose:compose-bom than 2024.09.00 is available: 2026.05.01"
         errorLine1="composeBom = &quot;2024.09.00&quot;"
         errorLine2="             ~~~~~~~~~~~~">
         <location
@@ -982,7 +1015,7 @@
 
     <issue
         id="GradleDependency"
-        message="A newer version of com.google.firebase:firebase-bom than 33.7.0 is available: 34.13.0"
+        message="A newer version of com.google.firebase:firebase-bom than 33.7.0 is available: 34.14.1"
         errorLine1="firebaseBom = &quot;33.7.0&quot;"
         errorLine2="              ~~~~~~~~">
         <location
@@ -1031,18 +1064,29 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="80"
+            line="92"
             column="20"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of com.squareup.okhttp3:okhttp than 4.12.0 is available: 5.3.2"
+        message="A newer version of com.squareup.okhttp3:okhttp than 4.12.0 is available: 5.4.0"
         errorLine1="    implementation(&quot;com.squareup.okhttp3:okhttp:4.12.0&quot;)"
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="115"
+            line="127"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of com.alphacephei:vosk-android than 0.3.47 is available: 0.3.75"
+        errorLine1="    implementation(&quot;com.alphacephei:vosk-android:0.3.47&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="128"
             column="20"/>
     </issue>
 
@@ -1053,7 +1097,7 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="118"
+            line="131"
             column="24"/>
     </issue>
 
@@ -1064,13 +1108,13 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="121"
+            line="134"
             column="24"/>
     </issue>
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of org.jetbrains.kotlin.plugin.compose than 2.2.10 is available: 2.3.21"
+        message="A newer version of org.jetbrains.kotlin.plugin.compose than 2.2.10 is available: 2.4.0"
         errorLine1="kotlin = &quot;2.2.10&quot;"
         errorLine2="         ~~~~~~~~">
         <location
@@ -1081,7 +1125,7 @@
 
     <issue
         id="NewerVersionAvailable"
-        message="A newer version of com.googlecode.libphonenumber:libphonenumber than 8.13.51 is available: 9.0.30"
+        message="A newer version of com.googlecode.libphonenumber:libphonenumber than 8.13.51 is available: 9.0.32"
         errorLine1="libphonenumber = &quot;8.13.51&quot;"
         errorLine2="                 ~~~~~~~~~">
         <location
@@ -1108,12 +1152,44 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="86"
+            line="98"
             column="20"/>
     </issue>
 
     <issue
         id="Aligned16KB"
+        message="The native library `arm64-v8a/libvosk.so` (from `com.alphacephei:vosk-android:0.3.47`) is not 16 KB aligned"
+        errorLine1="    implementation(&quot;com.alphacephei:vosk-android:0.3.47&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="128"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `x86_64/libjnidispatch.so` (from `net.java.dev.jna:jna:5.13.0`) is not 16 KB aligned">
+        <location
+            file="$GRADLE_USER_HOME/caches/9.3.1/transforms/93923c373026509141f58e8d19973614/workspace/transformed/jna-5.13.0/jni/x86_64/libjnidispatch.so"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `x86_64/libjnidispatch.so` (from `net.java.dev.jna:jna:5.13.0`) is not 16 KB aligned">
+        <location
+            file="$GRADLE_USER_HOME/caches/9.3.1/transforms/93923c373026509141f58e8d19973614/workspace/transformed/jna-5.13.0/jni/x86_64/libjnidispatch.so"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `x86_64/libjnidispatch.so` (from `net.java.dev.jna:jna:5.13.0`) is not 16 KB aligned">
+        <location
+            file="$GRADLE_USER_HOME/caches/9.3.1/transforms/93923c373026509141f58e8d19973614/workspace/transformed/jna-5.13.0/jni/x86_64/libjnidispatch.so"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
         message="The native library `x86_64/libtensorflowlite_jni.so` (from `com.google.ai.edge.litert:litert:1.0.1`) is not 16 KB aligned">
         <location
             file="$GRADLE_USER_HOME/caches/9.3.1/transforms/fe8c5b6cc391a7e5fe336dbffe724cda/workspace/transformed/litert-1.0.1/jni/x86_64/libtensorflowlite_jni.so"/>
@@ -1124,6 +1200,31 @@
         message="The native library `x86_64/libtensorflowlite_jni.so` (from `com.google.ai.edge.litert:litert:1.0.1`) is not 16 KB aligned">
         <location
             file="$GRADLE_USER_HOME/caches/9.3.1/transforms/fe8c5b6cc391a7e5fe336dbffe724cda/workspace/transformed/litert-1.0.1/jni/x86_64/libtensorflowlite_jni.so"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `arm64-v8a/libvosk.so` (from `com.alphacephei:vosk-android:0.3.47`) is not 16 KB aligned">
+        <location
+            file="$GRADLE_USER_HOME/caches/9.3.1/transforms/8d07523a150144e88788c52147fab11f/workspace/transformed/vosk-android-0.3.47/jni/arm64-v8a/libvosk.so"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `arm64-v8a/libvosk.so` (from `com.alphacephei:vosk-android:0.3.47`) is not 16 KB aligned">
+        <location
+            file="$GRADLE_USER_HOME/caches/9.3.1/transforms/8d07523a150144e88788c52147fab11f/workspace/transformed/vosk-android-0.3.47/jni/arm64-v8a/libvosk.so"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 29"
+        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/ui/IncomingCallActivity.kt"
+            line="41"
+            column="13"/>
     </issue>
 
     <issue
@@ -1167,6 +1268,17 @@
         <location
             file="src/main/java/io/vocaguard/ui/SettingsViewModel.kt"
             line="21"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `#EE1A1A2E` with a theme that also paints a background (inferred theme is `@style/Theme.VocaGuard`)"
+        errorLine1="    android:background=&quot;#EE1A1A2E&quot;>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/overlay_incoming_call.xml"
+            line="7"
             column="5"/>
     </issue>
 
@@ -1337,6 +1449,28 @@
             file="src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp"/>
         <location
             file="src/main/res/mipmap-xxxhdpi/ic_launcher.webp"/>
+    </issue>
+
+    <issue
+        id="ButtonStyle"
+        message="Buttons in button bars should be borderless; use `style=&quot;?android:attr/buttonBarButtonStyle&quot;` (and `?android:attr/buttonBarStyle` on the parent)"
+        errorLine1="        &lt;Button"
+        errorLine2="         ~~~~~~">
+        <location
+            file="src/main/res/layout/overlay_scam_alert.xml"
+            line="34"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="ButtonStyle"
+        message="Buttons in button bars should be borderless; use `style=&quot;?android:attr/buttonBarButtonStyle&quot;` (and `?android:attr/buttonBarStyle` on the parent)"
+        errorLine1="        &lt;Button"
+        errorLine2="         ~~~~~~">
+        <location
+            file="src/main/res/layout/overlay_scam_alert.xml"
+            line="43"
+            column="10"/>
     </issue>
 
     <issue
@@ -1676,7 +1810,7 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="80"
+            line="92"
             column="20"/>
     </issue>
 
@@ -1687,7 +1821,7 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="83"
+            line="95"
             column="20"/>
     </issue>
 
@@ -1698,7 +1832,7 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="86"
+            line="98"
             column="20"/>
     </issue>
 
@@ -1709,7 +1843,7 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="105"
+            line="117"
             column="20"/>
     </issue>
 
@@ -1720,7 +1854,18 @@
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="115"
+            line="127"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;com.alphacephei:vosk-android:0.3.47&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="128"
             column="20"/>
     </issue>
 
@@ -1731,7 +1876,7 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="118"
+            line="131"
             column="24"/>
     </issue>
 
@@ -1742,7 +1887,7 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="119"
+            line="132"
             column="24"/>
     </issue>
 
@@ -1753,7 +1898,7 @@
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="121"
+            line="134"
             column="24"/>
     </issue>
 
@@ -1764,7 +1909,7 @@
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
-            line="56"
+            line="61"
             column="17"/>
     </issue>
 
@@ -1775,7 +1920,7 @@
         errorLine2="                 ~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
-            line="56"
+            line="61"
             column="18"/>
     </issue>
 
@@ -1786,7 +1931,7 @@
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
-            line="58"
+            line="63"
             column="17"/>
     </issue>
 
@@ -1797,8 +1942,63 @@
         errorLine2="                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
-            line="58"
+            line="63"
             column="47"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+        errorLine1="                warningView?.text = &quot;⚠ SCAM CALL DETECTED\n${formatScamType(scamType)}\nDo not answer!&quot;"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
+            line="132"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                warningView?.text = &quot;⚠ SCAM CALL DETECTED\n${formatScamType(scamType)}\nDo not answer!&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
+            line="132"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="SetTextI18n"
+        message="String literal in `setText` can not be translated. Use Android resources instead."
+        errorLine1="                warningView?.text = &quot;⚠ SCAM CALL DETECTED\n${formatScamType(scamType)}\nDo not answer!&quot;"
+        errorLine2="                                                                                        ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/io/vocaguard/ui/ScamOverlayManager.kt"
+            line="132"
+            column="89"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Incoming Call&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;Incoming Call&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/overlay_incoming_call.xml"
+            line="13"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Decline&quot;, should use `@string` resource"
+        errorLine1="        android:text=&quot;Decline&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/overlay_incoming_call.xml"
+            line="43"
+            column="9"/>
     </issue>
 
     <issue
@@ -1821,6 +2021,28 @@
             file="src/main/res/layout/overlay_scam_alert.xml"
             line="23"
             column="9"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Not a scam&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Not a scam&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/overlay_scam_alert.xml"
+            line="38"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="HardcodedText"
+        message="Hardcoded string &quot;Dismiss&quot;, should use `@string` resource"
+        errorLine1="            android:text=&quot;Dismiss&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/overlay_scam_alert.xml"
+            line="48"
+            column="13"/>
     </issue>
 
 </issues>
