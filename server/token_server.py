@@ -41,7 +41,7 @@ class ReuseHTTPServer(HTTPServer):
 if __name__ == "__main__":
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(CERT_FILE, KEY_FILE)
-    server = ReuseHTTPServer(("0.0.0.0", 8080), Handler)
+    server = ReuseHTTPServer(("0.0.0.0", 443), Handler)
     server.socket = context.wrap_socket(server.socket, server_side=True)
-    print("Token server running on port 8080 (HTTPS)", flush=True)
+    print("Token server running on port 443 (HTTPS)", flush=True)
     server.serve_forever()

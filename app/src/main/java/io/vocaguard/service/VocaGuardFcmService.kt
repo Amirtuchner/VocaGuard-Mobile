@@ -40,7 +40,7 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                     val client = OkHttpClient()
                     val body = token.toRequestBody("text/plain".toMediaType())
                     val request = Request.Builder()
-                        .url("https://178.105.164.91:8080/register-token")
+                        .url("https://178.105.164.91/register-token")
                         .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
                         .post(body)
                         .build()
