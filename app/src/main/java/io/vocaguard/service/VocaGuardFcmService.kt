@@ -27,6 +27,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 
 class VocaGuardFcmService : FirebaseMessagingService() {
 
@@ -59,6 +60,28 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                 uploadToken(token)
             }
         }
+
+        // Signal Asterisk to bridge the waiting incoming call to the user's SIP phone
+        fun acceptCall(channel: String, callerNumber: String) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val body = JSONObject().apply {
+                        put("channel", channel)
+                        put("caller", callerNumber)
+                    }.toString().toRequestBody("application/json".toMediaType())
+                    val request = Request.Builder()
+                        .url("https://178.105.164.91/accept-call")
+                        .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                        .post(body)
+                        .build()
+                    OkHttpClient().newCall(request).execute().use { response ->
+                        Log.i(TAG, "Accept call signalled: ${response.code}")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to signal accept call", e)
+                }
+            }
+        }
     }
 
     override fun onNewToken(token: String) {
@@ -71,8 +94,9 @@ class VocaGuardFcmService : FirebaseMessagingService() {
 
         when (message.data["type"]) {
             "incoming_call" -> {
-                val callerNumber = message.data["caller_number"] ?: ""
-                showIncomingCallNotification(callerNumber)
+                val callerNumber    = message.data["caller_number"] ?: ""
+                val asteriskChannel = message.data["asterisk_channel"] ?: ""
+                showIncomingCallNotification(callerNumber, asteriskChannel)
                 return
             }
             "scam_alert" -> { /* handled below */ }
@@ -115,7 +139,7 @@ class VocaGuardFcmService : FirebaseMessagingService() {
         }
     }
 
-    private fun showIncomingCallNotification(callerNumber: String) {
+    private fun showIncomingCallNotification(callerNumber: String, asteriskChannel: String) {
         val channelId = "incoming_call_channel"
         val nm = getSystemService(NotificationManager::class.java)
 
@@ -128,12 +152,14 @@ class VocaGuardFcmService : FirebaseMessagingService() {
             nm.createNotificationChannel(channel)
         }
 
+        fun callIntent() = Intent(this, io.vocaguard.ui.IncomingCallActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(io.vocaguard.ui.IncomingCallActivity.EXTRA_CALLER_NUMBER, callerNumber)
+            putExtra(io.vocaguard.ui.IncomingCallActivity.EXTRA_CHANNEL, asteriskChannel)
+        }
+
         val fullScreenIntent = PendingIntent.getActivity(
-            this, 0,
-            Intent(this, io.vocaguard.ui.IncomingCallActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra(io.vocaguard.ui.IncomingCallActivity.EXTRA_CALLER_NUMBER, callerNumber)
-            },
+            this, 0, callIntent(),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -150,13 +176,8 @@ class VocaGuardFcmService : FirebaseMessagingService() {
 
         nm.notify(io.vocaguard.ui.IncomingCallActivity.NOTIFICATION_ID, notification)
 
-        // Also launch the activity directly so it shows immediately
-        startActivity(Intent(this, io.vocaguard.ui.IncomingCallActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(io.vocaguard.ui.IncomingCallActivity.EXTRA_CALLER_NUMBER, callerNumber)
-        })
-
-        Log.i(TAG, "Incoming call screen launched for $displayNumber")
+        startActivity(callIntent())
+        Log.i(TAG, "Incoming call screen launched for $displayNumber channel=$asteriskChannel")
     }
 
     private fun inferScamType(keywords: String): ScamType {

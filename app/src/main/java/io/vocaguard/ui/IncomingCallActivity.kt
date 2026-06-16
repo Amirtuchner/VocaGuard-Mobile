@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import io.vocaguard.service.VocaGuardFcmService
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -27,7 +28,8 @@ class IncomingCallActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_CALLER_NUMBER = "caller_number"
-        const val NOTIFICATION_ID = 2001
+        const val EXTRA_CHANNEL       = "asterisk_channel"
+        const val NOTIFICATION_ID     = 2001
     }
 
     private var ringtone: Ringtone? = null
@@ -50,7 +52,8 @@ class IncomingCallActivity : ComponentActivity() {
         val km = getSystemService(KeyguardManager::class.java)
         km.requestDismissKeyguard(this, null)
 
-        val callerNumber = intent.getStringExtra(EXTRA_CALLER_NUMBER) ?: ""
+        val callerNumber    = intent.getStringExtra(EXTRA_CALLER_NUMBER) ?: ""
+        val asteriskChannel = intent.getStringExtra(EXTRA_CHANNEL) ?: ""
 
         // Start looping ringtone
         val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
@@ -62,7 +65,11 @@ class IncomingCallActivity : ComponentActivity() {
         setContent {
             IncomingCallScreen(
                 callerNumber = callerNumber,
-                onAccept = { dismiss() },
+                onAccept = {
+                    // Signal Asterisk to originate SIP call to Linphone and bridge
+                    VocaGuardFcmService.acceptCall(asteriskChannel, callerNumber)
+                    dismiss()
+                },
                 onDecline = { dismiss() }
             )
         }
