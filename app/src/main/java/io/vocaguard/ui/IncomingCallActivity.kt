@@ -2,10 +2,13 @@ package io.vocaguard.ui
 
 import android.app.KeyguardManager
 import android.app.NotificationManager
+import android.content.Intent
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -68,7 +71,17 @@ class IncomingCallActivity : ComponentActivity() {
                 onAccept = {
                     // Signal Asterisk to originate SIP call to Linphone and bridge
                     VocaGuardFcmService.acceptCall(asteriskChannel, callerNumber)
-                    dismiss()
+                    ringtone?.stop()
+                    ringtone = null
+                    getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
+                    // Open Linphone after 1.5s so the incoming SIP call is ready to answer
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        packageManager.getLaunchIntentForPackage("org.linphone")?.let {
+                            it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(it)
+                        }
+                        finish()
+                    }, 1500)
                 },
                 onDecline = { dismiss() }
             )
