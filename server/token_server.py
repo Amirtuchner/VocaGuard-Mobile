@@ -52,6 +52,16 @@ def ami_originate(orig_channel: str, orig_caller: str):
         )
         recv_response(s)
 
+        # Mark the incoming channel as accepted so dialplan skips EAGI fallback.
+        s.sendall(
+            f"Action: Setvar\r\n"
+            f"Channel: {orig_channel}\r\n"
+            f"Variable: VG_ACCEPTED\r\n"
+            f"Value: 1\r\n\r\n"
+            .encode()
+        )
+        recv_response(s)
+
         s.sendall(
             f"Action: Originate\r\n"
             f"Channel: PJSIP/vocaguard\r\n"
@@ -60,6 +70,7 @@ def ami_originate(orig_channel: str, orig_caller: str):
             f"Priority: 1\r\n"
             f"Variable: ORIG_CHANNEL={orig_channel}\r\n"
             f"Variable: ORIG_CALLER={orig_caller}\r\n"
+            f"Variable: PJSIP_HEADER(add,Call-Info)=<urn:ietf:params:answer-after=0>\r\n"
             f"CallerID: {orig_caller}\r\n"
             f"Timeout: 30000\r\n"
             f"Async: yes\r\n\r\n"
