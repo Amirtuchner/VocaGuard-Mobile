@@ -1,7 +1,9 @@
 package io.vocaguard.ui
 
 import android.app.KeyguardManager
+import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Intent
 import android.media.Ringtone
 import android.media.RingtoneManager
@@ -12,6 +14,15 @@ import android.os.Looper
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import io.vocaguard.service.VocaGuardSipManager
+import androidx.core.app.NotificationCompat
+import io.vocaguard.R
+import io.vocaguard.receiver.ActiveCallReceiver
 import io.vocaguard.service.VocaGuardFcmService
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -36,6 +47,9 @@ class IncomingCallActivity : ComponentActivity() {
     }
 
     private var ringtone: Ringtone? = null
+    private var activeChannel: String = ""
+    private var callActive by mutableStateOf(false)
+    private var activeCallerNumber: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,26 +80,84 @@ class IncomingCallActivity : ComponentActivity() {
         }
 
         setContent {
-            IncomingCallScreen(
-                callerNumber = callerNumber,
-                onAccept = {
-                    // Signal Asterisk to originate SIP call to Linphone and bridge
-                    VocaGuardFcmService.acceptCall(asteriskChannel, callerNumber)
-                    ringtone?.stop()
-                    ringtone = null
-                    getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
-                    // Open Linphone after 1.5s so the incoming SIP call is ready to answer
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        packageManager.getLaunchIntentForPackage("org.linphone")?.let {
-                            it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            startActivity(it)
-                        }
-                        finish()
-                    }, 1500)
-                },
-                onDecline = { dismiss() }
+            val sipState by VocaGuardSipManager.callState.collectAsState()
+
+            // When the remote side hangs up, clean up and finish
+            LaunchedEffect(sipState) {
+                if (sipState == VocaGuardSipManager.CallState.ENDED && callActive) {
+                    getSystemService(NotificationManager::class.java)
+                        .cancel(ActiveCallReceiver.NOTIFICATION_ID)
+                    finish()
+                }
+            }
+
+            if (callActive) {
+                ActiveCallScreen(
+                    callerNumber = activeCallerNumber,
+                    onEndCall = { hangUpAndFinish() }
+                )
+            } else {
+                IncomingCallScreen(
+                    callerNumber = callerNumber,
+                    onAccept = {
+                        ringtone?.stop()
+                        ringtone = null
+                        getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
+                        activeChannel = asteriskChannel
+                        activeCallerNumber = callerNumber
+                        callActive = true
+                        showActiveCallNotification(asteriskChannel, callerNumber)
+                        // Tell the embedded SIP SDK to auto-answer the incoming INVITE,
+                        // then trigger Asterisk to originate the call via AMI.
+                        VocaGuardSipManager.acceptCall()
+                        VocaGuardFcmService.acceptCall(asteriskChannel, callerNumber)
+                    },
+                    onDecline = { dismiss() }
+                )
+            }
+        }
+    }
+
+    private fun hangUpAndFinish() {
+        VocaGuardSipManager.hangupCurrentCall()
+        VocaGuardFcmService.hangupCall(activeChannel)  // AMI hangup as fallback
+        getSystemService(NotificationManager::class.java).cancel(ActiveCallReceiver.NOTIFICATION_ID)
+        finish()
+    }
+
+    private fun showActiveCallNotification(channel: String, callerNumber: String) {
+        val channelId = "active_call_channel"
+        val nm = getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(channelId) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(channelId, "Active Call", NotificationManager.IMPORTANCE_LOW)
             )
         }
+        val hangUpPi = PendingIntent.getBroadcast(
+            this, 0,
+            Intent(ActiveCallReceiver.ACTION_HANG_UP, null, this, ActiveCallReceiver::class.java).apply {
+                putExtra(ActiveCallReceiver.EXTRA_CHANNEL, channel)
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        // Tapping the notification body brings the user back to VocaGuard's active call screen
+        val openVocaGuardPi = PendingIntent.getActivity(
+            this, 1,
+            Intent(this, IncomingCallActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setContentTitle("VocaGuard: Monitoring Call")
+            .setContentText("Tap to open • From: $displayNumber")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setOngoing(true)
+            .setContentIntent(openVocaGuardPi)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "End Call", hangUpPi)
+            .build()
+        nm.notify(ActiveCallReceiver.NOTIFICATION_ID, notification)
     }
 
     private fun dismiss() {
@@ -98,6 +170,48 @@ class IncomingCallActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         ringtone?.stop()
+    }
+}
+
+@Composable
+private fun ActiveCallScreen(
+    callerNumber: String,
+    onEndCall: () -> Unit
+) {
+    val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1A1A2E))
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Spacer(Modifier.height(48.dp))
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Call Active", color = Color(0xFF4CAF50), fontSize = 16.sp)
+            Spacer(Modifier.height(16.dp))
+            Text(displayNumber, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text("VocaGuard is monitoring this call", color = Color(0xFFAAAAAA), fontSize = 14.sp)
+            Spacer(Modifier.height(8.dp))
+            Text("Press back to return to Linphone", color = Color(0xFF888888), fontSize = 12.sp)
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(bottom = 64.dp)
+        ) {
+            Button(
+                onClick = onEndCall,
+                modifier = Modifier.size(80.dp),
+                shape = CircleShape,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+            ) {
+                Text("END", fontSize = 16.sp, color = Color.White)
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("End Call", color = Color.White, fontSize = 12.sp)
+        }
     }
 }
 

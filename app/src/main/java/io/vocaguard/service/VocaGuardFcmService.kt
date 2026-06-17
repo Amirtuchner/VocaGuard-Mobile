@@ -61,6 +61,27 @@ class VocaGuardFcmService : FirebaseMessagingService() {
             }
         }
 
+        // Signal Asterisk to hang up the bridged call
+        fun hangupCall(channel: String) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val body = JSONObject().apply {
+                        put("channel", channel)
+                    }.toString().toRequestBody("application/json".toMediaType())
+                    val request = Request.Builder()
+                        .url("https://178.105.164.91/hangup")
+                        .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                        .post(body)
+                        .build()
+                    OkHttpClient().newCall(request).execute().use { response ->
+                        Log.i(TAG, "Hangup signalled: ${response.code}")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to signal hangup", e)
+                }
+            }
+        }
+
         // Signal Asterisk to bridge the waiting incoming call to the user's SIP phone
         fun acceptCall(channel: String, callerNumber: String) {
             CoroutineScope(Dispatchers.IO).launch {

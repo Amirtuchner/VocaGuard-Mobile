@@ -30,6 +30,11 @@ android {
             ?: System.getenv("TOKEN_SERVER_SECRET")
             ?: ""
         buildConfigField("String", "TOKEN_SERVER_SECRET", "\"$secret\"")
+
+        val sipPassword = localProperties.getProperty("sip_password")
+            ?: System.getenv("SIP_PASSWORD")
+            ?: "vocaguard123"
+        buildConfigField("String", "SIP_PASSWORD", "\"$sipPassword\"")
     }
 
     // Signing config for CI — reads from environment variables set by the workflow.
@@ -125,6 +130,7 @@ dependencies {
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.messaging)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.linphone:linphone-sdk-android:5.3.+")
     implementation("com.alphacephei:vosk-android:0.3.47")
 
     testImplementation(libs.junit)
