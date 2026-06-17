@@ -221,20 +221,34 @@ class TextPreprocessor {
             // French
             "assurance maladie", "assurance santé", "couverture médicale", "mutuelle"))
         features.add(flag(
-            "investment", "trading", "profit", "returns",
-            "broker", "portfolio", "invest", "stock", "crypto",
+            "investment", "trading", "profit", "returns", "guaranteed returns", "high returns",
+            "broker", "portfolio", "invest", "stock", "crypto", "cryptocurrency", "bitcoin",
+            "forex", "binary options", "passive income", "trading platform", "trading account",
+            "account manager", "personal trader", "withdraw profits", "trading balance",
+            "hedge fund", "ponzi", "pyramid scheme", "token", "ico", "nft", "defi", "staking",
+            "arbitrage", "mining pool", "wallet", "usdt", "ethereum", "altcoin", "binance",
+            "minimum deposit", "initial deposit", "fund your account", "vip trading",
+            "insider tip", "market signal", "exclusive opportunity", "double your money",
             // Russian
             "инвестиции", "трейдинг", "прибыль", "доходность", "брокер",
             "криптовалюта", "акции", "вложить", "заработок", "пассивный доход",
+            "гарантированная доходность", "форекс", "торговый счёт", "вывод средств",
             // Hebrew
             "השקעה", "מסחר", "רווח", "תשואה", "ברוקר", "קריפטו", "ביטקוין",
-            "להשקיע", "הכפלת כסף", "פורקס", "מניות",
+            "להשקיע", "הכפלת כסף", "פורקס", "מניות", "פלטפורמת מסחר", "חשבון מסחר",
+            "תשואה מובטחת", "הכנסה פסיבית", "מנהל חשבון", "ארנק דיגיטלי",
             // Arabic
             "استثمار", "تداول", "ربح", "عائد", "وسيط", "عملة مشفرة", "بيتكوين",
+            "فوركس", "خيارات ثنائية", "دخل سلبي", "منصة تداول", "حساب تداول",
+            "عوائد مضمونة", "مدير حساب", "سحب الأرباح", "إيداع أولي",
             // Spanish
             "inversión", "ganancias", "rentabilidad", "criptomoneda", "ingresos pasivos",
+            "plataforma de trading", "cuenta de trading", "retiro de ganancias",
+            "retornos garantizados", "gestor de cuenta", "depósito mínimo",
             // French
-            "investissement", "rendement", "bénéfices", "cryptomonnaie", "revenus passifs"))
+            "investissement", "rendement", "bénéfices", "cryptomonnaie", "revenus passifs",
+            "plateforme de trading", "compte de trading", "retrait des bénéfices",
+            "rendements garantis", "gestionnaire de compte", "dépôt initial"))
         features.add(flag(
             "gift card", "bitcoin", "western union", "wire",
             "cryptocurrency", "prepaid card",

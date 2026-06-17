@@ -151,21 +151,49 @@ class ScamPatternDetector() {
                 "assurance maladie", "assurance santé", "couverture médicale", "mutuelle"
             ),
             ScamType.INVESTMENT_SCAM to listOf(
-                // English
+                // English — core investment fraud phrases
                 "guaranteed returns", "high returns", "risk free", "double your money",
                 "investment opportunity", "limited slots", "exclusive offer",
                 "bitcoin investment", "trading platform", "passive income",
                 "financial freedom", "get rich quick", "insider tip", "secret strategy",
+                // Crypto / DeFi / token
+                "crypto arbitrage", "defi staking", "nft project", "token presale",
+                "ico launch", "altcoin listing", "binance listing", "ethereum staking",
+                "usdt transfer", "mining pool", "connect your wallet", "approve the contract",
+                "crypto signal", "vip trading group", "telegram signal group",
+                // Pig-butchering / managed trading
+                "account manager", "personal trader", "vip trading account",
+                "trading balance", "withdraw your profits", "fund your account",
+                "minimum deposit", "initial deposit", "trading robot", "ai trading",
+                "forex robot", "automated trading", "managed account",
+                // Withdrawal block tactics
+                "tax clearance fee", "withdrawal fee", "unlock your withdrawal",
+                "security deposit to withdraw", "upgrade your account tier",
+                "processing fee to release", "insurance bond", "anti-money laundering fee",
+                // Pump and dump / Ponzi
+                "recruit members", "downline", "network marketing investment",
+                "peer to peer lending", "profit sharing cooperative",
+                "earn commissions on referrals", "build your downline",
                 // Russian
                 "гарантированный доход", "криптовалютные инвестиции", "пассивный доход без риска",
+                "торговый робот", "личный брокер", "вывод прибыли", "пополнить счёт",
+                "сигналы форекс", "vip торговый аккаунт", "арбитраж криптовалюты",
                 // Hebrew
                 "תשואה מובטחת", "השקעה בקריפטו", "הכפלת כסף", "פורקס",
+                "מנהל חשבון", "רובוט מסחר", "משיכת רווחים", "הפקדה ראשונית",
+                "אות מסחר", "קבוצת טלגרם vip", "ארביטראז' קריפטו",
                 // Arabic
                 "عائد مضمون", "استثمار بعملة مشفرة", "مضاعفة الأموال",
+                "روبوت التداول", "مدير الحساب", "سحب الأرباح", "تمويل الحساب",
+                "إيداع أولي", "مجموعة إشارات vip", "تداول مؤتمت",
                 // Spanish
                 "inversión garantizada", "ganancias altas sin riesgo", "criptomoneda",
+                "gestor de cuenta", "robot de trading", "retiro de ganancias",
+                "depósito mínimo", "grupo de señales vip", "trading automatizado",
                 // French
-                "investissement garanti", "rendements élevés sans risque", "cryptomonnaie"
+                "investissement garanti", "rendements élevés sans risque", "cryptomonnaie",
+                "gestionnaire de compte", "robot de trading", "retrait des bénéfices",
+                "dépôt initial", "groupe de signaux vip", "trading automatisé"
             ),
             ScamType.DONATION_FRAUD to listOf(
                 // English
