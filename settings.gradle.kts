@@ -20,7 +20,7 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven { url = uri("https://alphacephei.com/maven/") }
-        maven { url = uri("https://linphone.org/maven_repository/") }
+        maven { url = uri("https://download.linphone.org/maven_repository") }
     }
 }
 

@@ -39,8 +39,8 @@ object VocaGuardSipManager {
             val c = factory.createCore(null, null, context)
 
             // Audio-only — disable video
-            c.enableVideoCapture(false)
-            c.enableVideoDisplay(false)
+            c.isVideoCaptureEnabled = false
+            c.isVideoDisplayEnabled = false
 
             // SIP auth credentials
             val authInfo = factory.createAuthInfo(
@@ -54,7 +54,7 @@ object VocaGuardSipManager {
             val serverAddr = factory.createAddress("sip:$SERVER_IP")
             serverAddr?.transport = TransportType.Udp
             params.serverAddress = serverAddr
-            params.registerEnabled = true
+            params.isRegisterEnabled = true
             params.expires = 120
 
             val account = c.createAccount(params)
@@ -114,8 +114,8 @@ object VocaGuardSipManager {
 
     private fun answerCall(core: Core, call: Call) {
         val callParams = core.createCallParams(call)
-        callParams?.enableAudio(true)
-        callParams?.enableVideo(false)
+        callParams?.isAudioEnabled = true
+        callParams?.isVideoEnabled = false
         try {
             call.acceptWithParams(callParams)
             // Route audio to earpiece by default (user holds phone to ear)
