@@ -258,6 +258,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _alertTypeEnabled.value = _alertTypeEnabled.value + (scamType to enabled)
     }
 
+    // ── Call forwarding ───────────────────────────────────────────────────────
+
+    private val _callForwardingEnabled = MutableStateFlow(detectionSettings.callForwardingEnabled)
+    val callForwardingEnabled: StateFlow<Boolean> = _callForwardingEnabled.asStateFlow()
+
+    fun setCallForwardingEnabled(value: Boolean) {
+        detectionSettings.callForwardingEnabled = value
+        _callForwardingEnabled.value = value
+    }
+
     // ── Report endpoint ───────────────────────────────────────────────────────
 
     fun updateReportEndpointUrl(url: String) {

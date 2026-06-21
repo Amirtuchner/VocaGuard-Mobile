@@ -89,6 +89,15 @@ class DetectionSettings private constructor(context: Context) {
         get() = prefs.getString(KEY_REPORT_ENDPOINT, "") ?: ""
         set(value) = prefs.edit().putString(KEY_REPORT_ENDPOINT, value).apply()
 
+    /**
+     * Whether the user has activated unconditional call forwarding to the VocaGuard
+     * server number (*21*+97233741493#). This is a user-confirmed flag — Android has
+     * no API to query the actual network-side forwarding status.
+     */
+    var callForwardingEnabled: Boolean
+        get() = prefs.getBoolean(KEY_CALL_FORWARDING, false)
+        set(value) = prefs.edit().putBoolean(KEY_CALL_FORWARDING, value).apply()
+
     companion object {
         private const val PREFS_NAME = "vocaguard_settings"
         private const val KEY_SENSITIVITY = "sensitivity"
@@ -102,6 +111,7 @@ class DetectionSettings private constructor(context: Context) {
         private const val KEY_MESSAGE_SCAN = "message_scan_enabled"
         private const val KEY_REPORT_ENDPOINT = "report_endpoint_url"
         private const val KEY_THEME = "theme_preference"
+        private const val KEY_CALL_FORWARDING = "call_forwarding_enabled"
         /** Valid values: "system", "dark", "light". */
         const val THEME_SYSTEM = "system"
         const val THEME_DARK   = "dark"

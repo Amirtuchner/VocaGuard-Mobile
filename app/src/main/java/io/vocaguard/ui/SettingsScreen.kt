@@ -1,6 +1,7 @@
 package io.vocaguard.ui
 
 import android.content.Intent
+import android.net.Uri
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -50,6 +51,7 @@ fun SettingsTab(
     val reportEndpointUrl by viewModel.reportEndpointUrl.collectAsStateWithLifecycle()
     val reportEndpointSaved by viewModel.reportEndpointSaved.collectAsStateWithLifecycle()
     val modelUpdateStatus by viewModel.modelUpdateStatus.collectAsStateWithLifecycle()
+    val callForwardingEnabled by viewModel.callForwardingEnabled.collectAsStateWithLifecycle()
 
     // Family Guard
     val familyGuardEnabled  by viewModel.familyGuardEnabled.collectAsStateWithLifecycle()
@@ -97,6 +99,15 @@ fun SettingsTab(
                 text = "Settings",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
+            )
+        }
+
+        // ── Call Forwarding card ───────────────────────────────────────────────
+        item {
+            CallForwardingCard(
+                enabled   = callForwardingEnabled,
+                onEnabled  = { viewModel.setCallForwardingEnabled(true) },
+                onDisabled = { viewModel.setCallForwardingEnabled(false) }
             )
         }
 
@@ -994,6 +1005,84 @@ private fun ScamType.displayName(): String = when (this) {
     ScamType.DELIVERY_SCAM -> "Delivery / Package Scam"
     ScamType.JOB_SCAM -> "Job / Recruitment Scam"
     ScamType.SOCIAL_ENGINEERING -> "Social Engineering Scam"
+}
+
+// ---------------------------------------------------------------------------
+// Call Forwarding Card
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun CallForwardingCard(
+    enabled: Boolean,
+    onEnabled: () -> Unit,
+    onDisabled: () -> Unit
+) {
+    val context = LocalContext.current
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (enabled)
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+            else
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Call Forwarding",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (enabled)
+                            "Active — incoming calls are analyzed on the VocaGuard server."
+                        else
+                            "Inactive — calls are not being analyzed.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (enabled)
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        else
+                            MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        context.startActivity(
+                            Intent(Intent.ACTION_CALL, Uri.parse("tel:*21*%2B97233741493%23"))
+                        )
+                        onEnabled()
+                    },
+                    enabled = !enabled,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Enable") }
+                OutlinedButton(
+                    onClick = {
+                        context.startActivity(
+                            Intent(Intent.ACTION_CALL, Uri.parse("tel:%23%2321%23"))
+                        )
+                        onDisabled()
+                    },
+                    enabled = enabled,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Disable") }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Enable dials *21*+97233741493# — your carrier forwards all calls to VocaGuard.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

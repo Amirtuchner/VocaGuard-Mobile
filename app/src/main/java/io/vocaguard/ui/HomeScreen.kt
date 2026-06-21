@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.vocaguard.R
+import io.vocaguard.data.DetectionSettings
 import io.vocaguard.ui.theme.NavyDark
 
 @Composable
@@ -112,6 +114,10 @@ fun HomeTab(
 
     val allGranted = permissions.values.all { it }
     var permissionsExpanded by remember { mutableStateOf(!allGranted) }
+    val context = LocalContext.current
+    val callForwardingEnabled = remember(refreshKey) {
+        DetectionSettings.getInstance(context).callForwardingEnabled
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -171,6 +177,43 @@ fun HomeTab(
                             style = MaterialTheme.typography.bodySmall,
                             color = if (allGranted) MaterialTheme.colorScheme.onTertiaryContainer
                                     else MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+        }
+
+        // Call forwarding warning banner
+        if (!callForwardingEnabled) item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "Call forwarding not enabled",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            text = "Incoming calls are not being analyzed. Go to Settings to enable forwarding.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
                 }
