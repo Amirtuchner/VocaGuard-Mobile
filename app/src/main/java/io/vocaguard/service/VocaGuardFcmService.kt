@@ -22,6 +22,7 @@ import io.vocaguard.ui.ScamOverlayManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -82,25 +83,38 @@ class VocaGuardFcmService : FirebaseMessagingService() {
             }
         }
 
-        // Signal Asterisk to bridge the waiting incoming call to the user's SIP phone
+        // Signal Asterisk to bridge the waiting incoming call to the user's SIP phone.
+        // Retries up to 3 times with a 2-second delay to handle momentary network
+        // unavailability when the device wakes from lock screen.
         fun acceptCall(channel: String, callerNumber: String) {
             CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val body = JSONObject().apply {
-                        put("channel", channel)
-                        put("caller", callerNumber)
-                    }.toString().toRequestBody("application/json".toMediaType())
-                    val request = Request.Builder()
-                        .url("https://178.105.164.91/accept-call")
-                        .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
-                        .post(body)
-                        .build()
-                    OkHttpClient().newCall(request).execute().use { response ->
-                        Log.i(TAG, "Accept call signalled: ${response.code}")
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                val jsonBody = JSONObject().apply {
+                    put("channel", channel)
+                    put("caller", callerNumber)
+                }.toString()
+                var lastError: Exception? = null
+                repeat(3) { attempt ->
+                    if (attempt > 0) delay(2_000L)
+                    try {
+                        val request = Request.Builder()
+                            .url("https://178.105.164.91/accept-call")
+                            .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                            .post(jsonBody.toRequestBody("application/json".toMediaType()))
+                            .build()
+                        client.newCall(request).execute().use { response ->
+                            Log.i(TAG, "Accept call signalled (attempt ${attempt + 1}): ${response.code}")
+                        }
+                        return@launch  // success — stop retrying
+                    } catch (e: Exception) {
+                        lastError = e
+                        Log.w(TAG, "Accept call attempt ${attempt + 1} failed: $e")
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to signal accept call", e)
                 }
+                Log.e(TAG, "Failed to signal accept call after 3 attempts", lastError)
             }
         }
     }
