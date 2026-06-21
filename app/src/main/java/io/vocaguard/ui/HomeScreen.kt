@@ -80,6 +80,15 @@ fun HomeTab(
         permissions = permissionsManager.checkAllPermissions()
     }
 
+    // After reinstall, runtime permissions persist but the Call Screening role is reset.
+    // runtimePermLauncher never fires in that case, so auto-prompt here on first composition.
+    LaunchedEffect(Unit) {
+        if (permissions["Call Screening"] == false) {
+            pendingSystemPerms = listOf("Call Screening")
+            showSystemGuide = true
+        }
+    }
+
     if (showSystemGuide && pendingSystemPerms.isNotEmpty()) {
         val currentPerm = pendingSystemPerms.first()
         if (currentPerm == "Call Screening") {
