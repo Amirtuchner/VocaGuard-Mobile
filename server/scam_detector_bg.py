@@ -20,8 +20,9 @@ _spec = importlib.util.spec_from_file_location(
 _sd = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_sd)
 
-detect_scam         = _sd.detect_scam
-score_to_confidence = _sd.score_to_confidence
+detect_scam          = _sd.detect_scam
+detect_scam_combined = _sd.detect_scam_combined
+score_to_confidence  = _sd.score_to_confidence
 classify_scam_type  = _sd.classify_scam_type
 send_fcm_alert      = _sd.send_fcm_alert
 
@@ -90,12 +91,12 @@ def main():
         nonlocal alerted
         if alerted:
             return
-        is_scam, matched_kws, score = detect_scam(get_window_text())
+        is_scam, all_signals, total_score, mode = detect_scam_combined(get_window_text())
         if is_scam:
-            conf = score_to_confidence(score)
-            scam_type = classify_scam_type(matched_kws)
-            log.warning(f"BG SCAM ({label}): {scam_type} score={score}")
-            send_fcm_alert(matched_kws, transcript_disp.strip(),
+            conf = score_to_confidence(total_score)
+            scam_type = classify_scam_type(all_signals)
+            log.warning(f"BG SCAM ({label}): {scam_type} mode={mode} score={total_score} signals={all_signals}")
+            send_fcm_alert(all_signals, transcript_disp.strip(),
                            scam_type, caller_number, conf)
             alerted = True
 
@@ -124,14 +125,14 @@ def main():
                     # Check partial result mid-utterance — fires before silence
                     partial = json.loads(rec_en.PartialResult()).get("partial", "").strip()
                     if partial and len(partial.split()) >= 4:
-                        is_scam, matched_kws, score = detect_scam(
+                        is_scam, all_signals, total_score, mode = detect_scam_combined(
                             partial + " " + get_window_text()
                         )
                         if is_scam and not alerted:
-                            conf = score_to_confidence(score)
-                            scam_type = classify_scam_type(matched_kws)
-                            log.warning(f"BG SCAM (vosk-partial): {scam_type} score={score}")
-                            send_fcm_alert(matched_kws, partial, scam_type, caller_number, conf)
+                            conf = score_to_confidence(total_score)
+                            scam_type = classify_scam_type(all_signals)
+                            log.warning(f"BG SCAM (vosk-partial): {scam_type} mode={mode} score={total_score}")
+                            send_fcm_alert(all_signals, partial, scam_type, caller_number, conf)
                             alerted = True
 
                 whisper_buf.extend(resampled)

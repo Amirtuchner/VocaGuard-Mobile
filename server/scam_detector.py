@@ -296,6 +296,110 @@ def detect_scam(window_text: str):
         return True, matched[:5], score
     return False, [], 0
 
+
+# ---------------------------------------------------------------------------
+# Social Engineering signal tables
+# weight 2 = strong manipulation tactic
+# weight 1 = soft signal (needs partner signals to fire)
+# Each category is counted ONCE even if multiple phrases match.
+# ---------------------------------------------------------------------------
+
+SE_SCORE_THRESHOLD = 4   # SE-only fire threshold
+SE_COMBO_KW        = 2   # keyword score required for combo mode
+SE_COMBO_SE        = 2   # SE score required for combo mode
+
+SE_PATTERNS = {
+    # weight=2: strong manipulation
+    "false_scarcity": (2, [
+        "only two spots", "only three spots", "only one spot", "last spot",
+        "limited spots", "closing registration", "closes next week",
+        "closes this friday", "closes in 48 hours", "closes today",
+        "window closes", "fully booked", "institutional investors only",
+        "switching to institutional", "going public", "last chance to join",
+        "registration closes", "spots are limited",
+    ]),
+    "isolation_secrecy": (2, [
+        "private group", "invite only", "closed group", "invitation only",
+        "just between us", "only telling a few", "selected investors",
+        "closed trading group", "vip group", "exclusive group",
+        "by referral only", "members only", "not open to public",
+        "referral only", "not available to public",
+    ]),
+    "fomo_pressure": (2, [
+        "don t miss this", "don t want you to miss", "i don t want you to miss",
+        "before it s too late", "don t be left out", "this opportunity won t last",
+        "you will regret", "you ll regret", "missing out",
+        "last opportunity", "once in a lifetime", "never see this again",
+        "don t miss", "you don t want to miss",
+    ]),
+    # weight=1: soft signals
+    "rapport_building": (1, [
+        "since we re talking", "since you picked up", "i care about you",
+        "i want to help you", "i trust you", "i feel i can trust you",
+        "we ve been talking", "mutual friend", "thought of you",
+        "good to talk to you", "i like talking to you",
+    ]),
+    "social_proof": (1, [
+        "my sister", "my cousin", "my uncle", "all of them made",
+        "everyone in the group", "other members", "withdrawal screenshots",
+        "whatsapp group", "telegram group", "all my friends",
+        "people in my group", "group members",
+    ]),
+    "fake_authority": (1, [
+        "certified financial", "licensed broker", "hedge fund",
+        "cayman islands", "fully audited", "senior broker",
+        "quantitative trading", "proprietary algorithm", "registered in",
+        "years of experience", "financial consultant", "investment firm",
+        "financial analyst", "institutional grade",
+    ]),
+    "proof_claims": (1, [
+        "i can show you", "withdrawal receipt", "i withdrew",
+        "proof of payment", "my withdrawal", "show you the screenshot",
+        "see the results", "see my balance", "i can send you proof",
+    ]),
+    "risk_minimization": (1, [
+        "fully protected", "completely safe", "zero risk", "no risk",
+        "capital is protected", "i was skeptical too", "completely passive",
+        "all you do is deposit", "handles everything", "he does the trading",
+        "i didn t believe it", "i tested it first", "nothing to lose",
+        "your money is safe",
+    ]),
+    "passive_income_framing": (1, [
+        "passive income", "watch it grow", "all you do is",
+        "sit back and", "money works for you", "earn while you sleep",
+        "you don t have to do anything", "they handle everything",
+    ]),
+}
+
+
+def score_social_engineering(text: str):
+    normed = " " + _WORD_SEP.sub(" ", text.lower()) + " "
+    se_score = 0
+    se_signals = []
+    for category, (weight, phrases) in SE_PATTERNS.items():
+        for phrase in phrases:
+            p_normed = _WORD_SEP.sub(" ", phrase.lower()).strip()
+            if f" {p_normed} " in normed:
+                se_score += weight
+                se_signals.append(phrase)
+                break  # count each category only once
+    return se_score, se_signals
+
+
+def detect_scam_combined(window_text: str):
+    is_scam_kw, kw_signals, kw_score = detect_scam(window_text)
+    se_score, se_signals             = score_social_engineering(window_text)
+    all_signals = kw_signals + se_signals
+    total_score = kw_score + se_score
+
+    if is_scam_kw:
+        return True, all_signals, total_score, "keyword"
+    if se_score >= SE_SCORE_THRESHOLD:
+        return True, all_signals, total_score, "social_engineering"
+    if kw_score >= SE_COMBO_KW and se_score >= SE_COMBO_SE:
+        return True, all_signals, total_score, "combo"
+    return False, [], 0, None
+
 # ---------------------------------------------------------------------------
 # Firebase
 # ---------------------------------------------------------------------------
@@ -406,15 +510,15 @@ def main():
         nonlocal alerted
         if alerted:
             return
-        is_scam, matched_kws, score = detect_scam(get_window_text())
+        is_scam, all_signals, total_score, mode = detect_scam_combined(get_window_text())
         if is_scam:
-            conf = score_to_confidence(score)
-            scam_type = classify_scam_type(matched_kws)
+            conf = score_to_confidence(total_score)
+            scam_type = classify_scam_type(all_signals)
             log.warning(
-                f"SCAM DETECTED ({label}): type={scam_type} "
-                f"score={score} confidence={conf} keywords={matched_kws}"
+                f"SCAM DETECTED ({label}): type={scam_type} mode={mode} "
+                f"score={total_score} confidence={conf} signals={all_signals}"
             )
-            send_fcm_alert(matched_kws, transcript_disp.strip(),
+            send_fcm_alert(all_signals, transcript_disp.strip(),
                            scam_type, caller_number, conf)
             alerted = True
 
