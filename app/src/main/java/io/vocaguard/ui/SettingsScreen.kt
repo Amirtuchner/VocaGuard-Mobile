@@ -1056,9 +1056,15 @@ private fun CallForwardingCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
-                        context.startActivity(
-                            Intent(Intent.ACTION_CALL, Uri.parse("tel:*21*%2B97233741493%23"))
-                        )
+                        try {
+                            context.startActivity(
+                                Intent(Intent.ACTION_CALL, Uri.fromParts("tel", "*21*+97233741493#", null))
+                            )
+                        } catch (_: Exception) {
+                            context.startActivity(
+                                Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", "*21*+97233741493#", null))
+                            )
+                        }
                         onEnabled()
                     },
                     enabled = !enabled,
@@ -1067,7 +1073,7 @@ private fun CallForwardingCard(
                 OutlinedButton(
                     onClick = {
                         context.startActivity(
-                            Intent(Intent.ACTION_CALL, Uri.parse("tel:%23%2321%23"))
+                            Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", "#21#", null))
                         )
                         onDisabled()
                     },
@@ -1077,7 +1083,7 @@ private fun CallForwardingCard(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Enable dials *21*+97233741493# — your carrier forwards all calls to VocaGuard.",
+                text = "Enable dials automatically. To disable, the dialer opens pre-filled — tap Call to confirm.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
