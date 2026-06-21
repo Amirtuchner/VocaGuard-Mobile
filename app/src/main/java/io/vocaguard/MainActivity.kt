@@ -49,6 +49,7 @@ import io.vocaguard.ui.SeniorHomeScreen
 import io.vocaguard.ui.SettingsTab
 import io.vocaguard.ui.theme.VocaGuardTheme
 import io.vocaguard.service.VocaGuardFcmService
+import io.vocaguard.service.VocaGuardSipManager
 import io.vocaguard.widget.VocaGuardWidget
 
 /** Holds deep-link parameters until the composable tree is ready to consume them. */
@@ -163,6 +164,7 @@ class MainActivity : ComponentActivity() {
         if (missing.isNotEmpty()) requestPermissionsLauncher.launch(missing)
 
         phoneStateMonitor.startMonitoring()
+        VocaGuardSipManager.ensureRegistered()
 
         val manager = AppWidgetManager.getInstance(this)
         val ids = manager.getAppWidgetIds(ComponentName(this, VocaGuardWidget::class.java))

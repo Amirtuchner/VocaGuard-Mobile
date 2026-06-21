@@ -3,8 +3,14 @@ package io.vocaguard.service
 import android.content.Context
 import android.util.Log
 import io.vocaguard.BuildConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import org.linphone.core.*
 
 /**
@@ -24,6 +30,14 @@ object VocaGuardSipManager {
 
     private val _callState = MutableStateFlow(CallState.IDLE)
     val callState: StateFlow<CallState> = _callState
+
+    private val _registrationState = MutableStateFlow(RegistrationState.None)
+    /** Observed by UI to show SIP connectivity status. */
+    val registrationState: StateFlow<RegistrationState> = _registrationState
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var retryJob: Job? = null
+    private var retryCount = 0
 
     private var core: Core? = null
 
@@ -55,7 +69,7 @@ object VocaGuardSipManager {
             serverAddr?.transport = TransportType.Udp
             params.serverAddress = serverAddr
             params.isRegisterEnabled = true
-            params.expires = 120
+            params.expires = 60   // re-register every ~45s; limits gap after server restart
 
             val account = c.createAccount(params)
             c.addAccount(account)
@@ -90,6 +104,17 @@ object VocaGuardSipManager {
                     state: RegistrationState, message: String
                 ) {
                     Log.i(TAG, "Registration: $state — $message")
+                    _registrationState.value = state
+                    when (state) {
+                        RegistrationState.Ok -> {
+                            retryJob?.cancel()
+                            retryCount = 0
+                        }
+                        RegistrationState.Failed -> {
+                            scheduleReregister(account)
+                        }
+                        else -> {}
+                    }
                 }
             })
 
@@ -98,6 +123,35 @@ object VocaGuardSipManager {
             Log.i(TAG, "SIP core initialised and registered")
         } catch (e: Exception) {
             Log.e(TAG, "SIP init failed", e)
+        }
+    }
+
+    private fun scheduleReregister(account: Account) {
+        retryJob?.cancel()
+        val delayMs = when (retryCount) {
+            0    -> 5_000L
+            1    -> 15_000L
+            2    -> 30_000L
+            else -> 60_000L
+        }
+        retryCount++
+        retryJob = scope.launch {
+            delay(delayMs)
+            Log.w(TAG, "Re-registration attempt $retryCount after ${delayMs}ms")
+            account.refreshRegister()
+        }
+    }
+
+    /**
+     * Force a registration refresh. Call from MainActivity.onResume() so the
+     * app re-registers promptly after returning to the foreground (e.g. after
+     * Asterisk was restarted while the app was in the background).
+     */
+    fun ensureRegistered() {
+        val account = core?.defaultAccount ?: return
+        if (_registrationState.value != RegistrationState.Ok) {
+            Log.i(TAG, "ensureRegistered: state=${_registrationState.value}, refreshing")
+            account.refreshRegister()
         }
     }
 
