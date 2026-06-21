@@ -1,0 +1,13 @@
+/var/log/vocaguard_agi.log
+/var/log/vocaguard_bg.log
+/var/log/vocaguard_token.log
+/var/log/vocaguard_debug.log
+{
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

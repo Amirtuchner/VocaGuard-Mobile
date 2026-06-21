@@ -1,0 +1,18 @@
+[Unit]
+Description=VocaGuard FCM Token Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/opt/vocaguard-venv/bin/python3 /opt/vocaguard/token_server.py
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=5
+User=root
+StandardOutput=append:/var/log/vocaguard_token.log
+StandardError=append:/var/log/vocaguard_token.log
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
