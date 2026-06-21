@@ -4,7 +4,7 @@
    POST /accept-call     — signals Asterisk via AMI to bridge the user's SIP
                            phone into the waiting incoming call
 """
-import ssl, json, re, socket
+import ssl, json, re, socket, logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 SECRET_FILE     = "/opt/vocaguard/token_server_secret.txt"
@@ -16,6 +16,14 @@ TOKEN_FILE      = "/opt/vocaguard/fcm_token.txt"
 AMI_HOST = "127.0.0.1"
 AMI_PORT = 5038
 AMI_USER = "vocaguard-bridge"
+
+LOG_FILE = "/var/log/vocaguard_token.log"
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+log = logging.getLogger("token_server")
 
 # Channel names look like PJSIP/d60n8HovalTll3mH-00000001
 _CHANNEL_RE = re.compile(r"^PJSIP/[\w\-]{1,80}$")
@@ -152,7 +160,7 @@ class Handler(BaseHTTPRequestHandler):
             if token:
                 with open(TOKEN_FILE, "w") as f:
                     f.write(token)
-                print(f"Token saved: {token[:20]}...", flush=True)
+                log.info("Token saved: %s...", token[:20])
                 self.send_response(200)
             else:
                 self.send_response(400)
@@ -167,10 +175,10 @@ class Handler(BaseHTTPRequestHandler):
                     self.end_headers()
                     return
                 ami_originate(channel, caller)
-                print(f"Bridge originated: {channel}", flush=True)
+                log.info("Bridge originated: %s", channel)
                 self.send_response(200)
             except Exception as e:
-                print(f"accept-call error: {e}", flush=True)
+                log.error("accept-call error: %s", e)
                 self.send_response(500)
 
         elif self.path == "/hangup":
@@ -182,10 +190,10 @@ class Handler(BaseHTTPRequestHandler):
                     self.end_headers()
                     return
                 ami_hangup(channel)
-                print(f"Hangup: {channel}", flush=True)
+                log.info("Hangup: %s", channel)
                 self.send_response(200)
             except Exception as e:
-                print(f"hangup error: {e}", flush=True)
+                log.error("hangup error: %s", e)
                 self.send_response(500)
 
         else:
@@ -194,7 +202,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def log_message(self, format, *args):
-        pass  # suppress access logs
+        log.info("%s - - %s", self.address_string(), format % args)
 
 
 class ReuseHTTPServer(HTTPServer):
@@ -206,5 +214,5 @@ if __name__ == "__main__":
     context.load_cert_chain(CERT_FILE, KEY_FILE)
     server = ReuseHTTPServer(("0.0.0.0", 443), Handler)
     server.socket = context.wrap_socket(server.socket, server_side=True)
-    print("Token server running on port 443 (HTTPS)", flush=True)
+    log.info("Token server started on port 443")
     server.serve_forever()

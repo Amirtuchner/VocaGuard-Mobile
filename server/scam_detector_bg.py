@@ -31,7 +31,7 @@ from faster_whisper import WhisperModel
 
 MODEL_PATH_EN       = "/opt/vocaguard/model-en"
 SAMPLE_RATE         = 16000
-WHISPER_CHUNK_BYTES = 16000 * 2 * 2   # 2-second chunks at 16 kHz
+WHISPER_CHUNK_BYTES = 16000 * 2 * 4   # 4-second chunks at 16 kHz
 WINDOW_SECONDS      = 90
 
 logging.basicConfig(
@@ -120,6 +120,19 @@ def main():
                     if text:
                         add_text(text, "EN")
                         check_and_alert("vosk-en")
+                else:
+                    # Check partial result mid-utterance — fires before silence
+                    partial = json.loads(rec_en.PartialResult()).get("partial", "").strip()
+                    if partial and len(partial.split()) >= 4:
+                        is_scam, matched_kws, score = detect_scam(
+                            partial + " " + get_window_text()
+                        )
+                        if is_scam and not alerted:
+                            conf = score_to_confidence(score)
+                            scam_type = classify_scam_type(matched_kws)
+                            log.warning(f"BG SCAM (vosk-partial): {scam_type} score={score}")
+                            send_fcm_alert(matched_kws, partial, scam_type, caller_number, conf)
+                            alerted = True
 
                 whisper_buf.extend(resampled)
                 if len(whisper_buf) >= WHISPER_CHUNK_BYTES:
@@ -130,8 +143,8 @@ def main():
                                   .astype(np.float32) / 32768.0
                             )
                             segments, info = whisper_model.transcribe(
-                                audio_np, language=None, beam_size=1, best_of=1,
-                                vad_filter=True,
+                                audio_np, beam_size=1, best_of=1,
+                                vad_filter=False, language="en",
                             )
                             text = " ".join(seg.text for seg in segments).strip()
                             if text:
@@ -156,7 +169,7 @@ def main():
                   .astype(np.float32) / 32768.0
             )
             segments, info = whisper_model.transcribe(
-                audio_np, language=None, beam_size=1, best_of=1, vad_filter=True,
+                audio_np, language="en", beam_size=1, best_of=1, vad_filter=False,
             )
             text = " ".join(seg.text for seg in segments).strip()
             if text:

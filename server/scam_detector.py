@@ -72,8 +72,8 @@ SCAM_KEYWORDS_EN = [
     ("virus", 1), ("microsoft", 1), ("computer infected", 1), ("tech support", 1),
     ("suspicious activity", 1), ("account frozen", 1), ("verify your account", 1),
     ("bank transfer", 1), ("account compromised", 1),
-    ("you have won", 2), ("you've won", 2), ("you are a winner", 2), ("you won a prize", 2), ("you've earned", 2), ("earned a prize", 2), ("you earned", 2), ("claim your prize", 2), ("claim the prize", 2), ("thousand euro", 2), ("million euro", 2), ("thousand dollars", 2), ("hundred thousand", 2),
-    ("won", 1), ("lottery", 1), ("prize", 1), ("congratulations", 1), ("claim", 1), ("euro", 1), ("dollars", 1),
+    ("you have won", 2), ("you've won", 2), ("you are a winner", 2), ("you won a prize", 2), ("you've earned", 2), ("earned a prize", 2), ("you earned", 2), ("claim your prize", 2), ("claim the prize", 2), ("thousand euro", 2), ("million euro", 2), ("thousand euros", 2), ("million euros", 2), ("thousand dollars", 2), ("hundred thousand", 2),
+    ("won", 1), ("lottery", 1), ("prize", 1), ("congratulations", 1), ("claim", 1), ("euro", 1), ("euros", 1), ("dollars", 1), ("dollar", 1),
     ("ssn", 1), ("suspended", 1),
     ("press 1", 1), ("press one", 1), ("do not hang up", 1),
     ("password", 1), ("click the link", 1),
@@ -82,6 +82,18 @@ SCAM_KEYWORDS_EN = [
     ("job offer", 1), ("work from home", 1), ("hiring", 1), ("training fee", 1),
     ("urgent", 1), ("immediately", 1), ("right now", 1), ("last chance", 1),
     ("fraud department", 1),
+    # ── Investment / pig-butchering ──
+    # weight=3: any single phrase alone clears the threshold of 3
+    ("account manager", 3), ("personal trader", 3), ("fund your account", 3),
+    ("withdraw your profits", 3), ("withdraw profits", 3), ("guaranteed returns", 3),
+    ("vip trading", 3), ("trading account", 1), ("passive income", 1),
+    ("grow your money", 1), ("trading", 1), ("invest", 1), ("profit", 1),
+    ("deposit", 1), ("broker", 1), ("portfolio", 1),
+    # STT-robust investment phrases (survive transcription garbling)
+    ("arbitrage", 2), ("transfer funds", 2), ("lock in your position", 2),
+    ("monthly returns", 2), ("doubled their capital", 2), ("double your capital", 2),
+    ("exclusive opportunity", 1), ("window closes", 1), ("crypto arbitrage", 3),
+    ("guaranteed monthly", 2), ("your position before", 1),
 ]
 
 SCAM_KEYWORDS_HE = [
