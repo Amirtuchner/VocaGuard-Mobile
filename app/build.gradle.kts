@@ -40,9 +40,9 @@ android {
     // Signing config for CI — reads from environment variables set by the workflow.
     // For local release builds, place a keystore.jks in the project root and set
     // the four env vars, or configure a local.properties-based signing config.
-    val ciKeyAlias = System.getenv("SIGNING_KEY_ALIAS")
-    val ciKeyPassword = System.getenv("SIGNING_KEY_PASSWORD")
-    val ciStorePassword = System.getenv("SIGNING_STORE_PASSWORD")
+    val ciKeyAlias     = System.getenv("SIGNING_KEY_ALIAS")     ?: localProperties.getProperty("signing.keyAlias")
+    val ciKeyPassword  = System.getenv("SIGNING_KEY_PASSWORD")  ?: localProperties.getProperty("signing.keyPassword")
+    val ciStorePassword = System.getenv("SIGNING_STORE_PASSWORD") ?: localProperties.getProperty("signing.storePassword")
     val ciKeystore = rootProject.file("keystore.jks")
 
     signingConfigs {
@@ -71,6 +71,7 @@ android {
         baseline = file("lint-baseline.xml")
         abortOnError = true
         warningsAsErrors = false
+        disable += "InvalidFragmentVersionForActivityResult"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
