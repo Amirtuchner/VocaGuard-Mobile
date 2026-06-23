@@ -2,12 +2,15 @@ package io.vocaguard.ui
 
 import android.Manifest
 import android.app.role.RoleManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Bundle
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import io.vocaguard.service.CallAudioAccessibilityService
 import io.vocaguard.service.MessagingScamDetectorService
 
 class PermissionsManager(private val context: Context) {
@@ -84,9 +87,24 @@ class PermissionsManager(private val context: Context) {
     }
 
     fun openAccessibilitySettings() {
-        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        context.startActivity(intent)
+        // Try to deep-link directly to VocaGuard's accessibility service settings page.
+        // Falls back to the root Accessibility settings if the deep-link isn't supported.
+        try {
+            val componentName = ComponentName(context, CallAudioAccessibilityService::class.java)
+            val args = Bundle().apply {
+                putString(":settings:fragment_args_key", componentName.flattenToString())
+            }
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                putExtra(":settings:show_fragment_args", args)
+                putExtra(":settings:fragment", "com.android.settings.accessibility.AccessibilityServicePreferenceFragment")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            context.startActivity(intent)
+        }
     }
 
     fun openCallScreeningSettings() {
