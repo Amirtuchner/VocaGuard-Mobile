@@ -10,6 +10,7 @@ from tensorflow import keras
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_class_weight
 import re
 import math
 from collections import Counter
@@ -20,7 +21,7 @@ EPOCHS = 100
 BATCH_SIZE = 32
 VALIDATION_SPLIT = 0.2
 
-NUM_FEATURES = 46  # 26 keyword/text + 5 conversational behaviour + 6 audio/metadata + 5 call-centre signals + 4 new scam category signals
+NUM_FEATURES = 49  # 26 keyword/text + 5 conversational behaviour + 6 audio/metadata + 5 call-centre signals + 4 scam category signals + 3 exclusive sub-signals
 
 
 # ---------------------------------------------------------------------------
@@ -103,8 +104,8 @@ def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
     """
     Extract numerical features from text + optional audio/metadata signals.
     Must match TextPreprocessor.extractFeatures() in Android app.
-    42 features total (26 keyword/text + 5 conversational + 6 audio/metadata +
-    5 call-centre signals).
+    49 features total (26 keyword/text + 5 conversational + 6 audio/metadata +
+    5 call-centre signals + 4 scam-category signals + 3 exclusive sub-signals).
 
     All audio/metadata args default to 0 so existing transcript-only CSVs still work.
     """
@@ -334,24 +335,31 @@ def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
     # Features 43-45: New scam category signals
     features.append(flag(                                                                          # 43: romance / pig-butchering / grandparent scam
         "relationship", "dating", "met online", "fell in love", "soulmate", "long distance",
-        "my darling", "investment platform", "together we can", "i trust you",
+        "my darling", "i trust you", "i love you", "i miss you", "sweetheart", "my dear",
+        "dating app", "dating site", "matched on", "profile photo", "video call",
         "grandma", "grandpa", "it's me", "i'm in trouble", "bail money", "stuck abroad",
         "don't tell mom", "don't tell dad", "wire me", "send me the money",
+        "car accident", "in the hospital", "hospital bill",
         # Hebrew
         "מערכת יחסים", "היכרויות", "נפגשנו אונליין", "סבתא", "סבא", "אני בצרות",
-        "תעזור לי", "אל תגיד לאמא", "שלח לי כסף", "ביחד נשקיע",
+        "תעזור לי", "אל תגיד לאמא", "שלח לי כסף", "אני אוהב אותך",
+        "תאונה", "בית חולים", "שיחת וידאו", "אפליקציית היכרויות",
         # Arabic
         "علاقة", "مواعدة", "قابلتك عبر الإنترنت", "جدة", "جد", "أنا في ورطة",
-        "ساعدني", "أرسل لي المال", "لا تخبر أمي",
+        "ساعدني", "أرسل لي المال", "لا تخبر أمي", "أحبك", "أشتاق إليك",
+        "حادث سيارة", "المستشفى",
         # Spanish
         "relación", "citas en línea", "me enamoré", "alma gemela", "larga distancia",
         "abuela", "abuelo", "estoy en problemas", "ayúdame", "mándame dinero",
+        "te amo", "te extraño", "accidente", "hospital", "fianza",
         # French
         "relation amoureuse", "rencontre en ligne", "je suis tombé amoureux",
         "grand-mère", "grand-père", "je suis dans le pétrin", "envoie-moi de l'argent",
+        "je t'aime", "tu me manques", "accident", "hôpital", "caution",
         # Russian
         "отношения", "онлайн знакомства", "влюбился", "бабушка", "дедушка",
-        "я в беде", "помоги мне", "пришли деньги", "не говори маме"))
+        "я в беде", "помоги мне", "пришли деньги", "не говори маме",
+        "я люблю тебя", "скучаю по тебе", "авария", "больница", "залог"))
     features.append(flag(                                                                          # 44: delivery / package scam
         "package", "parcel", "fedex", "dhl", "ups", "usps", "customs fee",
         "held at customs", "delivery", "tracking", "shipment", "clearance fee",
@@ -372,25 +380,26 @@ def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
         "посылка", "доставка", "таможня", "федекс", "таможенный сбор",
         "не удалось доставить", "почта", "получить посылку"))
     features.append(flag(                                                                          # 45: job / recruitment scam
-        "job offer", "work from home", "hiring", "recruitment", "per week", "per month",
+        "job offer", "work from home", "hiring", "recruitment",
         "no experience", "part time", "remote work", "training fee", "start immediately",
-        "easy money", "money mule", "reshipping", "package forwarding",
-        "we found your resume", "earn from home",
+        "money mule", "reshipping", "package forwarding",
+        "we found your resume", "earn from home", "we found your cv",
+        "earn up to", "remote position", "work at home", "home based job",
         # Hebrew
         "הצעת עבודה", "עבודה מהבית", "גיוס עובדים", "להרוויח מהבית",
-        "ללא ניסיון", "עבודה גמישה", "משכורת מושכת", "דמי הכשרה",
+        "ללא ניסיון", "עבודה גמישה", "דמי הכשרה", "עמדה מרחוק",
         # Arabic
         "عرض عمل", "عمل من المنزل", "توظيف", "بدون خبرة", "دوام جزئي",
-        "اكسب من المنزل", "رسوم التدريب",
+        "اكسب من المنزل", "رسوم التدريب", "وظيفة عن بعد",
         # Spanish
         "oferta de trabajo", "trabajo desde casa", "contratación", "sin experiencia",
-        "medio tiempo", "ganar desde casa", "tarifa de capacitación",
+        "medio tiempo", "ganar desde casa", "tarifa de capacitación", "puesto remoto",
         # French
         "offre d'emploi", "travail à domicile", "recrutement", "sans expérience",
-        "mi-temps", "gagner de chez soi", "frais de formation",
+        "mi-temps", "gagner de chez soi", "frais de formation", "poste à distance",
         # Russian
         "вакансия", "работа из дома", "найм", "без опыта", "подработка",
-        "заработать из дома", "обучающий взнос"))
+        "заработать из дома", "обучающий взнос", "удалённая работа"))
     features.append(flag(                                                                          # 46: social engineering / impersonation scam
         # "safe account" fund-transfer tactics
         "safe account", "protected account", "security account",
@@ -429,6 +438,107 @@ def extract_features(text, avg_rms=0.0, rms_std_dev=0.0, silence_ratio=0.0,
         "transférez vos fonds", "votre identité a été volée",
         "gardez cela confidentiel", "n'appelez pas la police"))
 
+    # Feature 47: Romance emotional intimacy — exclusive to romance/grandparent scam
+    # Does NOT include investment terms, so pig-butchering rows must also carry these signals
+    features.append(flag(                                                                          # 47: romance emotional intimacy / grandparent emergency
+        # Love language
+        "i love you", "i miss you", "my sweetheart", "my dearest", "my love",
+        "you are beautiful", "beautiful photos", "i am falling in love",
+        "fell in love with you", "thinking of you", "you mean everything",
+        # Dating platform context
+        "tinder", "bumble", "hinge", "match.com", "dating app", "dating site",
+        "we matched", "dating profile", "profile picture", "online dating",
+        # Grandparent emergency
+        "bail money", "bail me out", "car accident", "i am in the hospital",
+        "hospital bill", "emergency surgery", "stuck in jail", "stranded abroad",
+        "don't tell mom", "don't tell dad", "it's your grandson", "it's your granddaughter",
+        # Hebrew
+        "אני אוהב אותך", "אני מתגעגע", "יקירתי", "יקירי", "התאהבתי בך",
+        "אפליקציית היכרויות", "פרופיל אונליין", "שיחת וידאו", "תמונות יפות",
+        "תאונת דרכים", "בית חולים", "ערבות", "נתקעתי בחו\"ל",
+        # Arabic
+        "أحبك", "أشتاق إليك", "يا حبيبي", "يا حبيبتي", "وقعت في حبك",
+        "تطبيق المواعدة", "الملف الشخصي", "مكالمة فيديو",
+        "حادث سيارة", "في المستشفى", "كفالة", "عالق في الخارج",
+        # Spanish
+        "te amo", "te extraño", "mi amor", "mi cariño", "me enamoré de ti",
+        "aplicación de citas", "perfil de citas", "videollamada",
+        "accidente de coche", "en el hospital", "fianza", "atrapado en el extranjero",
+        # French
+        "je t'aime", "tu me manques", "mon amour", "mon chéri", "je suis tombé amoureux de toi",
+        "application de rencontres", "profil en ligne", "appel vidéo",
+        "accident de voiture", "à l'hôpital", "caution", "coincé à l'étranger",
+        # Russian
+        "я люблю тебя", "я скучаю по тебе", "моя любовь", "дорогой", "дорогая",
+        "влюбился в тебя", "сайт знакомств", "приложение знакомств", "видеозвонок",
+        "авария", "в больнице", "залог", "застрял за рубежом"))
+
+    # Feature 48: Delivery fee-demand specifics — exclusive to delivery/package scam
+    features.append(flag(                                                                          # 48: delivery customs fee / redelivery demand
+        # Customs / clearance fee demands
+        "customs clearance fee", "customs clearance", "import duty", "customs tax",
+        "customs charge", "clearance fee", "customs fee",
+        "held at customs", "held at the border", "stopped at customs",
+        "detained at customs", "on hold at customs", "waiting at customs",
+        # Release / pay-to-receive
+        "pay to release", "fee to release", "pay to receive", "release your parcel",
+        "release your package", "release the shipment", "pay the release fee",
+        # Redelivery / address
+        "redelivery fee", "redelivery charge", "reschedule delivery",
+        "address undeliverable", "update your delivery address", "undeliverable address",
+        "pay a redelivery", "redelivery charge",
+        # Hebrew
+        "עמלת שחרור", "מכס לתשלום", "החבילה עצורה", "תשלום לשחרור חבילה",
+        "אגרת מכס", "דמי שחרור", "שחרור ממכס",
+        # Arabic
+        "رسوم التخليص الجمركي", "رسوم الجمارك", "طردك محتجز في الجمارك",
+        "ادفع رسوم التخليص", "رسوم إعادة التوصيل", "الإفراج عن طردك",
+        # Spanish
+        "arancel aduanero", "derechos de aduana", "su paquete está retenido en aduanas",
+        "pagar para liberar", "tarifa de liberación", "tarifa de reentrega",
+        "pago de derechos aduaneros",
+        # French
+        "droits de douane", "frais de douane", "votre colis est retenu en douane",
+        "frais de libération", "frais de réexpédition", "payer pour libérer votre colis",
+        "taxe douanière",
+        # Russian
+        "таможенная пошлина", "задержана на таможне", "оплатите пошлину",
+        "сбор за растаможку", "плата за повторную доставку", "посылка задержана"))
+
+    # Feature 49: Job upfront fee / task-based earning scam — exclusive to job scam
+    features.append(flag(                                                                          # 49: job upfront fee / task-earning scam
+        # Upfront payment demands
+        "training deposit", "registration fee", "starter kit fee", "background check fee",
+        "equipment deposit", "processing fee to start", "onboarding fee",
+        "refundable deposit", "security deposit for the job",
+        # Task / micro-earning scam
+        "mystery shopper", "mystery shopping", "product reviewer", "like and earn",
+        "earn per task", "complete tasks", "task completion", "boosting task",
+        "app review task", "rate products", "simple tasks online",
+        "telegram task", "boost ratings",
+        # Reshipping / money mule specifics
+        "reshipping agent", "parcel forwarding agent", "money transfer agent",
+        "you keep the commission", "keep fifteen percent", "keep ten percent",
+        "receive packages at home", "forward the funds",
+        # Hebrew
+        "דמי רישום", "עלות הכשרה", "קניות מסתוריות", "משימה מקוונת",
+        "הרוויח לפי משימה", "סוכן שליחויות", "עמלת עיבוד",
+        # Arabic
+        "رسوم التسجيل", "تكلفة التدريب", "متسوق سري", "مهام مدفوعة",
+        "اكسب لكل مهمة", "وكيل إعادة الشحن", "رسوم المعالجة للبدء",
+        # Spanish
+        "tarifa de registro", "costo de capacitación", "comprador misterioso",
+        "tareas pagadas", "agente de reenvío", "ganar por tarea",
+        "depósito de equipamiento", "honorarios de incorporación",
+        # French
+        "frais d'inscription", "coût de formation", "acheteur mystère",
+        "tâches rémunérées", "agent de réexpédition", "gagner par tâche",
+        "dépôt de formation", "frais d'intégration",
+        # Russian
+        "обучающий взнос", "регистрационный взнос", "тайный покупатель",
+        "задание за деньги", "зарабатывать на заданиях", "агент по пересылке",
+        "залог за оборудование", "взнос за обработку"))
+
     return features
 
 def load_data(csv_path):
@@ -461,19 +571,26 @@ def load_data(csv_path):
     """
     df = pd.read_csv(csv_path)
 
+    def _safe_float(val, default=0.0):
+        try:
+            f = float(val)
+            return default if (f != f) else f  # NaN check
+        except (TypeError, ValueError):
+            return default
+
     def row_features(row):
         return extract_features(
             text=row['text'],
-            avg_rms=row.get('avg_rms', 0.0),
-            rms_std_dev=row.get('rms_std_dev', 0.0),
-            silence_ratio=row.get('silence_ratio', 0.0),
-            had_long_silence=row.get('had_long_silence', 0.0),
-            call_duration_sec=row.get('call_duration_sec', 0.0),
-            call_hour=int(row.get('call_hour', 12)),
-            speaker_switches=int(row.get('speaker_switches', 0)),
-            noise_floor_db=float(row.get('noise_floor_db', 0.0)),
-            speech_rate_wpm=float(row.get('speech_rate_wpm', 0.0)),
-            dtmf_detected=float(row.get('dtmf_detected', 0.0)),
+            avg_rms=_safe_float(row.get('avg_rms', 0.0)),
+            rms_std_dev=_safe_float(row.get('rms_std_dev', 0.0)),
+            silence_ratio=_safe_float(row.get('silence_ratio', 0.0)),
+            had_long_silence=_safe_float(row.get('had_long_silence', 0.0)),
+            call_duration_sec=_safe_float(row.get('call_duration_sec', 0.0)),
+            call_hour=int(_safe_float(row.get('call_hour', 12), default=12)),
+            speaker_switches=int(_safe_float(row.get('speaker_switches', 0))),
+            noise_floor_db=_safe_float(row.get('noise_floor_db', 0.0)),
+            speech_rate_wpm=_safe_float(row.get('speech_rate_wpm', 0.0)),
+            dtmf_detected=_safe_float(row.get('dtmf_detected', 0.0)),
         )
 
     X = np.array([row_features(row) for _, row in df.iterrows()])
@@ -503,6 +620,11 @@ def train_model(X_train, y_train, X_val, y_val):
     """Train the model."""
     model = create_model()
 
+    # Compute class weights to compensate for imbalanced labels 11/12/13
+    unique_classes = np.unique(y_train)
+    weights = compute_class_weight('balanced', classes=unique_classes, y=y_train)
+    class_weight_dict = dict(zip(unique_classes, weights))
+
     # Add callbacks
     callbacks = [
         keras.callbacks.EarlyStopping(
@@ -524,6 +646,7 @@ def train_model(X_train, y_train, X_val, y_val):
         batch_size=BATCH_SIZE,
         validation_data=(X_val, y_val),
         callbacks=callbacks,
+        class_weight=class_weight_dict,
         verbose=1
     )
 
