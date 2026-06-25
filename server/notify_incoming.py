@@ -2,9 +2,8 @@
 """Lightweight pre-answer AGI: sends FCM incoming_call alert immediately.
    Includes the Asterisk channel name so the app can signal Accept via AMI.
    Also clears any stale PJSIP/vocaguard-* channels so the bridge can succeed.
-   Reads the DIVERSION channel variable (set from the SIP Diversion header relayed
-   by DIDWW) to identify which user the call was originally for, then looks up
-   their FCM token from the multi-tenant user database.
+   Reads ORIGINAL_CALLED (from REDIRECTING(from-num)) to identify which user
+   the call was originally for, then looks up their FCM token from the DB.
 """
 import sys, os, json, socket, re, sqlite3
 import firebase_admin
@@ -40,23 +39,17 @@ def agi_get_variable(name: str) -> str:
     return match.group(1) if match else ""
 
 
-def extract_number_from_diversion(diversion: str) -> str:
-    """Extract E.164 number from a SIP Diversion header value.
-    e.g. '<sip:+97252823354@carrier.com>;reason=unconditional' -> '+97252823354'
-    """
-    if not diversion:
-        return ""
-    match = re.search(r'sip:(\+?[\d]+)[@>]', diversion)
-    return match.group(1) if match else ""
-
-
 def get_fcm_token_for_number(phone_number: str) -> str:
-    """Look up FCM token by original called number. Falls back to token file."""
+    """Look up FCM token by original called number (suffix match).
+    DIDWW strips the country code prefix, so we match on trailing digits.
+    Falls back to single-user token file.
+    """
     if phone_number:
         try:
             conn = sqlite3.connect(DB_PATH)
             row = conn.execute(
-                "SELECT fcm_token FROM users WHERE phone_number=?", (phone_number,)
+                "SELECT fcm_token FROM users WHERE phone_number LIKE ?",
+                (f"%{phone_number}",)
             ).fetchone()
             conn.close()
             if row and row[0]:
@@ -138,9 +131,8 @@ def main():
     caller  = agi_vars.get("agi_callerid", "")
     channel = agi_vars.get("agi_channel", "")
 
-    # Read Diversion header (set in extensions.conf from PJSIP_HEADER)
-    diversion_raw    = agi_get_variable("DIVERSION")
-    diversion_number = extract_number_from_diversion(diversion_raw)
+    # Read original called number (set in extensions.conf from REDIRECTING(from-num))
+    diversion_number = agi_get_variable("ORIGINAL_CALLED")
 
     cleanup_stale_vocaguard_channels()
 

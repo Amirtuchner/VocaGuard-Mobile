@@ -33,12 +33,16 @@ FCM_TOKEN_FILE = "/opt/vocaguard/fcm_token.txt"
 
 
 def get_fcm_token_for_number(phone_number: str) -> str:
-    """Look up FCM token by original called number. Falls back to token file."""
+    """Look up FCM token by original called number (suffix match).
+    DIDWW strips the country code prefix, so we match on trailing digits.
+    Falls back to single-user token file.
+    """
     if phone_number:
         try:
             conn = sqlite3.connect(DB_PATH)
             row = conn.execute(
-                "SELECT fcm_token FROM users WHERE phone_number=?", (phone_number,)
+                "SELECT fcm_token FROM users WHERE phone_number LIKE ?",
+                (f"%{phone_number}",)
             ).fetchone()
             conn.close()
             if row and row[0]:
