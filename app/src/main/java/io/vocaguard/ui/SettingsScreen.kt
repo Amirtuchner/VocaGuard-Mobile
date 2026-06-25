@@ -113,21 +113,27 @@ fun SettingsTab(
             )
         }
 
-        // ── Server Detection + Call Forwarding card ────────────────────────────
+        // ── Server Detection card ──────────────────────────────────────────────
         item {
             ServerDetectionCard(
-                registered         = serverRegistered,
-                phoneField         = serverPhoneField,
-                onPhoneChange      = { serverPhoneField = it; viewModel.updateServerPhoneInput(it) },
-                sipExtension       = serverSipExtension,
-                activationCode     = serverActivationCode,
-                forwardingEnabled  = callForwardingEnabled,
-                onForwardingEnable = { viewModel.setCallForwardingEnabled(true) },
-                onForwardingDisable= { viewModel.setCallForwardingEnabled(false) },
-                status             = serverRegStatus,
-                isRegistering      = serverIsRegistering,
-                onRegister         = { viewModel.registerWithServer() },
-                onUnregister       = { viewModel.unregisterFromServer() }
+                registered     = serverRegistered,
+                phoneField     = serverPhoneField,
+                onPhoneChange  = { serverPhoneField = it; viewModel.updateServerPhoneInput(it) },
+                sipExtension   = serverSipExtension,
+                status         = serverRegStatus,
+                isRegistering  = serverIsRegistering,
+                onRegister     = { viewModel.registerWithServer() },
+                onUnregister   = { viewModel.unregisterFromServer() }
+            )
+        }
+
+        // ── Call Forwarding card ───────────────────────────────────────────────
+        item {
+            CallForwardingCard(
+                enabled         = callForwardingEnabled,
+                activationCode  = serverActivationCode.ifEmpty { "*21*+97233741493#" },
+                onEnabled       = { viewModel.setCallForwardingEnabled(true) },
+                onDisabled      = { viewModel.setCallForwardingEnabled(false) }
             )
         }
 
@@ -1028,11 +1034,89 @@ private fun ScamType.displayName(): String = when (this) {
 }
 
 // ---------------------------------------------------------------------------
+// Call Forwarding Card
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun CallForwardingCard(
+    enabled: Boolean,
+    activationCode: String,
+    onEnabled: () -> Unit,
+    onDisabled: () -> Unit
+) {
+    val context = LocalContext.current
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (enabled)
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+            else
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Call Forwarding",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = if (enabled)
+                    "Active — incoming calls are routed through the VocaGuard server."
+                else
+                    "Inactive — calls ring your phone directly without server analysis.",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (enabled)
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                else
+                    MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        try {
+                            context.startActivity(
+                                Intent(Intent.ACTION_CALL, Uri.fromParts("tel", activationCode, null))
+                            )
+                        } catch (_: Exception) {
+                            context.startActivity(
+                                Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", activationCode, null))
+                            )
+                        }
+                        onEnabled()
+                    },
+                    enabled = !enabled,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Enable") }
+                OutlinedButton(
+                    onClick = {
+                        context.startActivity(
+                            Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", "#21#", null))
+                        )
+                        onDisabled()
+                    },
+                    enabled = enabled,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Disable") }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Enable dials automatically. To disable, the dialer opens pre-filled — tap Call to confirm.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Alert Toggle Row (used in SettingsTab)
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Server Detection + Call Forwarding Card (unified)
+// Server Detection Card
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -1041,25 +1125,18 @@ private fun ServerDetectionCard(
     phoneField: String,
     onPhoneChange: (String) -> Unit,
     sipExtension: String,
-    activationCode: String,
-    forwardingEnabled: Boolean,
-    onForwardingEnable: () -> Unit,
-    onForwardingDisable: () -> Unit,
     status: String,
     isRegistering: Boolean,
     onRegister: () -> Unit,
     onUnregister: () -> Unit
 ) {
-    val context = LocalContext.current
-    val active = registered && forwardingEnabled
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = when {
-                active      -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                registered  -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
-                else        -> MaterialTheme.colorScheme.surfaceVariant
-            }
+            containerColor = if (registered)
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -1070,17 +1147,9 @@ private fun ServerDetectionCard(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = when {
-                    active     -> "Active — incoming calls are analyzed on the VocaGuard server."
-                    registered -> "Registered — enable call forwarding to start analysis."
-                    else       -> "Register your phone number to route calls through the VocaGuard server for AI scam analysis."
-                },
+                text = "Register your phone number so the VocaGuard server knows which device to alert.",
                 style = MaterialTheme.typography.bodySmall,
-                color = when {
-                    active    -> MaterialTheme.colorScheme.onSecondaryContainer
-                    registered-> MaterialTheme.colorScheme.error
-                    else      -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -1104,51 +1173,21 @@ private fun ServerDetectionCard(
                 }
             } else {
                 Text(
+                    text = "Registered",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
                     text = "SIP extension: $sipExtension",
                     style = MaterialTheme.typography.bodySmall
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (!forwardingEnabled) {
-                        Button(
-                            onClick = {
-                                try {
-                                    context.startActivity(
-                                        Intent(Intent.ACTION_CALL, Uri.fromParts("tel", activationCode, null))
-                                    )
-                                } catch (_: Exception) {
-                                    context.startActivity(
-                                        Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", activationCode, null))
-                                    )
-                                }
-                                onForwardingEnable()
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) { Text("Enable Forwarding") }
-                    } else {
-                        OutlinedButton(
-                            onClick = {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", "#21#", null))
-                                )
-                                onForwardingDisable()
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) { Text("Disable Forwarding") }
-                    }
-                    OutlinedButton(
-                        onClick = onUnregister,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Unregister") }
-                }
-                if (!forwardingEnabled) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Enable dials automatically. To disable, the dialer opens pre-filled — tap Call to confirm.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onUnregister,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Unregister") }
             }
 
             if (status.isNotEmpty()) {
