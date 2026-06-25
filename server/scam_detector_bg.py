@@ -3,9 +3,11 @@
 VocaGuard background scam detector — reads audio from a MixMonitor FIFO.
 Called from the vocaguard-user Asterisk context via System() when the
 user accepts a call and a SIP bridge is established.
-Usage: scam_detector_bg.py <audio_fifo_path> <caller_number>
+Usage: scam_detector_bg.py <audio_fifo_path> <caller_number> [user_phone]
+  user_phone — the original called number (from DIVERSION), used to look up
+               the correct FCM token in the multi-tenant user database.
 """
-import sys, os, json, logging, audioop, time
+import sys, os, json, logging, audioop, time, sqlite3
 from collections import deque
 import importlib.util
 
@@ -23,8 +25,56 @@ _spec.loader.exec_module(_sd)
 detect_scam          = _sd.detect_scam
 detect_scam_combined = _sd.detect_scam_combined
 score_to_confidence  = _sd.score_to_confidence
-classify_scam_type  = _sd.classify_scam_type
-send_fcm_alert      = _sd.send_fcm_alert
+classify_scam_type   = _sd.classify_scam_type
+send_fcm_alert       = _sd.send_fcm_alert
+
+DB_PATH        = "/opt/vocaguard/users.db"
+FCM_TOKEN_FILE = "/opt/vocaguard/fcm_token.txt"
+
+
+def get_fcm_token_for_number(phone_number: str) -> str:
+    """Look up FCM token by original called number. Falls back to token file."""
+    if phone_number:
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            row = conn.execute(
+                "SELECT fcm_token FROM users WHERE phone_number=?", (phone_number,)
+            ).fetchone()
+            conn.close()
+            if row and row[0]:
+                return row[0]
+        except Exception:
+            pass
+    try:
+        return open(FCM_TOKEN_FILE).read().strip()
+    except Exception:
+        return ""
+
+
+def send_fcm_with_token(token: str, keywords, transcript, scam_type,
+                        caller_number="", confidence=0.9):
+    """Send scam_alert FCM to a specific device token (multi-tenant aware)."""
+    from firebase_admin import messaging as fcm_msg
+    try:
+        if not token:
+            log.warning("BG: no FCM token — alert not sent")
+            return
+        msg = fcm_msg.Message(
+            data={
+                "type":          "scam_alert",
+                "keywords":      ", ".join(keywords),
+                "transcript":    transcript[:200],
+                "scam_type":     scam_type,
+                "caller_number": caller_number,
+                "confidence":    str(confidence),
+            },
+            android=fcm_msg.AndroidConfig(priority="high"),
+            token=token,
+        )
+        fcm_msg.send(msg)
+        log.info(f"BG FCM sent ({scam_type}) to token ...{token[-10:]}")
+    except Exception as e:
+        log.error(f"BG FCM error: {e}")
 
 import numpy as np
 from vosk import Model, KaldiRecognizer
@@ -48,12 +98,15 @@ log = logging.getLogger("vocaguard.bg")
 
 def main():
     if len(sys.argv) < 3:
-        log.error("Usage: scam_detector_bg.py <audio_fifo> <caller_number>")
+        log.error("Usage: scam_detector_bg.py <audio_fifo> <caller_number> [user_phone]")
         sys.exit(1)
 
     audio_path    = sys.argv[1]
     caller_number = sys.argv[2]
-    log.info(f"BG detector started: fifo={audio_path} caller={caller_number}")
+    user_phone    = sys.argv[3] if len(sys.argv) > 3 else ""
+    fcm_token     = get_fcm_token_for_number(user_phone)
+
+    log.info(f"BG detector started: fifo={audio_path} caller={caller_number} user={user_phone}")
 
     try:
         rec_en = KaldiRecognizer(Model(MODEL_PATH_EN), SAMPLE_RATE)
@@ -96,8 +149,8 @@ def main():
             conf = score_to_confidence(total_score)
             scam_type = classify_scam_type(all_signals)
             log.warning(f"BG SCAM ({label}): {scam_type} mode={mode} score={total_score} signals={all_signals}")
-            send_fcm_alert(all_signals, transcript_disp.strip(),
-                           scam_type, caller_number, conf)
+            send_fcm_with_token(fcm_token, all_signals, transcript_disp.strip(),
+                                scam_type, caller_number, conf)
             alerted = True
 
     # Open FIFO for reading — blocks until MixMonitor connects as writer.
@@ -132,7 +185,8 @@ def main():
                             conf = score_to_confidence(total_score)
                             scam_type = classify_scam_type(all_signals)
                             log.warning(f"BG SCAM (vosk-partial): {scam_type} mode={mode} score={total_score}")
-                            send_fcm_alert(all_signals, partial, scam_type, caller_number, conf)
+                            send_fcm_with_token(fcm_token, all_signals, partial,
+                                                scam_type, caller_number, conf)
                             alerted = True
 
                 whisper_buf.extend(resampled)

@@ -35,14 +35,23 @@ class VocaGuardFcmService : FirebaseMessagingService() {
     companion object {
         private const val TAG = "VocaGuardFCM"
 
-        // Upload current device token to the Asterisk server over HTTPS
+        // Upload current device token to the Asterisk server over HTTPS.
+        // Includes phone_number for multi-tenant routing if the user has registered.
         fun uploadToken(token: String) {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val client = OkHttpClient()
-                    val body = token.toRequestBody("text/plain".toMediaType())
+                    val phoneNumber = ServerDetectionManager.getPhoneNumber()
+                    val body = if (phoneNumber.isNotEmpty()) {
+                        JSONObject().apply {
+                            put("phone_number", phoneNumber)
+                            put("fcm_token", token)
+                        }.toString().toRequestBody("application/json".toMediaType())
+                    } else {
+                        token.toRequestBody("text/plain".toMediaType())
+                    }
                     val request = Request.Builder()
-                        .url("https://178.105.164.91/register-token")
+                        .url("https://${BuildConfig.TOKEN_SERVER_HOST}/register-token")
                         .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
                         .post(body)
                         .build()
@@ -68,9 +77,11 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                 try {
                     val body = JSONObject().apply {
                         put("channel", channel)
+                        val phone = ServerDetectionManager.getPhoneNumber()
+                        if (phone.isNotEmpty()) put("phone_number", phone)
                     }.toString().toRequestBody("application/json".toMediaType())
                     val request = Request.Builder()
-                        .url("https://178.105.164.91/hangup")
+                        .url("https://${BuildConfig.TOKEN_SERVER_HOST}/hangup")
                         .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
                         .post(body)
                         .build()
@@ -95,13 +106,15 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                 val jsonBody = JSONObject().apply {
                     put("channel", channel)
                     put("caller", callerNumber)
+                    val phone = ServerDetectionManager.getPhoneNumber()
+                    if (phone.isNotEmpty()) put("phone_number", phone)
                 }.toString()
                 var lastError: Exception? = null
                 repeat(3) { attempt ->
                     if (attempt > 0) delay(2_000L)
                     try {
                         val request = Request.Builder()
-                            .url("https://178.105.164.91/accept-call")
+                            .url("https://${BuildConfig.TOKEN_SERVER_HOST}/accept-call")
                             .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
                             .post(jsonBody.toRequestBody("application/json".toMediaType()))
                             .build()

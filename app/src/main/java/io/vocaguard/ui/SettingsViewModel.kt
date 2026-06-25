@@ -343,4 +343,66 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             )
         }
     }
+
+    // ── Server Detection registration ─────────────────────────────────────────
+
+    private val sdm = io.vocaguard.service.ServerDetectionManager
+
+    private val _serverRegistered = MutableStateFlow(sdm.isRegistered())
+    val serverRegistered: StateFlow<Boolean> = _serverRegistered.asStateFlow()
+
+    private val _serverPhoneInput = MutableStateFlow(sdm.getPhoneNumber())
+    val serverPhoneInput: StateFlow<String> = _serverPhoneInput.asStateFlow()
+
+    private val _serverSipExtension = MutableStateFlow(sdm.getSipExtension())
+    val serverSipExtension: StateFlow<String> = _serverSipExtension.asStateFlow()
+
+    private val _serverActivationCode = MutableStateFlow(sdm.getActivationCode())
+    val serverActivationCode: StateFlow<String> = _serverActivationCode.asStateFlow()
+
+    private val _serverRegStatus = MutableStateFlow("")
+    val serverRegStatus: StateFlow<String> = _serverRegStatus.asStateFlow()
+
+    private val _serverIsRegistering = MutableStateFlow(false)
+    val serverIsRegistering: StateFlow<Boolean> = _serverIsRegistering.asStateFlow()
+
+    fun updateServerPhoneInput(phone: String) {
+        _serverPhoneInput.value = phone
+    }
+
+    fun registerWithServer() {
+        if (_serverIsRegistering.value) return
+        _serverIsRegistering.value = true
+        _serverRegStatus.value = "Registering…"
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { fcmToken ->
+                viewModelScope.launch {
+                    val result = sdm.register(_serverPhoneInput.value.trim(), fcmToken)
+                    if (result.success) {
+                        _serverRegistered.value = true
+                        _serverSipExtension.value = result.sipExtension
+                        _serverActivationCode.value = sdm.getActivationCode()
+                        _serverRegStatus.value =
+                            "Registered! Dial ${sdm.getActivationCode()} to activate call forwarding."
+                        io.vocaguard.service.VocaGuardSipManager.reinitialize(getApplication())
+                    } else {
+                        _serverRegStatus.value = "Registration failed: ${result.error}"
+                    }
+                    _serverIsRegistering.value = false
+                }
+            }
+            .addOnFailureListener { e ->
+                _serverRegStatus.value = "Could not get FCM token: ${e.message}"
+                _serverIsRegistering.value = false
+            }
+    }
+
+    fun unregisterFromServer() {
+        sdm.clear()
+        _serverRegistered.value = false
+        _serverSipExtension.value = ""
+        _serverActivationCode.value = ""
+        _serverRegStatus.value = "Unregistered"
+        io.vocaguard.service.VocaGuardSipManager.reinitialize(getApplication())
+    }
 }

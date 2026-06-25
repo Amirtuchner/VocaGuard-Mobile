@@ -21,10 +21,9 @@ import org.linphone.core.*
  */
 object VocaGuardSipManager {
 
-    private const val TAG       = "VocaGuardSIP"
-    private const val SERVER_IP = "178.105.164.91"
-    private const val SIP_USER  = "vocaguard"
-    private const val SIP_REALM = "asterisk"
+    private const val TAG           = "VocaGuardSIP"
+    private const val SIP_REALM     = "asterisk"
+    private const val FALLBACK_USER = "vocaguard"
 
     enum class CallState { IDLE, INCOMING, ACTIVE, ENDED }
 
@@ -56,16 +55,21 @@ object VocaGuardSipManager {
             c.isVideoCaptureEnabled = false
             c.isVideoDisplayEnabled = false
 
+            // Use per-user SIP credentials if registered, otherwise fall back to legacy
+            val serverIp = BuildConfig.TOKEN_SERVER_HOST
+            val sipUser  = if (ServerDetectionManager.isRegistered()) ServerDetectionManager.getSipExtension() else FALLBACK_USER
+            val sipPass  = if (ServerDetectionManager.isRegistered()) ServerDetectionManager.getSipPassword() else BuildConfig.SIP_PASSWORD
+
             // SIP auth credentials
             val authInfo = factory.createAuthInfo(
-                SIP_USER, null, BuildConfig.SIP_PASSWORD, null, SIP_REALM, SERVER_IP
+                sipUser, null, sipPass, null, SIP_REALM, serverIp
             )
             c.addAuthInfo(authInfo)
 
             // SIP account
             val params = c.createAccountParams()
-            params.identityAddress = factory.createAddress("sip:$SIP_USER@$SERVER_IP")
-            val serverAddr = factory.createAddress("sip:$SERVER_IP")
+            params.identityAddress = factory.createAddress("sip:$sipUser@$serverIp")
+            val serverAddr = factory.createAddress("sip:$serverIp")
             serverAddr?.transport = TransportType.Udp
             params.serverAddress = serverAddr
             params.isRegisterEnabled = true
@@ -140,6 +144,20 @@ object VocaGuardSipManager {
             Log.w(TAG, "Re-registration attempt $retryCount after ${delayMs}ms")
             account.refreshRegister()
         }
+    }
+
+    /**
+     * Tear down and re-initialize the SIP core with fresh credentials.
+     * Call after a successful server registration to switch to the per-user extension.
+     */
+    fun reinitialize(context: Context) {
+        core?.stop()
+        core = null
+        retryJob?.cancel()
+        retryCount = 0
+        _callState.value = CallState.IDLE
+        _registrationState.value = RegistrationState.None
+        initialize(context)
     }
 
     /**

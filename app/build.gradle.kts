@@ -35,6 +35,11 @@ android {
             ?: System.getenv("SIP_PASSWORD")
             ?: "vocaguard123"
         buildConfigField("String", "SIP_PASSWORD", "\"$sipPassword\"")
+
+        val tokenServerHost = localProperties.getProperty("token_server_host")
+            ?: System.getenv("TOKEN_SERVER_HOST")
+            ?: "178.105.164.91"
+        buildConfigField("String", "TOKEN_SERVER_HOST", "\"$tokenServerHost\"")
     }
 
     // Signing config for CI — reads from environment variables set by the workflow.

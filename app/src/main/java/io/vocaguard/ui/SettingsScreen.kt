@@ -15,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -52,6 +54,15 @@ fun SettingsTab(
     val reportEndpointSaved by viewModel.reportEndpointSaved.collectAsStateWithLifecycle()
     val modelUpdateStatus by viewModel.modelUpdateStatus.collectAsStateWithLifecycle()
     val callForwardingEnabled by viewModel.callForwardingEnabled.collectAsStateWithLifecycle()
+
+    // Server Detection
+    val serverRegistered     by viewModel.serverRegistered.collectAsStateWithLifecycle()
+    val serverPhoneInput     by viewModel.serverPhoneInput.collectAsStateWithLifecycle()
+    val serverSipExtension   by viewModel.serverSipExtension.collectAsStateWithLifecycle()
+    val serverActivationCode by viewModel.serverActivationCode.collectAsStateWithLifecycle()
+    val serverRegStatus      by viewModel.serverRegStatus.collectAsStateWithLifecycle()
+    val serverIsRegistering  by viewModel.serverIsRegistering.collectAsStateWithLifecycle()
+    var serverPhoneField by remember(serverPhoneInput) { mutableStateOf(serverPhoneInput) }
 
     // Family Guard
     val familyGuardEnabled  by viewModel.familyGuardEnabled.collectAsStateWithLifecycle()
@@ -108,6 +119,21 @@ fun SettingsTab(
                 enabled   = callForwardingEnabled,
                 onEnabled  = { viewModel.setCallForwardingEnabled(true) },
                 onDisabled = { viewModel.setCallForwardingEnabled(false) }
+            )
+        }
+
+        // ── Server Detection card ──────────────────────────────────────────────
+        item {
+            ServerDetectionCard(
+                registered       = serverRegistered,
+                phoneField       = serverPhoneField,
+                onPhoneChange    = { serverPhoneField = it; viewModel.updateServerPhoneInput(it) },
+                sipExtension     = serverSipExtension,
+                activationCode   = serverActivationCode,
+                status           = serverRegStatus,
+                isRegistering    = serverIsRegistering,
+                onRegister       = { viewModel.registerWithServer() },
+                onUnregister     = { viewModel.unregisterFromServer() }
             )
         }
 
@@ -1094,6 +1120,127 @@ private fun CallForwardingCard(
 // ---------------------------------------------------------------------------
 // Alert Toggle Row (used in SettingsTab)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Server Detection Card
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ServerDetectionCard(
+    registered: Boolean,
+    phoneField: String,
+    onPhoneChange: (String) -> Unit,
+    sipExtension: String,
+    activationCode: String,
+    status: String,
+    isRegistering: Boolean,
+    onRegister: () -> Unit,
+    onUnregister: () -> Unit
+) {
+    val context = LocalContext.current
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (registered)
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Server Detection",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Register your phone number to route calls through the VocaGuard server for AI scam analysis.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (!registered) {
+                OutlinedTextField(
+                    value = phoneField,
+                    onValueChange = onPhoneChange,
+                    label = { Text("Your Phone Number (E.164)") },
+                    placeholder = { Text("+1234567890") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onRegister,
+                    enabled = !isRegistering && phoneField.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (isRegistering) "Registering…" else "Register with Server")
+                }
+            } else {
+                Text(
+                    text = "Registered",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "SIP extension: $sipExtension",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Activation code: $activationCode",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "Dial the code above on your phone to enable call forwarding to the VocaGuard server.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            try {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_CALL, Uri.fromParts("tel", activationCode, null))
+                                )
+                            } catch (_: Exception) {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", activationCode, null))
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Dial to Activate") }
+                    OutlinedButton(
+                        onClick = onUnregister,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Unregister") }
+                }
+            }
+
+            if (status.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (status.startsWith("Registered") || status.startsWith("Registering"))
+                        MaterialTheme.colorScheme.secondary
+                    else if (status.startsWith("Registration failed") || status.startsWith("Could not"))
+                        MaterialTheme.colorScheme.error
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun AlertToggleRow(

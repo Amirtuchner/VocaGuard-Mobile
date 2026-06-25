@@ -2,13 +2,17 @@
 """Lightweight pre-answer AGI: sends FCM incoming_call alert immediately.
    Includes the Asterisk channel name so the app can signal Accept via AMI.
    Also clears any stale PJSIP/vocaguard-* channels so the bridge can succeed.
+   Reads the DIVERSION channel variable (set from the SIP Diversion header relayed
+   by DIDWW) to identify which user the call was originally for, then looks up
+   their FCM token from the multi-tenant user database.
 """
-import sys, os, json, socket
+import sys, os, json, socket, re, sqlite3
 import firebase_admin
 from firebase_admin import credentials, messaging
 
 SERVICE_ACCOUNT = "/opt/vocaguard/service-account.json"
-FCM_TOKEN_FILE  = "/opt/vocaguard/fcm_token.txt"
+FCM_TOKEN_FILE  = "/opt/vocaguard/fcm_token.txt"   # single-user fallback
+DB_PATH         = "/opt/vocaguard/users.db"
 AMI_HOST        = "127.0.0.1"
 AMI_PORT        = 5038
 AMI_USER        = "vocaguard-bridge"
@@ -27,6 +31,46 @@ def agi_init():
     return agi_vars
 
 
+def agi_get_variable(name: str) -> str:
+    """Read a channel variable via the AGI GET VARIABLE command."""
+    sys.stdout.write(f"GET VARIABLE {name}\n")
+    sys.stdout.flush()
+    response = sys.stdin.readline().strip()
+    match = re.search(r'\((.+)\)', response)
+    return match.group(1) if match else ""
+
+
+def extract_number_from_diversion(diversion: str) -> str:
+    """Extract E.164 number from a SIP Diversion header value.
+    e.g. '<sip:+97252823354@carrier.com>;reason=unconditional' -> '+97252823354'
+    """
+    if not diversion:
+        return ""
+    match = re.search(r'sip:(\+?[\d]+)[@>]', diversion)
+    return match.group(1) if match else ""
+
+
+def get_fcm_token_for_number(phone_number: str) -> str:
+    """Look up FCM token by original called number. Falls back to token file."""
+    if phone_number:
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            row = conn.execute(
+                "SELECT fcm_token FROM users WHERE phone_number=?", (phone_number,)
+            ).fetchone()
+            conn.close()
+            if row and row[0]:
+                return row[0]
+        except Exception as e:
+            sys.stdout.write(f'VERBOSE "DB lookup warning: {e}" 1\n')
+            sys.stdout.flush()
+    # Fallback: single-user token file
+    try:
+        return open(FCM_TOKEN_FILE).read().strip()
+    except Exception:
+        return ""
+
+
 def _ami_recv(s: socket.socket) -> str:
     buf = b""
     while b"\r\n\r\n" not in buf:
@@ -38,23 +82,20 @@ def _ami_recv(s: socket.socket) -> str:
 
 
 def cleanup_stale_vocaguard_channels():
-    """Hang up any lingering PJSIP/vocaguard-* channels before we bridge a new call."""
+    """Hang up any lingering PJSIP/vocaguard_*-* channels before bridging a new call."""
     try:
         ami_secret = open(AMI_SECRET_FILE).read().strip()
         s = socket.create_connection((AMI_HOST, AMI_PORT), timeout=5)
-        s.recv(1024)  # banner
+        s.recv(1024)
 
-        # Login
         s.sendall(
             f"Action: Login\r\nUsername: {AMI_USER}\r\nSecret: {ami_secret}\r\n\r\n"
             .encode()
         )
         _ami_recv(s)
 
-        # Request channel list
         s.sendall(b"Action: CoreShowChannels\r\nActionID: cleanup\r\n\r\n")
 
-        # Collect all events until CoreShowChannelsComplete
         buf = b""
         while True:
             chunk = s.recv(4096)
@@ -66,29 +107,26 @@ def cleanup_stale_vocaguard_channels():
 
         text = buf.decode(errors="replace")
 
-        # Parse channel names from events
         stale = []
         for block in text.split("\r\n\r\n"):
             channel_line = next(
-                (l for l in block.splitlines() if l.startswith("Channel: PJSIP/vocaguard-")),
+                (l for l in block.splitlines()
+                 if l.startswith("Channel: PJSIP/vocaguard")),
                 None
             )
             if channel_line:
                 ch = channel_line.split(": ", 1)[1].strip()
                 stale.append(ch)
 
-        # Hang up each stale channel
         for ch in stale:
-            s.sendall(
-                f"Action: Hangup\r\nChannel: {ch}\r\n\r\n".encode()
-            )
+            s.sendall(f"Action: Hangup\r\nChannel: {ch}\r\n\r\n".encode())
             _ami_recv(s)
 
         s.sendall(b"Action: Logoff\r\n\r\n")
         s.close()
 
         if stale:
-            sys.stdout.write(f'VERBOSE "Cleared {len(stale)} stale vocaguard channel(s): {stale}" 1\n')
+            sys.stdout.write(f'VERBOSE "Cleared {len(stale)} stale channel(s)" 1\n')
             sys.stdout.flush()
     except Exception as e:
         sys.stdout.write(f'VERBOSE "cleanup_stale warning: {e}" 1\n')
@@ -100,19 +138,28 @@ def main():
     caller  = agi_vars.get("agi_callerid", "")
     channel = agi_vars.get("agi_channel", "")
 
+    # Read Diversion header (set in extensions.conf from PJSIP_HEADER)
+    diversion_raw    = agi_get_variable("DIVERSION")
+    diversion_number = extract_number_from_diversion(diversion_raw)
+
     cleanup_stale_vocaguard_channels()
 
     try:
         cred = credentials.Certificate(SERVICE_ACCOUNT)
         firebase_admin.initialize_app(cred)
-        token = open(FCM_TOKEN_FILE).read().strip()
+
+        token = get_fcm_token_for_number(diversion_number)
         if token:
+            data = {
+                "type":             "incoming_call",
+                "caller_number":    caller,
+                "asterisk_channel": channel,
+            }
+            if diversion_number:
+                data["diversion_number"] = diversion_number
+
             msg = messaging.Message(
-                data={
-                    "type":             "incoming_call",
-                    "caller_number":    caller,
-                    "asterisk_channel": channel,
-                },
+                data=data,
                 android=messaging.AndroidConfig(priority="high"),
                 token=token,
             )
@@ -120,6 +167,7 @@ def main():
     except Exception as e:
         sys.stdout.write(f'VERBOSE "FCM notify error: {e}" 1\n')
         sys.stdout.flush()
+
 
 if __name__ == "__main__":
     main()
