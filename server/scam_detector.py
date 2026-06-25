@@ -37,7 +37,7 @@ SERVICE_ACCOUNT      = "/opt/vocaguard/service-account.json"
 FCM_TOKEN_FILE       = "/opt/vocaguard/fcm_token.txt"
 SAMPLE_RATE          = 16000
 WHISPER_CHUNK_BYTES  = 16000 * 2 * 2   # 2-second chunks (was 3 s)
-SCAM_SCORE_THRESHOLD = 3
+SCAM_SCORE_THRESHOLD = 2
 WINDOW_SECONDS       = 90              # sliding window: only last 90 s counts
 
 logging.basicConfig(
@@ -554,8 +554,8 @@ def main():
                         segments, info = whisper_model.transcribe(
                             audio_np,
                             language=None,      # auto-detect: HE, RU, AR, mixed
-                            beam_size=1,
-                            best_of=1,
+                            beam_size=3,
+                            best_of=3,
                             vad_filter=True,
                         )
                         text = " ".join(seg.text for seg in segments).strip()
@@ -583,7 +583,7 @@ def main():
                   .astype(np.float32) / 32768.0
             )
             segments, info = whisper_model.transcribe(
-                audio_np, language=None, beam_size=1, best_of=1, vad_filter=True,
+                audio_np, language=None, beam_size=3, best_of=3, vad_filter=True,
             )
             text = " ".join(seg.text for seg in segments).strip()
             if text:
