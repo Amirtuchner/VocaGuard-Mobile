@@ -23,6 +23,7 @@ import io.vocaguard.service.VocaGuardSipManager
 import androidx.core.app.NotificationCompat
 import io.vocaguard.R
 import io.vocaguard.receiver.ActiveCallReceiver
+import io.vocaguard.service.ServerDetectionManager
 import io.vocaguard.service.VocaGuardFcmService
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -50,6 +51,7 @@ class IncomingCallActivity : ComponentActivity() {
     private var activeChannel: String = ""
     private var callActive by mutableStateOf(false)
     private var activeCallerNumber: String = ""
+    private var pendingCancel by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -82,19 +84,27 @@ class IncomingCallActivity : ComponentActivity() {
         setContent {
             val sipState by VocaGuardSipManager.callState.collectAsState()
 
-            // When the remote side hangs up, clean up and finish
+            // When the remote side hangs up, clean up and finish.
+            // If user cancelled during connecting, fire hangup once bridge is active.
             LaunchedEffect(sipState) {
-                if (sipState == VocaGuardSipManager.CallState.ENDED && callActive) {
-                    getSystemService(NotificationManager::class.java)
-                        .cancel(ActiveCallReceiver.NOTIFICATION_ID)
-                    finish()
+                when {
+                    sipState == VocaGuardSipManager.CallState.ACTIVE && pendingCancel -> {
+                        hangUpAndFinish()
+                    }
+                    sipState == VocaGuardSipManager.CallState.ENDED && callActive -> {
+                        getSystemService(NotificationManager::class.java)
+                            .cancel(ActiveCallReceiver.NOTIFICATION_ID)
+                        finish()
+                    }
                 }
             }
 
             if (callActive) {
                 ActiveCallScreen(
                     callerNumber = activeCallerNumber,
-                    onEndCall = { hangUpAndFinish() }
+                    connected = (sipState == VocaGuardSipManager.CallState.ACTIVE),
+                    onEndCall = { hangUpAndFinish() },
+                    onCancelConnecting = { pendingCancel = true }
                 )
             } else {
                 IncomingCallScreen(
@@ -137,6 +147,7 @@ class IncomingCallActivity : ComponentActivity() {
             this, 0,
             Intent(ActiveCallReceiver.ACTION_HANG_UP, null, this, ActiveCallReceiver::class.java).apply {
                 putExtra(ActiveCallReceiver.EXTRA_CHANNEL, channel)
+                putExtra(ActiveCallReceiver.EXTRA_PHONE, ServerDetectionManager.getPhoneNumber() ?: "")
             },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -176,7 +187,9 @@ class IncomingCallActivity : ComponentActivity() {
 @Composable
 private fun ActiveCallScreen(
     callerNumber: String,
-    onEndCall: () -> Unit
+    connected: Boolean,
+    onEndCall: () -> Unit,
+    onCancelConnecting: () -> Unit
 ) {
     val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
     Column(
@@ -189,28 +202,39 @@ private fun ActiveCallScreen(
     ) {
         Spacer(Modifier.height(48.dp))
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Call Active", color = Color(0xFF4CAF50), fontSize = 16.sp)
+            if (connected) {
+                Text("Call Active", color = Color(0xFF4CAF50), fontSize = 16.sp)
+            } else {
+                Text("Connecting…", color = Color(0xFFFFB300), fontSize = 16.sp)
+            }
             Spacer(Modifier.height(16.dp))
             Text(displayNumber, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Text("VocaGuard is monitoring this call", color = Color(0xFFAAAAAA), fontSize = 14.sp)
-            Spacer(Modifier.height(8.dp))
-            Text("Press back to return to Linphone", color = Color(0xFF888888), fontSize = 12.sp)
+            if (connected) {
+                Spacer(Modifier.height(8.dp))
+                Text("Press back to return to Linphone", color = Color(0xFF888888), fontSize = 12.sp)
+            }
         }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(bottom = 64.dp)
         ) {
             Button(
-                onClick = onEndCall,
+                onClick = if (connected) onEndCall else onCancelConnecting,
                 modifier = Modifier.size(80.dp),
                 shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (connected) Color(0xFFD32F2F) else Color(0xFF555555)
+                )
             ) {
                 Text("END", fontSize = 16.sp, color = Color.White)
             }
             Spacer(Modifier.height(8.dp))
-            Text("End Call", color = Color.White, fontSize = 12.sp)
+            Text(
+                if (connected) "End Call" else "Cancel",
+                color = Color.White, fontSize = 12.sp
+            )
         }
     }
 }

@@ -151,22 +151,25 @@ def update_fcm_token(phone: str, fcm_token: str) -> bool:
 
 def provision_pjsip_user(ext: str, password: str):
     """Append a PJSIP endpoint/auth/aor block and reload res_pjsip."""
+    # AOR name MUST match the extension username (To-header in REGISTER).
+    # Asterisk PJSIP maps incoming REGISTER to AOR by matching the To username.
     block = (
         f"\n[{ext}]\n"
         f"type=endpoint\n"
         f"context=vocaguard-user\n"
         f"auth=auth_{ext}\n"
-        f"aors=aor_{ext}\n"
+        f"aors={ext}\n"
         f"allow=!all,ulaw,alaw\n"
         f"direct_media=no\n"
         f"force_rport=yes\n"
         f"rewrite_contact=yes\n"
+        f"rtp_symmetric=yes\n"
         f"\n[auth_{ext}]\n"
         f"type=auth\n"
         f"auth_type=userpass\n"
         f"username={ext}\n"
         f"password={password}\n"
-        f"\n[aor_{ext}]\n"
+        f"\n[{ext}]\n"
         f"type=aor\n"
         f"max_contacts=1\n"
         f"remove_existing=yes\n"

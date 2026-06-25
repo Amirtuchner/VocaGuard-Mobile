@@ -7,6 +7,7 @@ import android.content.Intent
 import android.util.Log
 import io.vocaguard.BuildConfig
 import io.vocaguard.MainActivity
+import io.vocaguard.service.ServerDetectionManager
 import io.vocaguard.service.VocaGuardSipManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,9 +21,10 @@ import org.json.JSONObject
 class ActiveCallReceiver : BroadcastReceiver() {
 
     companion object {
-        const val ACTION_HANG_UP  = "io.vocaguard.ACTION_HANG_UP"
-        const val EXTRA_CHANNEL   = "active_call_channel"
-        const val NOTIFICATION_ID = 2002
+        const val ACTION_HANG_UP    = "io.vocaguard.ACTION_HANG_UP"
+        const val EXTRA_CHANNEL     = "active_call_channel"
+        const val EXTRA_PHONE       = "active_call_phone"
+        const val NOTIFICATION_ID   = 2002
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -42,13 +44,16 @@ class ActiveCallReceiver : BroadcastReceiver() {
         )
 
         // goAsync() keeps the receiver process alive while the HTTP hangup request completes.
+        val phone = intent.getStringExtra(EXTRA_PHONE) ?: ServerDetectionManager.getPhoneNumber()
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val body = JSONObject().apply { put("channel", channel) }
-                    .toString().toRequestBody("application/json".toMediaType())
+                val body = JSONObject().apply {
+                    put("channel", channel)
+                    if (!phone.isNullOrBlank()) put("phone_number", phone)
+                }.toString().toRequestBody("application/json".toMediaType())
                 val request = Request.Builder()
-                    .url("https://178.105.164.91/hangup")
+                    .url("https://${BuildConfig.TOKEN_SERVER_HOST}/hangup")
                     .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
                     .post(body)
                     .build()
