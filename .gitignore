@@ -25,3 +25,4 @@ google-services.json
 *.keystore
 *.jks
 app/google-services.json
+apk-download/*.apk
