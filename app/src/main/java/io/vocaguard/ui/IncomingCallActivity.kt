@@ -19,9 +19,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import io.vocaguard.service.VocaGuardSipManager
 import androidx.core.app.NotificationCompat
 import io.vocaguard.R
+import io.vocaguard.data.ScamType
 import io.vocaguard.receiver.ActiveCallReceiver
 import io.vocaguard.service.ServerDetectionManager
 import io.vocaguard.service.VocaGuardFcmService
@@ -36,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -83,12 +86,17 @@ class IncomingCallActivity : ComponentActivity() {
 
         setContent {
             val sipState by VocaGuardSipManager.callState.collectAsState()
+            val scamAlert by VocaGuardFcmService.scamAlertFlow.collectAsState()
 
             // When the remote side hangs up, clean up and finish.
             // If user cancelled during connecting, fire hangup once bridge is active.
             LaunchedEffect(sipState) {
                 when {
                     sipState == VocaGuardSipManager.CallState.ACTIVE && pendingCancel -> {
+                        // Wait for the Asterisk dialplan's Wait(1)+Bridge() to execute
+                        // before sending BYE — otherwise Bridge() never runs and
+                        // ORIG_CHANNEL is never cleaned up (scammer keeps ringing).
+                        delay(2000)
                         hangUpAndFinish()
                     }
                     sipState == VocaGuardSipManager.CallState.ENDED && callActive -> {
@@ -103,6 +111,7 @@ class IncomingCallActivity : ComponentActivity() {
                 ActiveCallScreen(
                     callerNumber = activeCallerNumber,
                     connected = (sipState == VocaGuardSipManager.CallState.ACTIVE),
+                    scamAlert = scamAlert,
                     onEndCall = { hangUpAndFinish() },
                     onCancelConnecting = { pendingCancel = true }
                 )
@@ -181,6 +190,7 @@ class IncomingCallActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         ringtone?.stop()
+        VocaGuardFcmService.scamAlertFlow.value = null
     }
 }
 
@@ -188,6 +198,7 @@ class IncomingCallActivity : ComponentActivity() {
 private fun ActiveCallScreen(
     callerNumber: String,
     connected: Boolean,
+    scamAlert: Pair<ScamType, Float>?,
     onEndCall: () -> Unit,
     onCancelConnecting: () -> Unit
 ) {
@@ -195,13 +206,49 @@ private fun ActiveCallScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A1A2E))
-            .padding(32.dp),
+            .background(Color(0xFF1A1A2E)),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Spacer(Modifier.height(48.dp))
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Scam alert banner — shown prominently at the top when server detects a scam
+        if (scamAlert != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFB71C1C))
+                    .padding(vertical = 16.dp, horizontal = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "SCAM DETECTED",
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        "${scamAlert.first.name.replace('_', ' ')}  •  ${(scamAlert.second * 100).toInt()}% confidence",
+                        color = Color(0xFFFFCDD2),
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        "Hang up now!",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier.padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(if (scamAlert == null) 48.dp else 16.dp))
             if (connected) {
                 Text("Call Active", color = Color(0xFF4CAF50), fontSize = 16.sp)
             } else {

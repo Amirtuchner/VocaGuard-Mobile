@@ -23,6 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -34,6 +35,9 @@ class VocaGuardFcmService : FirebaseMessagingService() {
 
     companion object {
         private const val TAG = "VocaGuardFCM"
+
+        /** Emits the latest scam alert so IncomingCallActivity can show an in-screen banner. */
+        val scamAlertFlow = MutableStateFlow<Pair<io.vocaguard.data.ScamType, Float>?>(null)
 
         // Upload current device token to the Asterisk server over HTTPS.
         // Includes phone_number for multi-tenant routing if the user has registered.
@@ -100,7 +104,7 @@ class VocaGuardFcmService : FirebaseMessagingService() {
         fun acceptCall(channel: String, callerNumber: String) {
             CoroutineScope(Dispatchers.IO).launch {
                 val client = OkHttpClient.Builder()
-                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .connectTimeout(4, java.util.concurrent.TimeUnit.SECONDS)
                     .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
                     .build()
                 val jsonBody = JSONObject().apply {
@@ -111,7 +115,7 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                 }.toString()
                 var lastError: Exception? = null
                 repeat(3) { attempt ->
-                    if (attempt > 0) delay(2_000L)
+                    if (attempt > 0) delay(500L)
                     try {
                         val request = Request.Builder()
                             .url("https://${BuildConfig.TOKEN_SERVER_HOST}/accept-call")
@@ -161,6 +165,9 @@ class VocaGuardFcmService : FirebaseMessagingService() {
             ?: inferScamType(keywords)
 
         Log.w(TAG, "Scam alert from server! Keywords: $keywords, caller: $callerNumber, confidence: $confidence")
+
+        // Notify IncomingCallActivity to show an in-screen banner immediately
+        scamAlertFlow.value = Pair(scamType, confidence)
 
         // Notification + TTS + vibration
         val alertManager = ScamAlertManager(applicationContext)

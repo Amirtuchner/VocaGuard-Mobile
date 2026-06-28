@@ -68,7 +68,7 @@ SCAM_KEYWORDS_EN = [
     ("gift card", 2), ("wire transfer", 2), ("western union", 2),
     ("social security", 2), ("remote access", 2), ("anydesk", 2), ("teamviewer", 2),
     ("bitcoin", 2), ("crypto", 2), ("money mule", 2),
-    ("irs", 1), ("tax", 1), ("legal action", 1), ("deportation", 1),
+    ("from the irs", 2), ("from the irf", 2), ("calling from iraq", 2), ("from iraq you", 2), ("owe back taxes", 2), ("owe back", 2), ("back taxes", 2), ("irs", 1), ("irf", 1), ("irr", 1), ("iirrs", 1), ("tax", 1), ("legal action", 1), ("deportation", 1),
     ("virus", 1), ("microsoft", 1), ("computer infected", 1), ("tech support", 1),
     ("suspicious activity", 1), ("account frozen", 1), ("verify your account", 1),
     ("bank transfer", 1), ("account compromised", 1),
@@ -258,6 +258,16 @@ def classify_scam_type(matched_keywords: list) -> str:
 # Detection — sliding window
 # ---------------------------------------------------------------------------
 
+
+# Normalize common STT misrecognitions of known scam terms before keyword matching.
+_IRS_VARIANTS = re.compile(r'(irf|irr|nirs|iirrs|nirrs)', re.IGNORECASE)
+_IRS_CONTEXT  = re.compile(r'(calling from|from the|from) (iraq|iraqi|iran|irak)', re.IGNORECASE)
+
+def _normalize_stt(text: str) -> str:
+    text = _IRS_VARIANTS.sub('irs', text)
+    text = _IRS_CONTEXT.sub(lambda m: m.group(1) + ' the irs', text)
+    return text
+
 def detect_scam(window_text: str):
     """
     Scan window_text against all keyword tables.
@@ -271,6 +281,7 @@ def detect_scam(window_text: str):
     that e.g. "ביט" (payment app) does not match inside "ביטוח לאומי".
     """
     # Normalise: punctuation → space, pad with spaces for boundary matching
+    window_text = _normalize_stt(window_text)
     normed_text = " " + _WORD_SEP.sub(" ", window_text.lower()) + " "
     score = 0
     matched = []
@@ -479,7 +490,7 @@ def main():
     # Whisper base — multilingual (Hebrew, Russian, Arabic, auto-detect)
     whisper_model = None
     try:
-        whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
+        whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
         log.info("Whisper base model loaded")
     except Exception as e:
         log.warning(f"Whisper load error — non-English detection disabled: {e}")
@@ -554,7 +565,7 @@ def main():
                         segments, info = whisper_model.transcribe(
                             audio_np,
                             language=None,      # auto-detect: HE, RU, AR, mixed
-                            beam_size=3,
+                            beam_size=5,
                             best_of=3,
                             vad_filter=True,
                         )
@@ -583,7 +594,7 @@ def main():
                   .astype(np.float32) / 32768.0
             )
             segments, info = whisper_model.transcribe(
-                audio_np, language=None, beam_size=3, best_of=3, vad_filter=True,
+                audio_np, language=None, beam_size=5, best_of=5, vad_filter=True,
             )
             text = " ".join(seg.text for seg in segments).strip()
             if text:

@@ -121,7 +121,7 @@ def main():
 
     whisper_model = None
     try:
-        whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
+        whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
         log.info("BG: Whisper model loaded")
     except Exception as e:
         log.warning(f"BG: Whisper load error: {e}")
@@ -202,7 +202,7 @@ def main():
                                   .astype(np.float32) / 32768.0
                             )
                             segments, info = whisper_model.transcribe(
-                                audio_np, beam_size=3, best_of=3,
+                                audio_np, beam_size=5, best_of=5,
                                 vad_filter=False, language="en",
                             )
                             text = " ".join(seg.text for seg in segments).strip()
@@ -228,7 +228,7 @@ def main():
                   .astype(np.float32) / 32768.0
             )
             segments, info = whisper_model.transcribe(
-                audio_np, language="en", beam_size=3, best_of=3, vad_filter=False,
+                audio_np, language="en", beam_size=5, best_of=5, vad_filter=False,
             )
             text = " ".join(seg.text for seg in segments).strip()
             if text:
