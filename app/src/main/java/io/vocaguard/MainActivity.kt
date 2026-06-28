@@ -119,10 +119,13 @@ class MainActivity : ComponentActivity() {
                         pendingFamilyAlert  = pendingFamilyAlert
                     )
                 } else {
-                    OnboardingScreen(onFinish = {
-                        detectionSettings.onboardingComplete = true
-                        onboardingDone = true
-                    })
+                    OnboardingScreen(
+                        permissionsManager = permissionsManager,
+                        onFinish = {
+                            detectionSettings.onboardingComplete = true
+                            onboardingDone = true
+                        }
+                    )
                 }
             }
         }

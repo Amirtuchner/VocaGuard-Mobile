@@ -64,12 +64,12 @@ class PermissionsManager(private val context: Context) {
         return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
     }
 
-    private fun isCallScreeningEnabled(): Boolean {
+    fun isCallScreeningEnabled(): Boolean {
         val roleManager = context.getSystemService(RoleManager::class.java)
         return roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
     }
 
-    private fun isAccessibilityEnabled(): Boolean {
+    fun isAccessibilityEnabled(): Boolean {
         val accessibilityEnabled = Settings.Secure.getInt(
             context.contentResolver,
             Settings.Secure.ACCESSIBILITY_ENABLED,
