@@ -224,7 +224,11 @@ private fun RegistrationStep(
         OutlinedTextField(
             value = phoneInput,
             onValueChange = onPhoneChange,
-            label = { Text("Phone number (e.g. +972501234567)") },
+            label = { Text("Phone number with country code") },
+            placeholder = { Text("+972 50 1234567") },
+            supportingText = {
+                Text("Include your country code and omit the leading zero.\nExample (Israel): +972 50 1234567  (not 050-1234567)")
+            },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
