@@ -432,6 +432,275 @@ class ScamPatternDetector() {
             // French
             "numéro de sécurité sociale", "mot de passe", "numéro de compte", "date de naissance", "code pin"
         )
+
+        // ── Message-specific detection ─────────────────────────────────────────
+        // All entries are multi-word phrases. Single generic words are excluded to
+        // eliminate false positives from normal chat about crypto, stocks, or finance.
+
+        private const val MIN_MESSAGE_PHRASE_MATCHES = 2
+        private const val MESSAGE_CONFIDENCE_PER_PHRASE = 0.35f
+        private const val CRITICAL_PHRASE_CONFIDENCE = 0.92f
+        private const val MESSAGE_THRESHOLD = 0.65f
+
+        /**
+         * Single-match critical phrases. These are virtually never used in legitimate
+         * conversation — one match is sufficient to flag a scam with high confidence.
+         */
+        private val CRITICAL_PHRASES = setOf(
+            // Crypto wallet drainer (seed / private key requests)
+            "seed phrase", "recovery phrase", "wallet seed", "secret phrase",
+            "secret recovery phrase", "wallet passphrase", "wallet recovery",
+            "12-word phrase", "24-word phrase", "12 word phrase", "24 word phrase",
+            "private key", "wallet private", "export your wallet",
+            // Hebrew
+            "ביטוי שחזור", "מפתח פרטי", "גרעין הארנק", "ביטוי סודי",
+            // Russian
+            "фраза восстановления", "приватный ключ", "сид-фраза", "сид фраза",
+            // Arabic
+            "عبارة الاسترداد", "المفتاح الخاص", "عبارة البذرة"
+        )
+
+        /**
+         * Message-specific phrase patterns — used only when scanning text messages.
+         * All entries are 2+ word phrases that rarely appear in legitimate chat.
+         */
+        private val MESSAGE_PATTERNS = mapOf(
+
+            // ── Investment / crypto / trading / stock ──────────────────────────
+            ScamType.INVESTMENT_SCAM to listOf(
+                // Crypto wallet operations (drainer / approval scams)
+                "connect your wallet", "sync your wallet", "validate your wallet",
+                "reconnect your wallet", "approve the transaction", "approve this transaction",
+                "sign this transaction", "connect wallet", "wallet connect",
+                "send usdt", "send btc", "send ethereum", "send crypto",
+                "usdt transfer", "transfer usdt", "transfer btc",
+                // Pig-butchering / managed trading
+                "trading platform", "account manager", "personal trader",
+                "trading balance", "trading profits", "withdraw your profits",
+                "fund your account", "minimum deposit", "initial deposit",
+                "trading robot", "ai trading", "ai trading bot",
+                "automated trading", "managed account", "let me teach you to trade",
+                "trading group", "vip trading group", "join my trading",
+                "my mentor can", "my broker can", "my account manager",
+                "portfolio has grown", "your balance has grown",
+                // Withdrawal block / fee extortion (strongest signal after critical phrases)
+                "withdrawal fee", "tax clearance fee", "fee to withdraw",
+                "fee to release", "processing fee to release", "unlock your withdrawal",
+                "insurance bond", "anti-money laundering fee",
+                "upgrade your account tier", "tax to withdraw",
+                "security deposit to withdraw", "release your funds",
+                // Signal groups
+                "crypto signals", "forex signals", "trading signals", "vip signals",
+                "crypto signal group", "telegram signal",
+                // DeFi / token / NFT
+                "token presale", "token pre-sale", "ico launch", "nft project",
+                "defi staking", "liquidity pool", "yield farming",
+                "mining pool", "cloud mining", "mining contract",
+                "altcoin listing", "binance listing", "coinbase listing",
+                // Stock / crypto pump-and-dump
+                "hot stock tip", "penny stock", "stock alert",
+                "insider tip", "buy before it", "get in early",
+                "before it moons", "before it pumps", "guaranteed to moon",
+                "will 10x", "will 100x", "before listing", "pre-listing",
+                "early investor", "early access to", "whitelist spot",
+                "this coin will", "this stock will",
+                // Guaranteed-return language
+                "guaranteed returns", "guaranteed profit", "guaranteed income",
+                "guaranteed daily", "risk free investment", "double your money",
+                "passive income", "financial freedom", "get rich quick",
+                "100% profit", "1000% return",
+                // Hebrew
+                "תשואה מובטחת", "קבוצת מסחר vip", "מנהל חשבון",
+                "דמי משיכה", "דמי שחרור", "עמלת עיבוד",
+                "הכפלת כסף", "רובוט מסחר", "ארביטראז' קריפטו",
+                "אות מסחר", "פלטפורמת מסחר", "הפקדה ראשונית",
+                "קבוצת סיגנלים", "לפני ההנפקה", "קבלת גישה מוקדמת",
+                "השקעה מובטחת", "הכנסה פסיבית", "חופש פיננסי",
+                // Russian
+                "гарантированный доход", "торговая группа vip", "мой менеджер счёта",
+                "вывод прибыли", "комиссия за вывод", "сбор за обработку",
+                "торговый робот", "минимальный депозит", "торговая платформа",
+                "до листинга", "ранний инвестор", "криптосигналы",
+                "пассивный доход", "финансовая свобода", "удвоить деньги",
+                // Arabic
+                "عائد مضمون", "مجموعة vip للتداول", "مدير حسابي",
+                "رسوم السحب", "رسوم التحرير", "رسوم المعالجة",
+                "ربح مضمون", "استثمار مضمون", "منصة التداول",
+                "قبل الإدراج", "مستثمر مبكر", "إشارات العملات",
+                "دخل سلبي", "حرية مالية", "مضاعفة المال"
+            ),
+
+            // ── Phishing ──────────────────────────────────────────────────────
+            ScamType.PHISHING to listOf(
+                "click this link", "click the link", "verify your account",
+                "account verification", "confirm your details",
+                "your account will be closed", "update your payment",
+                "confirm your password", "log in to avoid",
+                "suspicious login", "verify your identity",
+                "confirm your information", "unusual sign-in",
+                "account suspended", "account will be terminated",
+                "one-time password", "enter your otp",
+                // Hebrew
+                "לחץ כאן לאישור", "עדכן פרטי תשלום", "חשבונך ייחסם",
+                "אמת זהותך", "כניסה חשודה", "אמת את החשבון",
+                // Russian
+                "нажмите здесь для подтверждения", "обновите платёжные данные",
+                "подозрительный вход", "учётная запись заблокирована",
+                "подтвердите свою личность",
+                // Arabic
+                "انقر هنا للتحقق", "تحديث بيانات الدفع",
+                "تسجيل دخول مشبوه", "تأكيد هويتك"
+            ),
+
+            // ── Romance scam ──────────────────────────────────────────────────
+            ScamType.ROMANCE_SCAM to listOf(
+                "send me money", "wire me the money", "I need money urgently",
+                "stranded abroad", "stuck overseas", "medical emergency abroad",
+                "customs release fee", "visa problem", "I'll pay you back",
+                "military deployment", "army base", "peacekeeping mission",
+                "let me teach you to invest", "my uncle is a broker",
+                "never felt this way", "fell in love with you",
+                "I need your help urgently",
+                // Hebrew
+                "שלח לי כסף", "תקוע בחו\"ל", "צריך כסף דחוף",
+                "פריסה צבאית", "אשלם לך בחזרה", "עזרה דחופה",
+                // Russian
+                "пришли мне деньги", "застрял за границей",
+                "срочно нужны деньги", "военная командировка",
+                // Arabic
+                "أرسل لي مالاً", "عالق في الخارج",
+                "أحتاج مالاً بشكل عاجل", "نشر عسكري"
+            ),
+
+            // ── Job scam ──────────────────────────────────────────────────────
+            ScamType.JOB_SCAM to listOf(
+                "work from home", "earn from home", "no experience required",
+                "guaranteed daily earnings", "registration fee", "training fee",
+                "starter kit fee", "process payments for us",
+                "package reshipping", "mystery shopper",
+                "easy money from home", "be your own boss",
+                // Hebrew
+                "עבודה מהבית", "הכנסה יומית מובטחת", "דמי הרשמה",
+                "לא נדרש ניסיון", "עמלה קבועה",
+                // Russian
+                "работа из дома", "регистрационный взнос",
+                "ежедневный заработок гарантирован", "без опыта работы",
+                // Arabic
+                "عمل من المنزل", "رسوم تسجيل",
+                "دخل يومي مضمون", "لا يلزم خبرة"
+            ),
+
+            // ── Delivery scam ─────────────────────────────────────────────────
+            ScamType.DELIVERY_SCAM to listOf(
+                "package on hold", "customs clearance fee",
+                "pay to release your package", "delivery fee required",
+                "your parcel is held", "reschedule your delivery",
+                "pay customs duty", "failed delivery attempt",
+                "redelivery fee", "shipment held",
+                // Hebrew
+                "חבילה עצורה", "תשלום למכס", "דמי שחרור", "משלוח עצור",
+                // Russian
+                "посылка задержана", "таможенный сбор", "оплатите доставку",
+                // Arabic
+                "الطرد محتجز", "رسوم جمركية", "رسوم الاستلام"
+            ),
+
+            // ── Bank fraud ────────────────────────────────────────────────────
+            ScamType.BANK_FRAUD to listOf(
+                "unusual activity on your account", "unauthorized transaction",
+                "account has been locked", "security breach detected",
+                "confirm your account details", "fraud department",
+                "verify your card", "your card has been suspended",
+                "suspicious transaction", "your account has been",
+                // Hebrew
+                "פעילות חשודה בחשבון", "עסקה לא מאושרת",
+                "אמת פרטי כרטיס", "חשבון חסום",
+                // Russian
+                "несанкционированная операция", "счёт заблокирован",
+                "подозрительная активность", "отдел по борьбе с мошенничеством",
+                // Arabic
+                "نشاط مشبوه", "معاملة غير مصرح بها", "حسابك محظور"
+            ),
+
+            // ── Social engineering ─────────────────────────────────────────────
+            ScamType.SOCIAL_ENGINEERING to listOf(
+                "do not tell anyone", "don't tell anyone",
+                "keep this confidential", "keep this between us",
+                "move your funds", "transfer your savings",
+                "safe account", "protected account",
+                "don't contact your bank", "don't call the police",
+                "federal investigation", "under investigation",
+                "we are trying to protect you", "your identity has been stolen",
+                "move your money to safety", "we are protecting your funds",
+                // Hebrew
+                "אל תספר לאף אחד", "חשבון בטוח", "העבר כספים",
+                "שמור על סודיות", "חקירה פדרלית", "מגינים עליך",
+                // Russian
+                "никому не говорите", "безопасный счёт", "переведите деньги",
+                "держите в тайне", "федеральное расследование",
+                // Arabic
+                "لا تخبر أحداً", "حساب آمن", "حوّل أموالك",
+                "اكتم هذا الأمر", "قيد التحقيق"
+            ),
+
+            // ── Lottery / prize ───────────────────────────────────────────────
+            ScamType.LOTTERY_PRIZE to listOf(
+                "you have won", "you've won", "claim your prize",
+                "collect your winnings", "you are our winner",
+                "cash prize", "free vacation", "free cruise",
+                "you have been selected", "million dollar",
+                "prize money", "won the lottery",
+                // Hebrew
+                "זכית בפרס", "תבע את הפרס שלך", "מיליון דולר",
+                "נבחרת לקבל", "כסף פרס",
+                // Russian
+                "вы выиграли", "ваш приз", "получите выигрыш",
+                "миллион долларов", "вы стали победителем",
+                // Arabic
+                "فزت بجائزة", "استلم جائزتك", "مليون دولار", "تم اختيارك"
+            ),
+
+            // ── IRS / tax ─────────────────────────────────────────────────────
+            ScamType.IRS_SCAM to listOf(
+                "owe back taxes", "arrest warrant", "tax lien",
+                "internal revenue", "legal action will be taken",
+                "tax fraud investigation", "owe taxes",
+                "back taxes", "tax refund claim",
+                // Hebrew
+                "חוב מס", "מס הכנסה", "עיקול מס", "חוב מסים",
+                // Russian
+                "налоговый долг", "задолженность по налогам", "налоговая служба",
+                // Arabic
+                "ديون ضريبية", "مصلحة الضرائب", "مديونية ضريبية"
+            ),
+
+            // ── Social security ────────────────────────────────────────────────
+            ScamType.SOCIAL_SECURITY to listOf(
+                "social security number", "SSN suspended", "social security suspended",
+                "illegal activity on your social security",
+                "social security administration",
+                // Hebrew
+                "מספר ביטוח לאומי", "ת.ז חסומה", "ביטוח לאומי נחסם",
+                // Russian
+                "страховой номер снилс", "пенсионный фонд заблокирован",
+                // Arabic
+                "رقم الضمان الاجتماعي", "الضمان الاجتماعي معلق"
+            ),
+
+            // ── Tech support ──────────────────────────────────────────────────
+            ScamType.TECH_SUPPORT to listOf(
+                "your computer has", "computer virus", "microsoft support",
+                "remote access", "your device is infected",
+                "suspicious activity on your computer", "anydesk", "teamviewer",
+                "malware detected", "tech support", "apple support",
+                // Hebrew
+                "המחשב שלך נגוע", "גישה מרחוק", "תמיכה טכנית",
+                // Russian
+                "ваш компьютер взломан", "удалённый доступ", "техподдержка",
+                // Arabic
+                "جهازك مخترق", "وصول عن بعد", "دعم فني"
+            )
+        )
     }
 
     /**
@@ -512,6 +781,81 @@ class ScamPatternDetector() {
             scamType = ScamType.UNKNOWN,
             confidence = 0f,
             reason = "No scam patterns detected"
+        )
+    }
+
+    /**
+     * Analyses a text message (WhatsApp / Telegram / Messenger) for scam patterns.
+     *
+     * Uses [MESSAGE_PATTERNS] — phrase-only entries that are highly specific to scam
+     * scripts — and [CRITICAL_PHRASES] which trigger on a single match alone.
+     * Requires [MIN_MESSAGE_PHRASE_MATCHES] matches before scoring begins, so generic
+     * crypto/finance discussion does not trigger false positives.
+     */
+    fun analyzeMessage(text: String): DetectionResult {
+        val lowerText = text.lowercase()
+
+        // Critical phrase check — one match is enough (virtually never legit).
+        val criticalMatch = CRITICAL_PHRASES.firstOrNull { containsWord(lowerText, it) }
+        if (criticalMatch != null) {
+            return DetectionResult(
+                isScam = true,
+                scamType = ScamType.INVESTMENT_SCAM,
+                confidence = CRITICAL_PHRASE_CONFIDENCE,
+                reason = "Critical scam phrase detected: \"$criticalMatch\"",
+                keywords = listOf(criticalMatch)
+            )
+        }
+
+        // Boost signals (same as call detection — provide score boost when present alongside
+        // phrase matches, but cannot trigger a result on their own).
+        val hasUrgency  = URGENCY_KEYWORDS.any  { containsWord(lowerText, it) }
+        val hasThreat   = THREAT_KEYWORDS.any   { containsWord(lowerText, it) }
+        val hasPayment  = PAYMENT_KEYWORDS.any  { containsWord(lowerText, it) }
+        val hasInfo     = INFO_REQUEST_KEYWORDS.any { containsWord(lowerText, it) }
+        val hasSecrecy  = SECRECY_KEYWORDS.any  { containsWord(lowerText, it) }
+
+        var bestType: ScamType = ScamType.UNKNOWN
+        var bestConfidence = 0f
+        var bestKeywords: List<String> = emptyList()
+
+        for ((scamType, phrases) in MESSAGE_PATTERNS) {
+            val matched = phrases.filter { containsWord(lowerText, it) }
+            if (matched.size < MIN_MESSAGE_PHRASE_MATCHES) continue
+
+            val phraseScore   = (matched.size * MESSAGE_CONFIDENCE_PER_PHRASE).coerceAtMost(0.75f)
+            val urgencyBoost  = if (hasUrgency)  0.10f else 0f
+            val threatBoost   = if (hasThreat)   0.12f else 0f
+            val paymentBoost  = if (hasPayment)  0.10f else 0f
+            val infoBoost     = if (hasInfo)     0.08f else 0f
+            val secrecyBoost  = if (hasSecrecy)  0.18f else 0f
+
+            val confidence = (phraseScore + urgencyBoost + threatBoost + paymentBoost +
+                    infoBoost + secrecyBoost).coerceAtMost(1.0f)
+
+            if (confidence > bestConfidence) {
+                bestConfidence = confidence
+                bestType = scamType
+                bestKeywords = matched
+            }
+        }
+
+        if (bestConfidence >= MESSAGE_THRESHOLD) {
+            Log.w(TAG, "Scam message detected: $bestType (confidence=$bestConfidence)")
+            return DetectionResult(
+                isScam = true,
+                scamType = bestType,
+                confidence = bestConfidence,
+                reason = "Scam message — matched: ${bestKeywords.take(3).joinToString(", ")}",
+                keywords = bestKeywords
+            )
+        }
+
+        return DetectionResult(
+            isScam = false,
+            scamType = ScamType.UNKNOWN,
+            confidence = bestConfidence,
+            reason = "No scam message patterns detected"
         )
     }
 

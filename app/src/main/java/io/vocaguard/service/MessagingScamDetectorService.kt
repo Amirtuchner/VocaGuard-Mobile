@@ -42,7 +42,7 @@ class MessagingScamDetectorService : NotificationListenerService() {
          * (every incoming WhatsApp/Telegram notification), so we apply a stricter floor to
          * prevent low-confidence ensemble results from causing false-positive alerts.
          */
-        private const val MIN_MESSAGE_CONFIDENCE = 0.70f
+        private const val MIN_MESSAGE_CONFIDENCE = 0.65f
 
         /**
          * Minimum message text length to bother analysing. Very short messages (greetings,
@@ -168,7 +168,8 @@ class MessagingScamDetectorService : NotificationListenerService() {
         val text = extractText(sbn.notification) ?: return
         if (text.length < MIN_TEXT_LENGTH) return
 
-        val result = detector.analyzeText(text)
+        val result = detector.analyzeMessage(text)
+
         // Require isScam AND a confidence above the message-scanning floor.
         // The ensemble threshold (user sensitivity) may be as low as 0.40; for messages we
         // enforce a stricter minimum to avoid false-positive alerts on normal chat.

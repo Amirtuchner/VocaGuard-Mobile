@@ -111,6 +111,23 @@ class HybridScamDetector(private val context: Context) {
         return parts.joinToString("; ")
     }
 
+    /**
+     * Analyses a text message (WhatsApp / Telegram / Messenger).
+     *
+     * Uses [ScamPatternDetector.analyzeMessage] which only fires on high-specificity,
+     * multi-word phrases — making false positives from casual chat near-impossible.
+     * The ML classifier is used as a secondary guard only when the rule engine does
+     * not fire, to catch novel scam language not yet in the phrase list.
+     */
+    fun analyzeMessage(text: String): DetectionResult {
+        // Messages use rule-based phrase matching ONLY.
+        // The TFLite model is trained on phone-call transcripts and produces near-100%
+        // false-positive rates on normal chat — it is intentionally excluded here.
+        val ruleResult = ruleBasedDetector.analyzeMessage(text)
+        Log.d(TAG, "Message rule result: isScam=${ruleResult.isScam}, confidence=${ruleResult.confidence}, type=${ruleResult.scamType}")
+        return ruleResult
+    }
+
     fun getDetectorInfo(): String {
         val mlInfo = if (mlClassifier.isModelAvailable()) {
             "ML enabled (${mlClassifier.getModelInfo()})"
