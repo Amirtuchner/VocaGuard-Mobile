@@ -40,6 +40,7 @@ jobs:
 
       - name: Upload test results
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: test-results
@@ -47,6 +48,7 @@ jobs:
 
       - name: Upload lint results
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: lint-results
@@ -81,6 +83,7 @@ jobs:
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload debug APK
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: debug-apk
@@ -131,12 +134,14 @@ jobs:
         run: ./gradlew assembleRelease --stacktrace
 
       - name: Upload release APK
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: release-apk
           path: app/build/outputs/apk/release/app-release.apk
 
       - name: Upload ProGuard mapping
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: proguard-mapping
