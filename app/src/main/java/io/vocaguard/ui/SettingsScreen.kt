@@ -680,10 +680,6 @@ fun SettingsTab(
                         fontWeight = FontWeight.Bold
                     )
                     OutlinedButton(
-                        onClick = { permissionsManager.openAccessibilitySettings() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("Configure Accessibility Service") }
-                    OutlinedButton(
                         onClick = { permissionsManager.openOverlaySettings() },
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("Configure Overlay Permission") }

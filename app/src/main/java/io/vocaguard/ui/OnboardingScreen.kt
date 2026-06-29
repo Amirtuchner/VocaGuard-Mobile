@@ -26,7 +26,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-private const val TOTAL_STEPS = 5  // Welcome · Accessibility · Call Screening · Registration · Forwarding
+private const val TOTAL_STEPS = 4  // Welcome · Call Screening · Registration · Forwarding
 
 /**
  * Full-screen setup wizard shown once after install.
@@ -43,12 +43,10 @@ fun OnboardingScreen(
 
     // Re-check system permission states whenever the user returns from system settings.
     val lifecycleOwner = LocalLifecycleOwner.current
-    var accessibilityOk  by remember { mutableStateOf(permissionsManager.isAccessibilityEnabled()) }
     var callScreeningOk  by remember { mutableStateOf(permissionsManager.isCallScreeningEnabled()) }
     DisposableEffect(lifecycleOwner) {
         val obs = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                accessibilityOk = permissionsManager.isAccessibilityEnabled()
                 callScreeningOk = permissionsManager.isCallScreeningEnabled()
             }
         }
@@ -100,15 +98,11 @@ fun OnboardingScreen(
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
             when (step) {
                 0 -> WelcomeStep()
-                1 -> AccessibilityStep(
-                    isDone = accessibilityOk,
-                    onOpen  = { permissionsManager.openAccessibilitySettings() }
-                )
-                2 -> CallScreeningStep(
+                1 -> CallScreeningStep(
                     isDone   = callScreeningOk,
                     onEnable = { callScreeningLauncher.launch(permissionsManager.createCallScreeningIntent()) }
                 )
-                3 -> RegistrationStep(
+                2 -> RegistrationStep(
                     phoneInput    = serverPhoneInput,
                     onPhoneChange = viewModel::updateServerPhoneInput,
                     onRegister    = viewModel::registerWithServer,
@@ -116,7 +110,7 @@ fun OnboardingScreen(
                     isRegistered  = serverRegistered,
                     status        = serverRegStatus
                 )
-                4 -> CallForwardingStep(
+                3 -> CallForwardingStep(
                     activationCode = activationCode,
                     isEnabled      = callForwardingEnabled,
                     onDial         = {
@@ -168,18 +162,6 @@ private fun WelcomeStep() {
         icon        = Icons.Default.Shield,
         title       = "Welcome to VocaGuard",
         description = "Let's get you set up in 4 quick steps so VocaGuard can protect you from scam calls."
-    )
-}
-
-@Composable
-private fun AccessibilityStep(isDone: Boolean, onOpen: () -> Unit) {
-    StepLayout(
-        icon        = Icons.Default.Accessibility,
-        title       = "Enable Accessibility Service",
-        description = "VocaGuard needs Accessibility access to detect active calls and show scam alerts on screen.",
-        isDone      = isDone,
-        actionLabel = "Open Settings",
-        onAction    = onOpen
     )
 }
 

@@ -5,6 +5,14 @@
 -renamesourcefileattribute SourceFile
 
 # ============================================================
+# Linphone SDK — keep all classes and interfaces so R8 does not
+# strip CoreListenerStub callbacks used by VocaGuardSipManager
+# ============================================================
+-keep class org.linphone.** { *; }
+-keep interface org.linphone.** { *; }
+-dontwarn org.linphone.**
+
+# ============================================================
 # LiteRT (TensorFlow Lite)
 # ============================================================
 -keep class com.google.ai.edge.litert.** { *; }

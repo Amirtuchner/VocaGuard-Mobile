@@ -35,7 +35,6 @@ class PermissionsManagerTest {
             "Notifications",
             "Contacts",
             "Call Screening",
-            "Accessibility",
             "Draw Overlay",
             "Notification Access"
         )
@@ -48,7 +47,7 @@ class PermissionsManagerTest {
     @Test
     fun `checkAllPermissions returns exactly 10 entries`() {
         val permissions = manager.checkAllPermissions()
-        assertTrue("Expected 10 permission entries, got ${permissions.size}", permissions.size == 10)
+        assertTrue("Expected 9 permission entries, got ${permissions.size}", permissions.size == 9)
     }
 
     @Test

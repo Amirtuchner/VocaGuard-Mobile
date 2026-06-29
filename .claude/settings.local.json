@@ -228,7 +228,11 @@
       "Bash(/c/Users/userX/AppData/Local/Android/Sdk/platform-tools/adb logcat:*)",
       "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew assembleDebug)",
       "Bash(\"/c/Users/userX/AppData/Local/Android/Sdk/platform-tools/adb\" install:*)",
-      "Bash(\"/c/Users/userX/AppData/Local/Android/Sdk/platform-tools/adb\" uninstall:*)"
+      "Bash(\"/c/Users/userX/AppData/Local/Android/Sdk/platform-tools/adb\" uninstall:*)",
+      "WebFetch(domain:download.linphone.org)",
+      "WebFetch(domain:gitlab.linphone.org)",
+      "WebFetch(domain:doc.didww.com)",
+      "WebFetch(domain:api.didww.com)"
     ]
   }
 }

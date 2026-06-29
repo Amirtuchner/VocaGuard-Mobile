@@ -2,15 +2,12 @@ package io.vocaguard.ui
 
 import android.Manifest
 import android.app.role.RoleManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Bundle
 import android.provider.Settings
 import androidx.core.content.ContextCompat
-import io.vocaguard.service.CallAudioAccessibilityService
 import io.vocaguard.service.MessagingScamDetectorService
 
 class PermissionsManager(private val context: Context) {
@@ -36,7 +33,6 @@ class PermissionsManager(private val context: Context) {
         permissions["Notifications"] = hasPermission(Manifest.permission.POST_NOTIFICATIONS)
         permissions["Contacts"] = hasPermission(Manifest.permission.READ_CONTACTS)
         permissions["Call Screening"] = isCallScreeningEnabled()
-        permissions["Accessibility"] = isAccessibilityEnabled()
         permissions["Draw Overlay"] = Settings.canDrawOverlays(context)
         permissions["Notification Access"] = hasNotificationListenerAccess()
 
@@ -67,44 +63,6 @@ class PermissionsManager(private val context: Context) {
     fun isCallScreeningEnabled(): Boolean {
         val roleManager = context.getSystemService(RoleManager::class.java)
         return roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
-    }
-
-    fun isAccessibilityEnabled(): Boolean {
-        val accessibilityEnabled = Settings.Secure.getInt(
-            context.contentResolver,
-            Settings.Secure.ACCESSIBILITY_ENABLED,
-            0
-        )
-
-        if (accessibilityEnabled == 1) {
-            val services = Settings.Secure.getString(
-                context.contentResolver,
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            )
-            return services?.contains(context.packageName) == true
-        }
-        return false
-    }
-
-    fun openAccessibilitySettings() {
-        // Try to deep-link directly to VocaGuard's accessibility service settings page.
-        // Falls back to the root Accessibility settings if the deep-link isn't supported.
-        try {
-            val componentName = ComponentName(context, CallAudioAccessibilityService::class.java)
-            val args = Bundle().apply {
-                putString(":settings:fragment_args_key", componentName.flattenToString())
-            }
-            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-                putExtra(":settings:show_fragment_args", args)
-                putExtra(":settings:fragment", "com.android.settings.accessibility.AccessibilityServicePreferenceFragment")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            context.startActivity(intent)
-        }
     }
 
     fun openCallScreeningSettings() {

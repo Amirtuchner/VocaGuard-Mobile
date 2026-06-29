@@ -1,8 +1,10 @@
 package io.vocaguard.service
 
 import android.app.Notification
+import android.app.RemoteInput
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -191,5 +193,39 @@ class MessagingScamDetectorService : NotificationListenerService() {
 
         // Overlay warning on top of whatever app is in the foreground.
         overlayManager.show(result.scamType, result.confidence)
+
+        // Auto-reply in the chat so the user sees the warning inline.
+        sendReplyWarning(sbn)
+    }
+
+    /**
+     * Sends an auto-reply to the conversation using the notification's RemoteInput reply action.
+     * The warning appears as a new message in the chat thread, sent from the user's account.
+     */
+    private fun sendReplyWarning(sbn: StatusBarNotification) {
+        val replyAction = sbn.notification.actions?.firstOrNull { action ->
+            action.remoteInputs?.isNotEmpty() == true
+        } ?: run {
+            Log.d(TAG, "No RemoteInput reply action found for ${sbn.packageName} — skipping auto-reply")
+            return
+        }
+
+        val remoteInput = replyAction.remoteInputs?.firstOrNull() ?: return
+
+        val warningText = "⚠️ A scam message was detected — do not continue with this. \"VocaGuard\""
+
+        val fillInIntent = Intent()
+        RemoteInput.addResultsToIntent(
+            arrayOf(remoteInput),
+            fillInIntent,
+            Bundle().apply { putCharSequence(remoteInput.resultKey, warningText) }
+        )
+
+        try {
+            replyAction.actionIntent.send(this, 0, fillInIntent)
+            Log.d(TAG, "Auto-reply warning sent to ${sbn.packageName}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send auto-reply warning to ${sbn.packageName}", e)
+        }
     }
 }

@@ -68,7 +68,6 @@ fun HomeTab(
         permissions = permissionsManager.checkAllPermissions()
         val sysPerms = mutableListOf<String>()
         if (permissions["Draw Overlay"] == false) sysPerms.add("Draw Overlay")
-        if (permissions["Accessibility"] == false) sysPerms.add("Accessibility")
         if (permissions["Call Screening"] == false) sysPerms.add("Call Screening")
         if (sysPerms.isNotEmpty()) {
             pendingSystemPerms = sysPerms
@@ -103,7 +102,6 @@ fun HomeTab(
                     showSystemGuide = false
                     when (currentPerm) {
                         "Draw Overlay"        -> permissionsManager.openOverlaySettings()
-                        "Accessibility"       -> permissionsManager.openAccessibilitySettings()
                         "Notification Access" -> permissionsManager.openNotificationListenerSettings()
                     }
                     val remaining = pendingSystemPerms.drop(1)
@@ -274,7 +272,6 @@ fun HomeTab(
                         onClick = if (granted) null else ({
                             when (name) {
                                 "Draw Overlay"       -> permissionsManager.openOverlaySettings()
-                                "Accessibility"      -> permissionsManager.openAccessibilitySettings()
                                 "Call Screening"     -> permissionsManager.openCallScreeningSettings()
                                 "Notification Access"-> permissionsManager.openNotificationListenerSettings()
                                 else                 -> permissionsManager.openAppSettings()
@@ -306,7 +303,6 @@ fun HomeTab(
                                 val sysPerms = mutableListOf<String>()
                                 if (permissions["Draw Overlay"] == false) sysPerms.add("Draw Overlay")
                                 if (permissions["Call Screening"] == false) sysPerms.add("Call Screening")
-                                if (permissions["Accessibility"] == false) sysPerms.add("Accessibility")
                                 if (permissions["Notification Access"] == false) sysPerms.add("Notification Access")
                                 if (sysPerms.isNotEmpty()) {
                                     pendingSystemPerms = sysPerms
@@ -538,7 +534,6 @@ private val permissionDefs = listOf(
     PermissionDef("Notifications",     "Notifications",        "Sends instant scam alerts to your screen",           Icons.Default.Notifications),
     PermissionDef("Call Screening",    "Call Screening",       "Screens calls before your phone rings",              Icons.Default.Shield),
     PermissionDef("Draw Overlay",      "Screen Overlay",       "Shows a warning banner during scam calls",           Icons.Default.Layers),
-    PermissionDef("Accessibility",     "Accessibility",        "Reads on-screen call info for real-time detection",  Icons.Default.Accessibility, optional = true),
     PermissionDef("Notification Access","Message Scanning",   "Detects scams in WhatsApp & Telegram messages",      Icons.Default.Notifications, optional = true),
 )
 
@@ -610,8 +605,6 @@ fun PermissionItem(name: String, granted: Boolean, onClick: (() -> Unit)? = null
 private val systemPermDescriptions = mapOf(
     "Draw Overlay" to "VocaGuard needs to draw over other apps to show scam alerts during calls. " +
             "Please enable \"Display over other apps\" for VocaGuard on the next screen.",
-    "Accessibility" to "VocaGuard uses the Accessibility Service to read on-screen call content for real-time detection. " +
-            "Please enable the VocaGuard service on the next screen.",
     "Call Screening" to "VocaGuard needs to be set as the default caller ID & spam app to screen incoming calls. " +
             "Please select VocaGuard on the next screen.",
     "Notification Access" to "VocaGuard needs Notification Access to detect scams in WhatsApp and Telegram messages. " +
