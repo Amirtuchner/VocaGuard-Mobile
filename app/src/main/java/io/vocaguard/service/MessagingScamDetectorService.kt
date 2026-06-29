@@ -19,9 +19,8 @@ import io.vocaguard.ui.ScamOverlayManager
  * Monitors WhatsApp and Telegram notifications for scam message patterns.
  *
  * When a notification from a watched app arrives, the message text is extracted
- * and analysed by [HybridScamDetector]. On a positive detection the notification
- * is cancelled (so the user is not prompted to open or reply to it), the existing
- * alert pipeline is fired (sound / vibration / TTS / family alert), and an overlay
+ * and analysed by [HybridScamDetector]. On a positive detection the existing
+ * alert pipeline is fired (sound / vibration / TTS / family alert) and an overlay
  * warning is shown if SYSTEM_ALERT_WINDOW is granted.
  *
  * Limitation: notification text is only available when the user has "Show
@@ -180,9 +179,6 @@ class MessagingScamDetectorService : NotificationListenerService() {
             "Scam message detected from ${sbn.packageName}: " +
                 "${result.scamType} (confidence=${result.confidence})"
         )
-
-        // Dismiss the notification so the user is not prompted to open it.
-        cancelNotification(sbn.key)
 
         // Fire the existing alert pipeline (sound, vibration, TTS, VocaGuard
         // notification, family alert).
