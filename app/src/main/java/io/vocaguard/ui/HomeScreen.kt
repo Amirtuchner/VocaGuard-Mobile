@@ -289,7 +289,6 @@ fun HomeTab(
                                 permissions.getOrDefault(
                                     when (it) {
                                         android.Manifest.permission.READ_PHONE_STATE -> "Phone State"
-                                        android.Manifest.permission.READ_CALL_LOG -> "Call Log"
                                         android.Manifest.permission.ANSWER_PHONE_CALLS -> "Answer Calls"
                                         android.Manifest.permission.RECORD_AUDIO -> "Record Audio"
                                         android.Manifest.permission.POST_NOTIFICATIONS -> "Notifications"
@@ -528,7 +527,6 @@ private data class PermissionDef(
 
 private val permissionDefs = listOf(
     PermissionDef("Phone State",       "Phone Access",         "Detects incoming and outgoing calls",                Icons.Default.Phone),
-    PermissionDef("Call Log",          "Call History",         "Saves analyzed calls to your history",               Icons.Default.History),
     PermissionDef("Answer Calls",      "Manage Calls",         "Can silence or reject detected scam calls",          Icons.Default.Call),
     PermissionDef("Record Audio",      "Microphone",           "Analyzes call audio for scam patterns",              Icons.Default.Mic),
     PermissionDef("Notifications",     "Notifications",        "Sends instant scam alerts to your screen",           Icons.Default.Notifications),

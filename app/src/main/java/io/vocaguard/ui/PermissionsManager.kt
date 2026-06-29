@@ -15,7 +15,6 @@ class PermissionsManager(private val context: Context) {
     companion object {
         val REQUIRED_PERMISSIONS = arrayOf(
             Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.READ_CALL_LOG,
             Manifest.permission.ANSWER_PHONE_CALLS,
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.POST_NOTIFICATIONS,
@@ -27,7 +26,6 @@ class PermissionsManager(private val context: Context) {
         val permissions = mutableMapOf<String, Boolean>()
 
         permissions["Phone State"] = hasPermission(Manifest.permission.READ_PHONE_STATE)
-        permissions["Call Log"] = hasPermission(Manifest.permission.READ_CALL_LOG)
         permissions["Answer Calls"] = hasPermission(Manifest.permission.ANSWER_PHONE_CALLS)
         permissions["Record Audio"] = hasPermission(Manifest.permission.RECORD_AUDIO)
         permissions["Notifications"] = hasPermission(Manifest.permission.POST_NOTIFICATIONS)

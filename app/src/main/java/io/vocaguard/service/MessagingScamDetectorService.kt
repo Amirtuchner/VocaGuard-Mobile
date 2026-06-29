@@ -59,6 +59,10 @@ class MessagingScamDetectorService : NotificationListenerService() {
             "org.telegram.messenger.beta",
             "com.facebook.orca",              // Facebook Messenger
             "com.facebook.mlite",             // Messenger Lite
+            "com.google.android.apps.messaging", // Google Messages (SMS)
+            "com.samsung.android.messaging",     // Samsung Messages (SMS)
+            "com.android.mms",                   // Stock Android MMS
+            "com.android.messaging",             // AOSP Messaging
         )
 
         /**

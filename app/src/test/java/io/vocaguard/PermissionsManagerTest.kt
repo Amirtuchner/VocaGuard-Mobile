@@ -29,7 +29,6 @@ class PermissionsManagerTest {
 
         val expectedKeys = setOf(
             "Phone State",
-            "Call Log",
             "Answer Calls",
             "Record Audio",
             "Notifications",
@@ -47,7 +46,7 @@ class PermissionsManagerTest {
     @Test
     fun `checkAllPermissions returns exactly 10 entries`() {
         val permissions = manager.checkAllPermissions()
-        assertTrue("Expected 9 permission entries, got ${permissions.size}", permissions.size == 9)
+        assertTrue("Expected 8 permission entries, got ${permissions.size}", permissions.size == 8)
     }
 
     @Test
@@ -65,7 +64,6 @@ class PermissionsManagerTest {
         assertTrue(required.contains(android.Manifest.permission.READ_PHONE_STATE))
         assertTrue(required.contains(android.Manifest.permission.RECORD_AUDIO))
         assertTrue(required.contains(android.Manifest.permission.POST_NOTIFICATIONS))
-        assertTrue(required.contains(android.Manifest.permission.READ_CALL_LOG))
         assertTrue(required.contains(android.Manifest.permission.ANSWER_PHONE_CALLS))
     }
 
