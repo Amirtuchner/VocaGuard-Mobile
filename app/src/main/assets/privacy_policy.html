@@ -40,8 +40,11 @@ immediately after analysis.</p>
   as suspicious is stored locally on your device in an encrypted database. The 50 most
   recent transcripts are kept; older ones are deleted automatically. Transcripts are
   never uploaded to our servers.</li>
-  <li><strong>Caller phone numbers</strong> — Checked against a local scam number
-  database and optionally against the NumVerify API (if you configure an API key).</li>
+  <li><strong>Caller phone numbers</strong> — The phone number of incoming callers
+  flagged as potential scams is stored locally on your device as part of the call
+  history. This is the <em>caller's</em> number, never your own. Numbers are also
+  checked against a local scam database and optionally against the NumVerify API
+  (if you configure an API key).</li>
   <li><strong>FCM device token</strong> — A Firebase Cloud Messaging token is registered
   with the VocaGuard server to deliver real-time scam alerts to your device. The token
   identifies your device to the notification service but contains no personal information.</li>
