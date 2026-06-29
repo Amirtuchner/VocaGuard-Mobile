@@ -17,7 +17,7 @@
 <body>
 
 <h1>VocaGuard Privacy Policy</h1>
-<p><em>Last updated: 2026-06-21</em></p>
+<p><em>Last updated: 2026-06-29</em></p>
 
 <p>VocaGuard ("we", "our", or "the app") is a real-time scam call detection service.
 This policy explains what data we collect, how we use it, and your rights.</p>
@@ -69,7 +69,7 @@ We do not use advertising networks or profiling services.</p>
 
 <h2>4. Permissions Used</h2>
 <ul>
-  <li><strong>READ_PHONE_STATE, READ_CALL_LOG, ANSWER_PHONE_CALLS</strong> — Identify
+  <li><strong>READ_PHONE_STATE, ANSWER_PHONE_CALLS</strong> — Identify
   the caller and detect call state changes.</li>
   <li><strong>RECORD_AUDIO</strong> — Used for on-device speech recognition as a
   supplementary detection method on devices where call forwarding is not active.</li>
@@ -78,8 +78,11 @@ We do not use advertising networks or profiling services.</p>
   <li><strong>POST_NOTIFICATIONS</strong> — Display real-time scam alert notifications.</li>
   <li><strong>INTERNET</strong> — Communicate with the VocaGuard server, deliver
   FCM notifications, and perform optional NumVerify lookups.</li>
-  <li><strong>ACCESSIBILITY SERVICE</strong> — Detect when a call window is active
-  on the screen. Does not read content from other apps.</li>
+  <li><strong>NOTIFICATION LISTENER SERVICE</strong> — Read notification content from
+  WhatsApp, Telegram, Facebook Messenger, and SMS apps to detect scam messages in
+  real time. Only the text of incoming messages from unknown senders is analysed;
+  messages from saved contacts are never scanned. No message content is stored or
+  transmitted to our servers.</li>
   <li><strong>SYSTEM_ALERT_WINDOW</strong> (optional) — Display an on-screen warning
   overlay during a detected scam call. Requires manual grant.</li>
   <li><strong>RECEIVE_BOOT_COMPLETED</strong> — Restart background services after
