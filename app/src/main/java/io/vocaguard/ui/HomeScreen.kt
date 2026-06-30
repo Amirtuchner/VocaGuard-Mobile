@@ -39,13 +39,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.vocaguard.R
 import io.vocaguard.data.DetectionSettings
-import io.vocaguard.service.ServerDetectionManager
 import io.vocaguard.ui.theme.NavyDark
 
 @Composable
 fun HomeTab(
     permissionsManager: PermissionsManager,
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = viewModel(),
+    settingsViewModel: SettingsViewModel = viewModel()
 ) {
     var permissions by remember { mutableStateOf(permissionsManager.checkAllPermissions()) }
     var refreshKey by remember { mutableStateOf(0) }
@@ -128,9 +128,8 @@ fun HomeTab(
     val callForwardingEnabled = remember(refreshKey) {
         DetectionSettings.getInstance(context).callForwardingEnabled
     }
-    val forwardingCode = remember(refreshKey) {
-        ServerDetectionManager.getActivationCode().ifEmpty { "*21*+97233741493#" }
-    }
+    val serverActivationCode by settingsViewModel.serverActivationCode.collectAsStateWithLifecycle()
+    val forwardingCode = serverActivationCode.ifEmpty { "*21*+97233741493#" }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
