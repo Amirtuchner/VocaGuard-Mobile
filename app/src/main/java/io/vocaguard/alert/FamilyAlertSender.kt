@@ -12,7 +12,6 @@ import io.vocaguard.data.ScamType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -54,7 +53,7 @@ class FamilyAlertSender(private val context: Context) {
         val scamLabel = scamType.displayName()
 
         contacts.forEach { contact ->
-            sendSms(contact, senderName, scamLabel, confidencePct, timeStr, scamType, confidence, customMessage)
+            sendSms(contact, senderName, scamLabel, confidencePct, timeStr, customMessage)
         }
     }
 
@@ -66,21 +65,13 @@ class FamilyAlertSender(private val context: Context) {
         scamLabel: String,
         confidencePct: Int,
         timeStr: String,
-        scamType: ScamType,
-        confidence: Float,
         customMessage: String = ""
     ) = withContext(Dispatchers.IO) {
         try {
-            val deepLink = buildDeepLink(senderName, scamType, confidence)
-            val message = buildString {
-                if (customMessage.isNotBlank()) {
-                    append("[VocaGuard] $customMessage\n\n")
-                    append("Tap to view in VocaGuard:\n$deepLink")
-                } else {
-                    append("[VocaGuard] SCAM ALERT\n")
-                    append("$senderName's phone detected a $scamLabel at $timeStr ($confidencePct% confidence).\n\n")
-                    append("Tap to view in VocaGuard:\n$deepLink")
-                }
+            val message = if (customMessage.isNotBlank()) {
+                "[VocaGuard] $customMessage"
+            } else {
+                "[VocaGuard] SCAM ALERT\n$senderName's phone detected a $scamLabel at $timeStr ($confidencePct% confidence)."
             }
 
             @Suppress("DEPRECATION")
@@ -167,21 +158,6 @@ class FamilyAlertSender(private val context: Context) {
                 Log.w(TAG, "TTS unavailable for call alert")
             }
         }
-    }
-
-    // ── Deep link builder ─────────────────────────────────────────────────────
-
-    private fun buildDeepLink(
-        senderName: String,
-        scamType: ScamType,
-        confidence: Float
-    ): String {
-        fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
-        return "vocaguard://alert" +
-                "?name=${enc(senderName)}" +
-                "&type=${enc(scamType.name)}" +
-                "&conf=${(confidence * 100).toInt()}" +
-                "&ts=${System.currentTimeMillis()}"
     }
 
     private fun ScamType.displayName(): String = when (this) {
