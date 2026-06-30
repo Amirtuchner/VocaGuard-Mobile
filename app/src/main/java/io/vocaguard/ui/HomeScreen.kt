@@ -129,7 +129,7 @@ fun HomeTab(
         DetectionSettings.getInstance(context).callForwardingEnabled
     }
     val forwardingCode = remember(refreshKey) {
-        ServerDetectionManager(context).getActivationCode().ifEmpty { "*21*+97233741493#" }
+        ServerDetectionManager.getActivationCode().ifEmpty { "*21*+97233741493#" }
     }
 
     LazyColumn(
