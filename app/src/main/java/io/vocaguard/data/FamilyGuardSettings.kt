@@ -9,9 +9,8 @@ import org.json.JSONObject
  * Persists all Family Guard Mode settings.
  *
  * **Senior's device (monitored side):**
- *   - [isEnabled] — activates SMS + webhook alerts to contacts on scam detection
+ *   - [isEnabled] — activates SMS alerts to contacts on scam detection
  *   - [contacts] — list of family members / caregivers to notify
- *   - [webhookUrl] — optional HTTPS endpoint for push services (ntfy.sh, Pushover, IFTTT…)
  *   - [seniorModeEnabled] — activates the large-print, voice-guided UI
  *   - [seniorName] — the name shown in outgoing alert messages (e.g. "Grandma")
  *
@@ -26,7 +25,7 @@ class FamilyGuardSettings private constructor(context: Context) {
 
     // ── Feature toggles ───────────────────────────────────────────────────────
 
-    /** Whether to send SMS + webhook alerts to [contacts] when a scam is detected. */
+    /** Whether to send SMS alerts to [contacts] when a scam is detected. */
     var isEnabled: Boolean
         get() = prefs.getBoolean(KEY_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_ENABLED, value).apply()
@@ -40,11 +39,6 @@ class FamilyGuardSettings private constructor(context: Context) {
     var seniorName: String
         get() = prefs.getString(KEY_SENIOR_NAME, "") ?: ""
         set(value) = prefs.edit().putString(KEY_SENIOR_NAME, value.trim()).apply()
-
-    /** Optional HTTPS webhook URL for forwarding alerts to push notification services. */
-    var webhookUrl: String
-        get() = prefs.getString(KEY_WEBHOOK_URL, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_WEBHOOK_URL, value.trim()).apply()
 
     /**
      * Whether to make an outgoing phone call to the primary contact after a scam call ends.
@@ -96,7 +90,6 @@ class FamilyGuardSettings private constructor(context: Context) {
         private const val KEY_ENABLED = "enabled"
         private const val KEY_SENIOR_MODE = "senior_mode"
         private const val KEY_SENIOR_NAME = "senior_name"
-        private const val KEY_WEBHOOK_URL = "webhook_url"
         private const val KEY_CONTACTS = "contacts"
         private const val KEY_CALL_ALERT = "call_alert_enabled"
 

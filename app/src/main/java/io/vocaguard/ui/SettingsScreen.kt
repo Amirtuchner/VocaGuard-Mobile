@@ -69,7 +69,6 @@ fun SettingsTab(
     val seniorModeEnabled   by viewModel.seniorModeEnabled.collectAsStateWithLifecycle()
     val seniorName          by viewModel.seniorName.collectAsStateWithLifecycle()
     val callAlertEnabled    by viewModel.callAlertEnabled.collectAsStateWithLifecycle()
-    val familyWebhookUrl    by viewModel.familyWebhookUrl.collectAsStateWithLifecycle()
     val familyContacts      by viewModel.familyContacts.collectAsStateWithLifecycle()
 
     // Local slider state for smooth drag without flooding the ViewModel.
@@ -82,7 +81,6 @@ fun SettingsTab(
     var advancedExpanded by remember { mutableStateOf(false) }
 
     // Family Guard local state
-    var familyWebhookInput by remember(familyWebhookUrl) { mutableStateOf(familyWebhookUrl) }
     var newContactName by remember { mutableStateOf("") }
     var newContactPhone by remember { mutableStateOf("") }
     var seniorNameInput by remember(seniorName) { mutableStateOf(seniorName) }
@@ -137,16 +135,22 @@ fun SettingsTab(
             )
         }
 
+        // ── Senior Mode card ───────────────────────────────────────────────────
+        item {
+            SeniorModeCard(
+                enabled  = seniorModeEnabled,
+                onEnabledChange = { enabled ->
+                    viewModel.setSeniorModeEnabled(enabled)
+                    onSeniorModeChanged(enabled)
+                }
+            )
+        }
+
         // ── Family Guard Mode card ─────────────────────────────────────────────
         item {
             FamilyGuardCard(
                 enabled          = familyGuardEnabled,
                 onEnabledChange  = { viewModel.setFamilyGuardEnabled(it) },
-                seniorMode       = seniorModeEnabled,
-                onSeniorMode     = { enabled ->
-                    viewModel.setSeniorModeEnabled(enabled)
-                    onSeniorModeChanged(enabled)
-                },
                 seniorNameInput  = seniorNameInput,
                 onSeniorNameChange = { seniorNameInput = it },
                 onSeniorNameSave = { viewModel.saveSeniorName() },
@@ -163,12 +167,6 @@ fun SettingsTab(
                     newContactPhone = ""
                 },
                 onRemoveContact  = { viewModel.removeFamilyContact(it) },
-                webhookUrl       = familyWebhookInput,
-                onWebhookChange  = { familyWebhookInput = it },
-                onWebhookSave    = {
-                    viewModel.updateFamilyWebhookUrl(familyWebhookInput)
-                    viewModel.saveFamilyWebhookUrl()
-                },
                 onTestAlert      = { viewModel.sendTestAlert() },
                 hasSmsPermission = permissionsManager.hasSendSms(),
                 hasCallPermission = permissionsManager.hasCallPhone(),
@@ -747,6 +745,45 @@ fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
 }
 
 // ---------------------------------------------------------------------------
+// Senior Mode Card
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun SeniorModeCard(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Senior Mode",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Simplified home screen with larger text, voice guidance, and one-tap emergency access.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = onEnabledChange)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Family Guard Mode Card
 // ---------------------------------------------------------------------------
 
@@ -754,8 +791,6 @@ fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
 private fun FamilyGuardCard(
     enabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
-    seniorMode: Boolean,
-    onSeniorMode: (Boolean) -> Unit,
     seniorNameInput: String,
     onSeniorNameChange: (String) -> Unit,
     onSeniorNameSave: () -> Unit,
@@ -768,9 +803,6 @@ private fun FamilyGuardCard(
     onNewContactPhone: (String) -> Unit,
     onAddContact: () -> Unit,
     onRemoveContact: (String) -> Unit,
-    webhookUrl: String,
-    onWebhookChange: (String) -> Unit,
-    onWebhookSave: () -> Unit,
     onTestAlert: () -> Unit,
     hasSmsPermission: Boolean,
     hasCallPermission: Boolean,
@@ -843,16 +875,6 @@ private fun FamilyGuardCard(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                // ── Senior Mode toggle ─────────────────────────────────────
-                AlertToggleRow(
-                    label = "Senior Mode",
-                    description = "Large text, voice guidance, and a simplified home screen.",
-                    checked = seniorMode,
-                    onCheckedChange = onSeniorMode
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
                 // ── Name of the senior ─────────────────────────────────────
                 Text(
                     text = "Protected person's name",
@@ -899,7 +921,7 @@ private fun FamilyGuardCard(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "These people receive SMS + call alerts. The first contact gets the phone call.",
+                    text = "All contacts receive an SMS alert. Only the first contact also gets a phone call.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -912,7 +934,7 @@ private fun FamilyGuardCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    contacts.forEach { contact ->
+                    contacts.forEachIndexed { index, contact ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -924,6 +946,12 @@ private fun FamilyGuardCard(
                                     fontWeight = FontWeight.SemiBold)
                                 Text(contact.phoneNumber, style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    text = if (index == 0) "Primary — SMS + phone call" else "SMS only",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (index == 0) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                             TextButton(onClick = { onRemoveContact(contact.phoneNumber) }) {
                                 Text("Remove", color = MaterialTheme.colorScheme.error)
@@ -961,32 +989,6 @@ private fun FamilyGuardCard(
 
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider()
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // ── Webhook URL ────────────────────────────────────────────
-                Text(
-                    text = "Webhook URL (optional)",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = "Receive push notifications via ntfy.sh, Pushover, IFTTT, or a custom server.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = webhookUrl,
-                    onValueChange = onWebhookChange,
-                    label = { Text("https://…") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(onClick = onWebhookSave, modifier = Modifier.fillMaxWidth()) {
-                    Text("Save Webhook")
-                }
-
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // ── Test alert button ──────────────────────────────────────

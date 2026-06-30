@@ -6,16 +6,12 @@ import android.net.Uri
 import android.speech.tts.TextToSpeech
 import android.telephony.SmsManager
 import android.util.Log
-import io.vocaguard.BuildConfig
 import io.vocaguard.data.FamilyContact
 import io.vocaguard.data.FamilyGuardSettings
 import io.vocaguard.data.ScamType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -24,22 +20,14 @@ import java.util.Locale
 /**
  * Notifies family members / caregivers when a scam call is detected on the senior's device.
  *
- * Two channels:
- *  1. **SMS** — sent to every contact in [FamilyGuardSettings.contacts]. The message includes a
- *     `vocaguard://alert` deep-link so that caregivers who also have VocaGuard installed can tap it
- *     to import the alert directly into their [FamilyDashboard].
- *  2. **Webhook** — if [FamilyGuardSettings.webhookUrl] is set, a JSON POST is made to that URL
- *     (compatible with ntfy.sh, Pushover, IFTTT, or any custom server).
- *
- * Both channels are opt-in: SMS requires the `SEND_SMS` permission and Family Guard Mode to be
- * enabled; webhook requires a non-empty URL. Failures are logged but never crash the caller.
+ * Sends an SMS alert to every contact in [FamilyGuardSettings.contacts].
+ * Requires the `SEND_SMS` permission and Family Guard Mode to be enabled.
+ * Failures are logged but never crash the caller.
  */
 class FamilyAlertSender(private val context: Context) {
 
     companion object {
         private const val TAG = "FamilyAlertSender"
-        private const val CONNECT_TIMEOUT_MS = 10_000
-        private const val READ_TIMEOUT_MS = 10_000
     }
 
     private val settings = FamilyGuardSettings.getInstance(context)
@@ -67,11 +55,6 @@ class FamilyAlertSender(private val context: Context) {
 
         contacts.forEach { contact ->
             sendSms(contact, senderName, scamLabel, confidencePct, timeStr, scamType, confidence, customMessage)
-        }
-
-        val webhookUrl = settings.webhookUrl
-        if (webhookUrl.isNotBlank()) {
-            sendWebhook(webhookUrl, senderName, scamLabel, confidencePct, scamType, confidence, callerNumber)
         }
     }
 
@@ -114,59 +97,6 @@ class FamilyAlertSender(private val context: Context) {
             Log.e(TAG, "SEND_SMS permission denied — grant it in Settings", e)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send SMS to ${contact.name}", e)
-        }
-    }
-
-    // ── Webhook ───────────────────────────────────────────────────────────────
-
-    private suspend fun sendWebhook(
-        url: String,
-        senderName: String,
-        scamLabel: String,
-        confidencePct: Int,
-        scamType: ScamType,
-        confidence: Float,
-        callerNumber: String
-    ) = withContext(Dispatchers.IO) {
-        if (!url.startsWith("https://")) {
-            Log.w(TAG, "Webhook URL must use HTTPS. Skipping.")
-            return@withContext
-        }
-        try {
-            val payload = JSONObject().apply {
-                put("event", "scam_detected")
-                put("senderName", senderName)
-                put("scamType", scamType.name)
-                put("scamLabel", scamLabel)
-                put("confidencePct", confidencePct)
-                put("callerNumber", callerNumber)
-                put("timestamp", System.currentTimeMillis())
-                put("appVersion", BuildConfig.VERSION_NAME)
-            }.toString()
-
-            val connection = URL(url).openConnection() as HttpURLConnection
-            connection.connectTimeout = CONNECT_TIMEOUT_MS
-            connection.readTimeout = READ_TIMEOUT_MS
-            connection.requestMethod = "POST"
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json")
-            // ntfy.sh title/priority headers (ignored by other services)
-            connection.setRequestProperty("Title", "⚠️ VocaGuard: $scamLabel detected")
-            connection.setRequestProperty("Priority", "urgent")
-
-            try {
-                connection.outputStream.bufferedWriter().use { it.write(payload) }
-                val code = connection.responseCode
-                if (code in 200..299) {
-                    Log.i(TAG, "Webhook delivered (HTTP $code)")
-                } else {
-                    Log.w(TAG, "Webhook returned HTTP $code")
-                }
-            } finally {
-                connection.disconnect()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Webhook delivery failed", e)
         }
     }
 

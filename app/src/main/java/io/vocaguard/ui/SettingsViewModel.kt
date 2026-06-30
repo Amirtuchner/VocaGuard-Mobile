@@ -110,9 +110,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _callAlertEnabled = MutableStateFlow(familySettings.callAlertEnabled)
     val callAlertEnabled: StateFlow<Boolean> = _callAlertEnabled.asStateFlow()
 
-    private val _familyWebhookUrl = MutableStateFlow(familySettings.webhookUrl)
-    val familyWebhookUrl: StateFlow<String> = _familyWebhookUrl.asStateFlow()
-
     private val _familyContacts = MutableStateFlow(familySettings.contacts)
     val familyContacts: StateFlow<List<FamilyContact>> = _familyContacts.asStateFlow()
 
@@ -315,14 +312,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setCallAlertEnabled(enabled: Boolean) {
         familySettings.callAlertEnabled = enabled
         _callAlertEnabled.value = enabled
-    }
-
-    fun updateFamilyWebhookUrl(url: String) {
-        _familyWebhookUrl.value = url
-    }
-
-    fun saveFamilyWebhookUrl() {
-        familySettings.webhookUrl = _familyWebhookUrl.value
     }
 
     fun addFamilyContact(name: String, phoneNumber: String) {

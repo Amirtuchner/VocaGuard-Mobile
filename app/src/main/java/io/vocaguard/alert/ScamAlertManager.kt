@@ -104,7 +104,7 @@ class ScamAlertManager(private val context: Context) {
         if (settings.enableTts) speakAlert(scamType)
         showAlertNotification(scamType, transcript, confidence, phoneNumber)
 
-        // Notify family members / caregivers via SMS and/or webhook (fire-and-forget).
+        // Notify family members / caregivers via SMS (fire-and-forget).
         alertScope.launch {
             familyAlertSender.sendAlert(
                 scamType = scamType,

@@ -147,7 +147,11 @@ fun OnboardingScreen(
                     onClick = { if (step < TOTAL_STEPS - 1) step++ else onFinish() },
                     modifier = Modifier.defaultMinSize(minWidth = 120.dp)
                 ) {
-                    Text(if (step == TOTAL_STEPS - 1) "Get Started" else "Next")
+                    Text(when {
+                        step < TOTAL_STEPS - 1 -> "Next"
+                        callForwardingEnabled  -> "Get Started"
+                        else                   -> "Skip (not recommended)"
+                    })
                 }
             }
         }

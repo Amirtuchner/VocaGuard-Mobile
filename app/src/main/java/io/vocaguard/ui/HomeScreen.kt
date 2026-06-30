@@ -1,5 +1,7 @@
 package io.vocaguard.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -37,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.vocaguard.R
 import io.vocaguard.data.DetectionSettings
+import io.vocaguard.service.ServerDetectionManager
 import io.vocaguard.ui.theme.NavyDark
 
 @Composable
@@ -125,6 +128,9 @@ fun HomeTab(
     val callForwardingEnabled = remember(refreshKey) {
         DetectionSettings.getInstance(context).callForwardingEnabled
     }
+    val forwardingCode = remember(refreshKey) {
+        ServerDetectionManager(context).getActivationCode().ifEmpty { "*21*+97233741493#" }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -200,28 +206,46 @@ fun HomeTab(
                     containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
                 )
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = "Call forwarding not enabled",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
                         )
-                        Text(
-                            text = "Incoming calls are not being analyzed. Go to Settings to enable forwarding.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Call forwarding not enabled",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text(
+                                text = "Incoming calls are not being analyzed by VocaGuard's server.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            val intent = Intent(
+                                Intent.ACTION_DIAL,
+                                Uri.parse("tel:" + forwardingCode.replace("#", "%23"))
+                            )
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
                         )
+                    ) {
+                        Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Fix Now — Dial $forwardingCode")
                     }
                 }
             }
