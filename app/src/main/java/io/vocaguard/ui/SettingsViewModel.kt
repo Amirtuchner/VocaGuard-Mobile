@@ -10,8 +10,11 @@ import io.vocaguard.data.FamilyContact
 import io.vocaguard.data.FamilyGuardSettings
 import io.vocaguard.data.NetworkScamChecker
 import io.vocaguard.data.ScamType
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -112,6 +115,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val _familyContacts = MutableStateFlow(familySettings.contacts)
     val familyContacts: StateFlow<List<FamilyContact>> = _familyContacts.asStateFlow()
+
+    private val _testAlertMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val testAlertMessage: SharedFlow<String> = _testAlertMessage.asSharedFlow()
 
     // ── Sensitivity ───────────────────────────────────────────────────────────
 
@@ -326,10 +332,29 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun sendTestAlert() {
         viewModelScope.launch {
-            io.vocaguard.alert.FamilyAlertSender(getApplication()).sendAlert(
-                scamType   = io.vocaguard.data.ScamType.IRS_SCAM,
-                confidence = 0.92f
-            )
+            val permManager = PermissionsManager(context)
+            when {
+                !familySettings.isEnabled ->
+                    _testAlertMessage.emit("Enable Family Guard first")
+                familySettings.contacts.isEmpty() ->
+                    _testAlertMessage.emit("Add at least one contact first")
+                !permManager.hasSendSms() ->
+                    _testAlertMessage.emit("SMS permission not granted — grant it in App Settings > Permissions")
+                else -> {
+                    val sender = io.vocaguard.alert.FamilyAlertSender(context)
+                    sender.sendAlert(
+                        scamType   = io.vocaguard.data.ScamType.IRS_SCAM,
+                        confidence = 0.92f
+                    )
+                    sender.makeCallAlert(
+                        scamType          = io.vocaguard.data.ScamType.IRS_SCAM,
+                        confidence        = 0.92f,
+                        delayBeforeCallMs = 0L
+                    )
+                    val count = familySettings.contacts.size
+                    _testAlertMessage.emit("Test alert sent to $count contact${if (count > 1) "s" else ""}")
+                }
+            }
         }
     }
 

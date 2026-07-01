@@ -18,7 +18,9 @@ class PermissionsManager(private val context: Context) {
             Manifest.permission.ANSWER_PHONE_CALLS,
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.POST_NOTIFICATIONS,
-            Manifest.permission.READ_CONTACTS
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.SEND_SMS,
+            Manifest.permission.CALL_PHONE
         )
     }
 

@@ -1,20 +1,29 @@
 package io.vocaguard.alert
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.speech.tts.TextToSpeech
 import android.telephony.SmsManager
 import android.util.Log
+import io.vocaguard.BuildConfig
 import io.vocaguard.data.FamilyContact
 import io.vocaguard.data.FamilyGuardSettings
 import io.vocaguard.data.ScamType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 /**
  * Notifies family members / caregivers when a scam call is detected on the senior's device.
@@ -91,24 +100,18 @@ class FamilyAlertSender(private val context: Context) {
         }
     }
 
-    // ── Phone call alert ──────────────────────────────────────────────────────
+    // ── Phone call alert (server-originated) ──────────────────────────────────
 
     /**
-     * Dials the primary family contact (first in the list) and plays a TTS voice message
-     * once the call is placed. This is called *after* the scam call ends so it does not
-     * interfere with the active call detection.
+     * Asks the VocaGuard server to originate an outbound call to the primary family contact.
+     * The server generates a TTS message and plays it when the caregiver answers —
+     * so the audio is heard on the caregiver's device, not the senior's.
      *
-     * Flow:
-     *  1. Initiates an outgoing call via [Intent.ACTION_CALL].
-     *  2. Waits 8 seconds for the caregiver to answer.
-     *  3. Plays a TTS message through the device speaker so the caregiver hears it.
-     *
-     * Requires CALL_PHONE permission and [FamilyGuardSettings.callAlertEnabled] = true.
+     * Requires [FamilyGuardSettings.callAlertEnabled] = true.
      *
      * @param scamType  The type of scam that was detected.
      * @param confidence  Detection confidence (0.0–1.0).
-     * @param delayBeforeCallMs  How long to wait before dialling (default 5 s, giving the
-     *                           senior time to end the scam call first).
+     * @param delayBeforeCallMs  How long to wait before dialling (default 5 s).
      */
     suspend fun makeCallAlert(
         scamType: ScamType,
@@ -120,44 +123,50 @@ class FamilyAlertSender(private val context: Context) {
 
         delay(delayBeforeCallMs)
 
-        try {
-            val dialIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:${contact.phoneNumber}")).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            context.startActivity(dialIntent)
-            Log.i(TAG, "Phone call alert initiated to ${contact.name} (${contact.phoneNumber})")
-        } catch (e: SecurityException) {
-            Log.e(TAG, "CALL_PHONE permission denied — grant it in App Permissions", e)
-            return
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initiate phone call alert", e)
-            return
-        }
+        withContext(Dispatchers.IO) {
+            try {
+                val payload = JSONObject().apply {
+                    put("caregiver_number", contact.phoneNumber)
+                    put("scam_type", scamType.displayName())
+                    put("confidence_pct", (confidence * 100).toInt())
+                    put("senior_name", settings.seniorName.ifBlank { "your family member" })
+                }.toString()
 
-        // Wait for the caregiver to answer, then play TTS voice message
-        delay(8_000L)
-        speakCallAlertMessage(scamType, confidence)
+                val body = payload.toRequestBody("application/json".toMediaType())
+                val request = Request.Builder()
+                    .url("https://${BuildConfig.TOKEN_SERVER_HOST}/call_caregiver")
+                    .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                    .post(body)
+                    .build()
+
+                buildTrustAllHttpClient().newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        Log.i(TAG, "Server call alert initiated to ${contact.name} (${contact.phoneNumber})")
+                    } else {
+                        Log.e(TAG, "Server call alert failed: HTTP ${response.code}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to request server call alert", e)
+            }
+        }
     }
 
-    private fun speakCallAlertMessage(scamType: ScamType, confidence: Float) {
-        val senderName = settings.seniorName.ifBlank { "your family member" }
-        val scamLabel = scamType.displayName()
-        val confidencePct = (confidence * 100).toInt()
-
-        val message = "VocaGuard alert. $senderName's phone detected a $scamLabel with " +
-                "$confidencePct percent confidence. Please check on them. " +
-                "This is an automated alert from VocaGuard."
-
-        var tts: TextToSpeech? = null
-        tts = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                tts?.setLanguage(Locale.getDefault())
-                tts?.speak(message, TextToSpeech.QUEUE_FLUSH, null, "familyCallAlert")
-                Log.i(TAG, "TTS voice message played on call alert")
-            } else {
-                Log.w(TAG, "TTS unavailable for call alert")
-            }
+    private fun buildTrustAllHttpClient(): OkHttpClient {
+        val trustAll = object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+            override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
         }
+        val sslCtx = SSLContext.getInstance("TLS").also {
+            it.init(null, arrayOf<TrustManager>(trustAll), SecureRandom())
+        }
+        return OkHttpClient.Builder()
+            .sslSocketFactory(sslCtx.socketFactory, trustAll)
+            .hostnameVerifier { _, _ -> true }
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
     }
 
     private fun ScamType.displayName(): String = when (this) {

@@ -22,6 +22,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.collect
 import io.vocaguard.BuildConfig
 import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.FamilyContact
@@ -98,6 +99,16 @@ fun SettingsTab(
     if (showPrivacyPolicy) {
         PrivacyPolicyDialog(onDismiss = { showPrivacyPolicy = false })
     }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.testAlertMessage.collect { msg ->
+            snackbarHostState.showSnackbar(msg)
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -660,6 +671,11 @@ fun SettingsTab(
             }
         }
     }
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier.align(Alignment.BottomCenter)
+    )
+    } // end outer Box
 }
 
 // ---------------------------------------------------------------------------
