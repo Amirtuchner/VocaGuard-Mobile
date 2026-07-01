@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.collect
 import io.vocaguard.data.CallTranscript
 import io.vocaguard.data.ScamType
 import java.text.SimpleDateFormat
@@ -81,6 +82,21 @@ fun HistoryTab(viewModel: HistoryViewModel = viewModel()) {
         )
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.snackbarEvent.collect { event ->
+            when (event) {
+                is SnackbarEvent.Success -> snackbarHostState.showSnackbar(event.message)
+                is SnackbarEvent.Error -> snackbarHostState.showSnackbar(
+                    message = event.message,
+                    duration = SnackbarDuration.Long
+                )
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     if (displayed.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -113,8 +129,7 @@ fun HistoryTab(viewModel: HistoryViewModel = viewModel()) {
                 }
             }
         }
-        return
-    }
+    } else {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -277,6 +292,12 @@ fun HistoryTab(viewModel: HistoryViewModel = viewModel()) {
 
         item { Spacer(modifier = Modifier.height(8.dp)) }
     }
+    } // end else
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier.align(Alignment.BottomCenter)
+    )
+    } // end outer Box
 }
 
 @Composable
@@ -324,43 +345,71 @@ fun TranscriptCard(
                 }
                 if (transcript.phoneNumber.isNotEmpty()) {
                     var whitelisted by remember { mutableStateOf(false) }
-                    IconButton(onClick = {
-                        onWhitelist()
-                        whitelisted = true
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = "Whitelist number",
-                            tint = if (whitelisted) MaterialTheme.colorScheme.primary
-                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        IconButton(onClick = {
+                            onWhitelist()
+                            whitelisted = true
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = "Whitelist number",
+                                tint = if (whitelisted) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = "Safe",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-                IconButton(onClick = onReport) {
-                    Icon(
-                        imageVector = Icons.Default.Flag,
-                        contentDescription = "Report scam",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    IconButton(onClick = onReport) {
+                        Icon(
+                            imageVector = Icons.Default.Flag,
+                            contentDescription = "Report scam",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = "Report",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 // "Not a scam" button — only shown for scam-flagged, not yet corrected entries
                 if (isScam && !markedFalsePositive) {
-                    IconButton(onClick = {
-                        markedFalsePositive = true
-                        onMarkFalsePositive()
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.ThumbDown,
-                            contentDescription = "Mark as not a scam",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        IconButton(onClick = {
+                            markedFalsePositive = true
+                            onMarkFalsePositive()
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.ThumbDown,
+                                contentDescription = "Mark as not a scam",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = "Not scam",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = "Delete",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

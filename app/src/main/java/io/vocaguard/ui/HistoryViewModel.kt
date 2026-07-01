@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -28,6 +31,11 @@ data class HistoryFilter(
     val showScamOnly: Boolean = false
 )
 
+sealed class SnackbarEvent {
+    data class Success(val message: String) : SnackbarEvent()
+    data class Error(val message: String, val throwable: Throwable?) : SnackbarEvent()
+}
+
 class HistoryViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = TranscriptRepository.getInstance(application)
@@ -37,6 +45,9 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     val filter: StateFlow<HistoryFilter> = _filter.asStateFlow()
 
     private val _currentPage = MutableStateFlow(1)
+
+    private val _snackbarEvent = MutableSharedFlow<SnackbarEvent>(extraBufferCapacity = 1)
+    val snackbarEvent: SharedFlow<SnackbarEvent> = _snackbarEvent.asSharedFlow()
 
     /** All transcripts from DB (newest first, up to MAX_STORED). */
     private val allTranscripts: StateFlow<List<CallTranscript>> = repository.observeAll()
@@ -98,19 +109,105 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     // ── Mutations ─────────────────────────────────────────────────────────────
 
     fun delete(id: Long) {
-        viewModelScope.launch { repository.delete(id) }
+        viewModelScope.launch {
+            try {
+                repository.delete(id)
+                _snackbarEvent.emit(SnackbarEvent.Success("Transcript deleted"))
+            } catch (e: Exception) {
+                CrashReporter.recordException(e)
+                _snackbarEvent.emit(SnackbarEvent.Error("Failed to delete transcript: ${e.message}", e))
+            }
+        }
     }
 
     fun reportScamNumber(phoneNumber: String, scamType: ScamType) {
-        viewModelScope.launch { scamDb.reportScamNumber(phoneNumber, scamType) }
+        viewModelScope.launch {
+            try {
+                scamDb.reportScamNumber(phoneNumber, scamType)
+                _snackbarEvent.emit(SnackbarEvent.Success(
+                    "Reported as ${scamType.name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }}"
+                ))
+            } catch (e: Exception) {
+                CrashReporter.recordException(e)
+                _snackbarEvent.emit(SnackbarEvent.Error("Failed to report number: ${e.message}", e))
+            }
+        }
     }
 
     fun addToWhitelist(phoneNumber: String) {
-        scamDb.addToWhitelist(phoneNumber)
+        viewModelScope.launch {
+            try {
+                scamDb.addToWhitelist(phoneNumber)
+                _snackbarEvent.emit(SnackbarEvent.Success("$phoneNumber added to safe list"))
+            } catch (e: Exception) {
+                CrashReporter.recordException(e)
+                _snackbarEvent.emit(SnackbarEvent.Error("Failed to add to safe list: ${e.message}", e))
+            }
+        }
     }
 
     fun markAsFalsePositive(id: Long) {
-        viewModelScope.launch { repository.markAsFalsePositive(id) }
+        viewModelScope.launch {
+            try {
+                repository.markAsFalsePositive(id)
+                _snackbarEvent.emit(SnackbarEvent.Success("Marked as not a scam"))
+            } catch (e: Exception) {
+                CrashReporter.recordException(e)
+                _snackbarEvent.emit(SnackbarEvent.Error("Failed to update: ${e.message}", e))
+            }
+        }
+    }
+
+    // SCREENSHOT: seeds fake data for Play Store screenshots — remove after
+    fun seedDemoData() {
+        val now = System.currentTimeMillis()
+        val h = 3_600_000L
+        val demos = listOf(
+            CallTranscript(
+                id = 900001L, timestamp = now - 2 * h,
+                phoneNumber = "+1 800 555 0192",
+                detectedScamTypes = listOf("LOTTERY_PRIZE"),
+                text = "Congratulations! You have won a \$1,000,000 prize in our national sweepstakes. " +
+                       "To claim your winnings, press 1 now and provide your bank account number. " +
+                       "This offer expires in 24 hours. Take your prize before the window closes!"
+            ),
+            CallTranscript(
+                id = 900002L, timestamp = now - 26 * h,
+                phoneNumber = "+1 866 555 0173",
+                detectedScamTypes = listOf("BANK_FRAUD"),
+                text = "This is an urgent security alert from your bank's fraud department. " +
+                       "We have detected unauthorized transactions on your account. " +
+                       "To prevent further losses, please verify your identity by providing your account number and PIN."
+            ),
+            CallTranscript(
+                id = 900003L, timestamp = now - 50 * h,
+                phoneNumber = "+44 20 7946 0958",
+                detectedScamTypes = listOf("INVESTMENT_SCAM"),
+                text = "Hi, this is Alex from Global Capital Markets. We have an exclusive crypto " +
+                       "arbitrage opportunity available for a limited time. Our clients have doubled " +
+                       "their capital in 30 days. Guaranteed monthly returns of 40%. Act now before " +
+                       "this window closes — transfer funds today to lock in your position."
+            ),
+            CallTranscript(
+                id = 900004L, timestamp = now - 96 * h,
+                phoneNumber = "+1 877 555 0109",
+                detectedScamTypes = listOf("IRS_SCAM"),
+                text = "This is the IRS. A federal warrant has been issued for your arrest due to " +
+                       "unpaid taxes. You must call us back immediately or law enforcement officers " +
+                       "will be dispatched to your address within the hour."
+            ),
+            CallTranscript(
+                id = 900005L, timestamp = now - 144 * h,
+                phoneNumber = "+1 855 555 0130",
+                detectedScamTypes = listOf("TECH_SUPPORT"),
+                text = "This is Microsoft technical support. Our systems have detected a serious virus " +
+                       "on your computer. Your personal data and banking information are at risk. " +
+                       "Press 1 now to be connected to a certified technician who will remove the threat."
+            ),
+        )
+        viewModelScope.launch {
+            demos.forEach { repository.save(it) }
+        }
     }
 
     // ── Export ────────────────────────────────────────────────────────────────

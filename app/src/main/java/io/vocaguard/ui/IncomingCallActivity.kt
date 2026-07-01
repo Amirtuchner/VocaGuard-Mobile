@@ -202,7 +202,13 @@ private fun ActiveCallScreen(
     onEndCall: () -> Unit,
     onCancelConnecting: () -> Unit
 ) {
-    val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
+    val displayNumber = "+1 800 555 0192" // SCREENSHOT: revert after screenshot
+    // SCREENSHOT: auto-show scam banner when connected — revert after screenshot
+    LaunchedEffect(connected) {
+        if (connected) {
+            VocaGuardFcmService.scamAlertFlow.value = Pair(ScamType.LOTTERY_PRIZE, 0.84f)
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -292,7 +298,7 @@ private fun IncomingCallScreen(
     onAccept: () -> Unit,
     onDecline: () -> Unit
 ) {
-    val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
+    val displayNumber = "+1 800 555 0192" // SCREENSHOT: revert after screenshot
 
     Column(
         modifier = Modifier

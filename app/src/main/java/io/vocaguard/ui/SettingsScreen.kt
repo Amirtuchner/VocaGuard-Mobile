@@ -36,6 +36,7 @@ fun SettingsTab(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val historyViewModel: HistoryViewModel = viewModel() // SCREENSHOT: remove after screenshot
 
     val sensitivity    by viewModel.sensitivity.collectAsStateWithLifecycle()
     val locale         by viewModel.locale.collectAsStateWithLifecycle()
@@ -109,6 +110,14 @@ fun SettingsTab(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
+        }
+
+        // SCREENSHOT: seed demo data for Play Store screenshots — remove after screenshot
+        item {
+            OutlinedButton(
+                onClick = { historyViewModel.seedDemoData() },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Seed Demo Data (screenshots)") }
         }
 
         // ── Server Detection card ──────────────────────────────────────────────
