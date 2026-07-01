@@ -599,39 +599,6 @@ fun SettingsTab(
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "NumVerify API Key",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Optional: enables network-based phone number screening. Get a free key at numverify.com.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = apiKey,
-                        onValueChange = { viewModel.updateApiKey(it) },
-                        label = { Text("API Key") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = { viewModel.saveApiKey() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(if (apiKeySaved) "Saved!" else "Save API Key")
-                    }
-                }
-            }
-        }
-
-        if (advancedExpanded) item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
                         text = "Backup & Restore",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
