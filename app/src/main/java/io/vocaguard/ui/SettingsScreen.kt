@@ -69,6 +69,7 @@ fun SettingsTab(
     val familyGuardEnabled  by viewModel.familyGuardEnabled.collectAsStateWithLifecycle()
     val seniorModeEnabled   by viewModel.seniorModeEnabled.collectAsStateWithLifecycle()
     val seniorName          by viewModel.seniorName.collectAsStateWithLifecycle()
+    val seniorPhoneNumber   by viewModel.seniorPhoneNumber.collectAsStateWithLifecycle()
     val callAlertEnabled    by viewModel.callAlertEnabled.collectAsStateWithLifecycle()
     val familyContacts      by viewModel.familyContacts.collectAsStateWithLifecycle()
 
@@ -85,6 +86,7 @@ fun SettingsTab(
     var newContactName by remember { mutableStateOf("") }
     var newContactPhone by remember { mutableStateOf("") }
     var seniorNameInput by remember(seniorName) { mutableStateOf(seniorName) }
+    var seniorPhoneInput by remember(seniorPhoneNumber) { mutableStateOf(seniorPhoneNumber) }
 
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -163,8 +165,17 @@ fun SettingsTab(
                 enabled          = familyGuardEnabled,
                 onEnabledChange  = { viewModel.setFamilyGuardEnabled(it) },
                 seniorNameInput  = seniorNameInput,
-                onSeniorNameChange = { seniorNameInput = it },
-                onSeniorNameSave = { viewModel.saveSeniorName() },
+                onSeniorNameChange = { seniorNameInput = it; viewModel.updateSeniorName(it) },
+                onSeniorNameSave = {
+                    try { viewModel.saveSeniorName(); android.widget.Toast.makeText(context, "Name saved", android.widget.Toast.LENGTH_SHORT).show() }
+                    catch (e: Exception) { android.widget.Toast.makeText(context, "Failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show() }
+                },
+                seniorPhoneInput = seniorPhoneInput,
+                onSeniorPhoneChange = { seniorPhoneInput = it; viewModel.updateSeniorPhoneNumber(it) },
+                onSeniorPhoneSave = {
+                    try { viewModel.saveSeniorPhoneNumber(); android.widget.Toast.makeText(context, "Phone number saved", android.widget.Toast.LENGTH_SHORT).show() }
+                    catch (e: Exception) { android.widget.Toast.makeText(context, "Failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show() }
+                },
                 callAlert        = callAlertEnabled,
                 onCallAlert      = { viewModel.setCallAlertEnabled(it) },
                 contacts         = familyContacts,
@@ -777,6 +788,9 @@ private fun FamilyGuardCard(
     seniorNameInput: String,
     onSeniorNameChange: (String) -> Unit,
     onSeniorNameSave: () -> Unit,
+    seniorPhoneInput: String,
+    onSeniorPhoneChange: (String) -> Unit,
+    onSeniorPhoneSave: () -> Unit,
     callAlert: Boolean,
     onCallAlert: (Boolean) -> Unit,
     contacts: List<FamilyContact>,
@@ -879,6 +893,33 @@ private fun FamilyGuardCard(
                         modifier = Modifier.weight(1f)
                     )
                     Button(onClick = onSeniorNameSave, modifier = Modifier.align(Alignment.CenterVertically)) {
+                        Text("Save")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // ── Phone number of the senior (caller ID) ─────────────────
+                Text(
+                    text = "Protected person's phone number",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "Used as the caller ID when alerting the caregiver (e.g. +972528233354).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = seniorPhoneInput,
+                        onValueChange = onSeniorPhoneChange,
+                        label = { Text("+972...") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Button(onClick = onSeniorPhoneSave, modifier = Modifier.align(Alignment.CenterVertically)) {
                         Text("Save")
                     }
                 }

@@ -40,6 +40,11 @@ class FamilyGuardSettings private constructor(context: Context) {
         get() = prefs.getString(KEY_SENIOR_NAME, "") ?: ""
         set(value) = prefs.edit().putString(KEY_SENIOR_NAME, value.trim()).apply()
 
+    /** The senior's own phone number in E.164 format — used as caller ID when alerting the caregiver. */
+    var seniorPhoneNumber: String
+        get() = prefs.getString(KEY_SENIOR_PHONE, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_SENIOR_PHONE, value.trim()).apply()
+
     /**
      * Whether to make an outgoing phone call to the primary contact after a scam call ends.
      * The call plays a TTS voice message so the caregiver knows immediately what happened.
@@ -90,6 +95,7 @@ class FamilyGuardSettings private constructor(context: Context) {
         private const val KEY_ENABLED = "enabled"
         private const val KEY_SENIOR_MODE = "senior_mode"
         private const val KEY_SENIOR_NAME = "senior_name"
+        private const val KEY_SENIOR_PHONE = "senior_phone"
         private const val KEY_CONTACTS = "contacts"
         private const val KEY_CALL_ALERT = "call_alert_enabled"
 

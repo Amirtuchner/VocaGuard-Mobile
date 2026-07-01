@@ -116,9 +116,10 @@ class FamilyAlertSender(private val context: Context) {
     suspend fun makeCallAlert(
         scamType: ScamType,
         confidence: Float,
-        delayBeforeCallMs: Long = 5_000L
+        delayBeforeCallMs: Long = 5_000L,
+        ignoreCallAlertEnabled: Boolean = false
     ) {
-        if (!settings.callAlertEnabled) return
+        if (!ignoreCallAlertEnabled && !settings.callAlertEnabled) return
         val contact = settings.contacts.firstOrNull() ?: return
 
         delay(delayBeforeCallMs)
@@ -130,6 +131,8 @@ class FamilyAlertSender(private val context: Context) {
                     put("scam_type", scamType.displayName())
                     put("confidence_pct", (confidence * 100).toInt())
                     put("senior_name", settings.seniorName.ifBlank { "your family member" })
+                    val seniorPhone = settings.seniorPhoneNumber
+                    if (seniorPhone.isNotBlank()) put("senior_number", seniorPhone)
                 }.toString()
 
                 val body = payload.toRequestBody("application/json".toMediaType())

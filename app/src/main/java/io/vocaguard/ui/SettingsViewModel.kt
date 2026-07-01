@@ -110,6 +110,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _seniorName = MutableStateFlow(familySettings.seniorName)
     val seniorName: StateFlow<String> = _seniorName.asStateFlow()
 
+    private val _seniorPhoneNumber = MutableStateFlow(familySettings.seniorPhoneNumber)
+    val seniorPhoneNumber: StateFlow<String> = _seniorPhoneNumber.asStateFlow()
+
     private val _callAlertEnabled = MutableStateFlow(familySettings.callAlertEnabled)
     val callAlertEnabled: StateFlow<Boolean> = _callAlertEnabled.asStateFlow()
 
@@ -315,6 +318,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         familySettings.seniorName = _seniorName.value
     }
 
+    fun updateSeniorPhoneNumber(phone: String) {
+        _seniorPhoneNumber.value = phone
+    }
+
+    fun saveSeniorPhoneNumber() {
+        familySettings.seniorPhoneNumber = _seniorPhoneNumber.value
+    }
+
     fun setCallAlertEnabled(enabled: Boolean) {
         familySettings.callAlertEnabled = enabled
         _callAlertEnabled.value = enabled
@@ -347,9 +358,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         confidence = 0.92f
                     )
                     sender.makeCallAlert(
-                        scamType          = io.vocaguard.data.ScamType.IRS_SCAM,
-                        confidence        = 0.92f,
-                        delayBeforeCallMs = 0L
+                        scamType                 = io.vocaguard.data.ScamType.IRS_SCAM,
+                        confidence               = 0.92f,
+                        delayBeforeCallMs        = 0L,
+                        ignoreCallAlertEnabled   = true
                     )
                     val count = familySettings.contacts.size
                     _testAlertMessage.emit("Test alert sent to $count contact${if (count > 1) "s" else ""}")
