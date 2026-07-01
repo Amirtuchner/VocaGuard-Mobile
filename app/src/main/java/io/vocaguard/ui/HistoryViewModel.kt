@@ -63,7 +63,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                     transcript.phoneNumber.contains(q, ignoreCase = true)
                 val matchesType = f.scamTypeFilter == null ||
                     transcript.detectedScamTypes.any { it == f.scamTypeFilter }
-                val matchesScamOnly = !f.showScamOnly || transcript.detectedScamTypes.isNotEmpty()
+                val matchesScamOnly = !f.showScamOnly || (transcript.detectedScamTypes.isNotEmpty() && !transcript.isFalsePositive)
                 matchesQuery && matchesType && matchesScamOnly
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -155,58 +155,6 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                 CrashReporter.recordException(e)
                 _snackbarEvent.emit(SnackbarEvent.Error("Failed to update: ${e.message}", e))
             }
-        }
-    }
-
-    // SCREENSHOT: seeds fake data for Play Store screenshots — remove after
-    fun seedDemoData() {
-        val now = System.currentTimeMillis()
-        val h = 3_600_000L
-        val demos = listOf(
-            CallTranscript(
-                id = 900001L, timestamp = now - 2 * h,
-                phoneNumber = "+1 800 555 0192",
-                detectedScamTypes = listOf("LOTTERY_PRIZE"),
-                text = "Congratulations! You have won a \$1,000,000 prize in our national sweepstakes. " +
-                       "To claim your winnings, press 1 now and provide your bank account number. " +
-                       "This offer expires in 24 hours. Take your prize before the window closes!"
-            ),
-            CallTranscript(
-                id = 900002L, timestamp = now - 26 * h,
-                phoneNumber = "+1 866 555 0173",
-                detectedScamTypes = listOf("BANK_FRAUD"),
-                text = "This is an urgent security alert from your bank's fraud department. " +
-                       "We have detected unauthorized transactions on your account. " +
-                       "To prevent further losses, please verify your identity by providing your account number and PIN."
-            ),
-            CallTranscript(
-                id = 900003L, timestamp = now - 50 * h,
-                phoneNumber = "+44 20 7946 0958",
-                detectedScamTypes = listOf("INVESTMENT_SCAM"),
-                text = "Hi, this is Alex from Global Capital Markets. We have an exclusive crypto " +
-                       "arbitrage opportunity available for a limited time. Our clients have doubled " +
-                       "their capital in 30 days. Guaranteed monthly returns of 40%. Act now before " +
-                       "this window closes — transfer funds today to lock in your position."
-            ),
-            CallTranscript(
-                id = 900004L, timestamp = now - 96 * h,
-                phoneNumber = "+1 877 555 0109",
-                detectedScamTypes = listOf("IRS_SCAM"),
-                text = "This is the IRS. A federal warrant has been issued for your arrest due to " +
-                       "unpaid taxes. You must call us back immediately or law enforcement officers " +
-                       "will be dispatched to your address within the hour."
-            ),
-            CallTranscript(
-                id = 900005L, timestamp = now - 144 * h,
-                phoneNumber = "+1 855 555 0130",
-                detectedScamTypes = listOf("TECH_SUPPORT"),
-                text = "This is Microsoft technical support. Our systems have detected a serious virus " +
-                       "on your computer. Your personal data and banking information are at risk. " +
-                       "Press 1 now to be connected to a certified technician who will remove the threat."
-            ),
-        )
-        viewModelScope.launch {
-            demos.forEach { repository.save(it) }
         }
     }
 

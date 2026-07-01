@@ -36,7 +36,6 @@ fun SettingsTab(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val historyViewModel: HistoryViewModel = viewModel() // SCREENSHOT: remove after screenshot
 
     val sensitivity    by viewModel.sensitivity.collectAsStateWithLifecycle()
     val locale         by viewModel.locale.collectAsStateWithLifecycle()
@@ -110,14 +109,6 @@ fun SettingsTab(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
-        }
-
-        // SCREENSHOT: seed demo data for Play Store screenshots — remove after screenshot
-        item {
-            OutlinedButton(
-                onClick = { historyViewModel.seedDemoData() },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Seed Demo Data (screenshots)") }
         }
 
         // ── Server Detection card ──────────────────────────────────────────────
@@ -305,7 +296,7 @@ fun SettingsTab(
             }
         }
 
-        // ── Message Scanning (WhatsApp / Telegram / Messenger) ──────────────────
+        // ── Message Scanning (SMS / WhatsApp / Telegram / Messenger) ────────────
         item {
             val hasAccess = permissionsManager.hasNotificationListenerAccess()
 
@@ -341,7 +332,7 @@ fun SettingsTab(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Scans WhatsApp, Telegram, and Facebook Messenger notifications for " +
+                        text = "Scans SMS, WhatsApp, Telegram, and Facebook Messenger notifications for " +
                             "scam patterns. When a scam is detected the notification is dismissed and " +
                             "you receive a VocaGuard warning instead. Requires Notification Access.",
                         style = MaterialTheme.typography.bodySmall,
@@ -350,7 +341,7 @@ fun SettingsTab(
                     Spacer(modifier = Modifier.height(8.dp))
                     AlertToggleRow(
                         label = "Scan messages",
-                        description = "WhatsApp, Telegram, Messenger",
+                        description = "SMS, WhatsApp, Telegram, Messenger",
                         checked = messageScanEnabled,
                         onCheckedChange = { enabled ->
                             viewModel.setMessageScanEnabled(enabled)
