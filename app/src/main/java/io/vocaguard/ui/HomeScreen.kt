@@ -555,7 +555,7 @@ private val permissionDefs = listOf(
     PermissionDef("Notifications",     "Notifications",        "Sends instant scam alerts to your screen",           Icons.Default.Notifications),
     PermissionDef("Call Screening",    "Call Screening",       "Screens calls before your phone rings",              Icons.Default.Shield),
     PermissionDef("Draw Overlay",      "Screen Overlay",       "Shows a warning banner during scam calls",           Icons.Default.Layers),
-    PermissionDef("Notification Access","Message Scanning",   "Detects scams in SMS, WhatsApp, Telegram & Messenger messages", Icons.Default.Notifications, optional = true),
+    PermissionDef("Notification Access","Message Scanning",   "Detects scams in SMS, WhatsApp, Telegram & Facebook Messenger messages", Icons.Default.Notifications, optional = true),
 )
 
 @Composable
