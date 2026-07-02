@@ -22,11 +22,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import io.vocaguard.billing.BillingManager
 import io.vocaguard.billing.SubscriptionStatus
@@ -96,8 +102,16 @@ class MainActivity : ComponentActivity() {
 
             VocaGuardTheme(darkTheme = darkTheme, seniorMode = seniorMode.value) {
                 var onboardingDone by remember { mutableStateOf(detectionSettings.onboardingComplete) }
-                val billingStatus by BillingManager.getInstance(this@MainActivity).status
-                    .collectAsState()
+                val billing = BillingManager.getInstance(this@MainActivity)
+                val billingStatus by billing.status.collectAsState()
+                val snackbarHostState = remember { SnackbarHostState() }
+                val scope = rememberCoroutineScope()
+
+                LaunchedEffect(Unit) {
+                    billing.billingError.collect { msg ->
+                        scope.launch { snackbarHostState.showSnackbar(msg) }
+                    }
+                }
 
                 when {
                     !onboardingDone -> OnboardingScreen(
@@ -107,15 +121,16 @@ class MainActivity : ComponentActivity() {
                             onboardingDone = true
                         }
                     )
-                    billingStatus == SubscriptionStatus.Expired -> PaywallScreen(
-                        onSubscribeClick = {
-                            BillingManager.getInstance(this@MainActivity)
-                                .startSubscriptionFlow(this@MainActivity)
-                        },
-                        onRestoreClick = {
-                            BillingManager.getInstance(this@MainActivity).refresh()
-                        }
-                    )
+                    billingStatus == SubscriptionStatus.Expired -> Scaffold(
+                        snackbarHost = { SnackbarHost(snackbarHostState) { data ->
+                            Snackbar(snackbarData = data)
+                        }}
+                    ) { _ ->
+                        PaywallScreen(
+                            onSubscribeClick = { billing.startSubscriptionFlow(this@MainActivity) },
+                            onRestoreClick   = { billing.refresh() }
+                        )
+                    }
                     else -> MainScreen(
                         permissionsManager  = permissionsManager,
                         selectedTab         = selectedTab,

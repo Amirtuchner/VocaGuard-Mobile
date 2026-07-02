@@ -18,8 +18,11 @@ import com.android.billingclient.api.queryPurchasesAsync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
@@ -49,6 +52,9 @@ class BillingManager private constructor(private val context: Context) :
 
     private val _status = MutableStateFlow<SubscriptionStatus>(SubscriptionStatus.Unknown)
     val status: StateFlow<SubscriptionStatus> = _status.asStateFlow()
+
+    private val _billingError = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val billingError: SharedFlow<String> = _billingError.asSharedFlow()
 
     private val billingClient: BillingClient = BillingClient.newBuilder(context)
         .setListener(this)
@@ -83,7 +89,14 @@ class BillingManager private constructor(private val context: Context) :
             purchase.products.contains(PRODUCT_ID) &&
                 purchase.purchaseState == Purchase.PurchaseState.PURCHASED
         }
-        _status.value = if (active) SubscriptionStatus.Active else SubscriptionStatus.Expired
+        if (active) {
+            _status.value = SubscriptionStatus.Active
+        } else {
+            // Only block with paywall if the product actually exists in Play Console.
+            // If it hasn't been created yet, stay Unknown so access isn't blocked.
+            val productExists = queryProductDetails() != null
+            _status.value = if (productExists) SubscriptionStatus.Expired else SubscriptionStatus.Unknown
+        }
 
         // Acknowledge any unacknowledged purchases so Play doesn't revoke them
         result.purchasesList
@@ -113,20 +126,30 @@ class BillingManager private constructor(private val context: Context) :
         }
     }
 
+    private suspend fun queryProductDetails() =
+        billingClient.queryProductDetails(
+            QueryProductDetailsParams.newBuilder().setProductList(
+                listOf(
+                    QueryProductDetailsParams.Product.newBuilder()
+                        .setProductId(PRODUCT_ID)
+                        .setProductType(BillingClient.ProductType.SUBS)
+                        .build()
+                )
+            ).build()
+        ).productDetailsList?.firstOrNull()
+
     fun startSubscriptionFlow(activity: Activity) {
         scope.launch(Dispatchers.Main) {
-            val productList = listOf(
-                QueryProductDetailsParams.Product.newBuilder()
-                    .setProductId(PRODUCT_ID)
-                    .setProductType(BillingClient.ProductType.SUBS)
-                    .build()
-            )
-            val detailsResult = billingClient.queryProductDetails(
-                QueryProductDetailsParams.newBuilder().setProductList(productList).build()
-            )
-            val productDetails = detailsResult.productDetailsList?.firstOrNull() ?: return@launch
+            val productDetails = queryProductDetails()
+            if (productDetails == null) {
+                _billingError.tryEmit("Subscription product not available yet. Please try again later.")
+                return@launch
+            }
             val offerToken = productDetails.subscriptionOfferDetails?.firstOrNull()?.offerToken
-                ?: return@launch
+            if (offerToken == null) {
+                _billingError.tryEmit("No subscription offer available. Please try again later.")
+                return@launch
+            }
 
             val flowParams = BillingFlowParams.newBuilder()
                 .setProductDetailsParamsList(
