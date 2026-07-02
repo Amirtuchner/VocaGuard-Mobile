@@ -9,6 +9,7 @@ import android.telephony.PhoneStateListener
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import android.util.Log
+import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.ScamDatabaseManager
 import io.vocaguard.service.CallMonitoringService
 
@@ -99,6 +100,13 @@ class PhoneStateMonitor(private val context: Context) {
     }
 
     private fun onCallActive() {
+        // Only run local monitoring when call forwarding is active.
+        // If forwarding is off, the user has deliberately disabled monitoring —
+        // starting local analysis would cause false positives on normal calls.
+        if (!DetectionSettings.getInstance(context).callForwardingEnabled) {
+            Log.i(TAG, "Call answered but call forwarding is disabled — skipping local monitoring")
+            return
+        }
         // Call answered (OFFHOOK) — start audio monitoring now so we capture call audio,
         // not the ringing silence. Primary fallback on Samsung where
         // CallScreeningService.onScreenCall() is not invoked by the firmware.
