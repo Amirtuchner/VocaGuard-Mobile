@@ -22,11 +22,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import io.vocaguard.billing.BillingManager
+import io.vocaguard.billing.SubscriptionStatus
 import io.vocaguard.data.CommunityScamSyncWorker
 import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.FamilyGuardSettings
@@ -36,6 +39,7 @@ import io.vocaguard.ui.CrashReporter
 import io.vocaguard.ui.HistoryTab
 import io.vocaguard.ui.HomeTab
 import io.vocaguard.ui.OnboardingScreen
+import io.vocaguard.ui.PaywallScreen
 import io.vocaguard.ui.PermissionsManager
 import io.vocaguard.ui.SeniorHomeScreen
 import io.vocaguard.ui.SettingsTab
@@ -68,6 +72,7 @@ class MainActivity : ComponentActivity() {
         // (fallback for Samsung devices where CallScreeningService is not invoked)
         startForegroundService(Intent(this, PhoneMonitorService::class.java))
 
+        BillingManager.getInstance(this)   // initialise early so status is ready by first frame
         CommunityScamSyncWorker.schedule(this)
         VocaGuardFcmService.refreshToken()
         applyIntentTab(intent)
@@ -91,20 +96,31 @@ class MainActivity : ComponentActivity() {
 
             VocaGuardTheme(darkTheme = darkTheme, seniorMode = seniorMode.value) {
                 var onboardingDone by remember { mutableStateOf(detectionSettings.onboardingComplete) }
-                if (onboardingDone) {
-                    MainScreen(
-                        permissionsManager  = permissionsManager,
-                        selectedTab         = selectedTab,
-                        seniorMode          = seniorMode,
-                        themePreference     = themePreference
-                    )
-                } else {
-                    OnboardingScreen(
+                val billingStatus by BillingManager.getInstance(this@MainActivity).status
+                    .collectAsState()
+
+                when {
+                    !onboardingDone -> OnboardingScreen(
                         permissionsManager = permissionsManager,
                         onFinish = {
                             detectionSettings.onboardingComplete = true
                             onboardingDone = true
                         }
+                    )
+                    billingStatus == SubscriptionStatus.Expired -> PaywallScreen(
+                        onSubscribeClick = {
+                            BillingManager.getInstance(this@MainActivity)
+                                .startSubscriptionFlow(this@MainActivity)
+                        },
+                        onRestoreClick = {
+                            BillingManager.getInstance(this@MainActivity).refresh()
+                        }
+                    )
+                    else -> MainScreen(
+                        permissionsManager  = permissionsManager,
+                        selectedTab         = selectedTab,
+                        seniorMode          = seniorMode,
+                        themePreference     = themePreference
                     )
                 }
             }
@@ -128,6 +144,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        BillingManager.getInstance(this).refresh()
         val missing = PermissionsManager.REQUIRED_PERMISSIONS.filter { perm ->
             checkSelfPermission(perm) != android.content.pm.PackageManager.PERMISSION_GRANTED
         }.toTypedArray()

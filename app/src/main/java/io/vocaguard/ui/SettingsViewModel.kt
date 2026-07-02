@@ -4,6 +4,8 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.vocaguard.billing.BillingManager
+import io.vocaguard.billing.SubscriptionStatus
 import io.vocaguard.data.CommunityScamSync
 import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.FamilyContact
@@ -369,6 +371,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             }
         }
     }
+
+    // ── Subscription status ───────────────────────────────────────────────────
+
+    val billingStatus: StateFlow<SubscriptionStatus> =
+        BillingManager.getInstance(application).status
 
     // ── Server Detection registration ─────────────────────────────────────────
 

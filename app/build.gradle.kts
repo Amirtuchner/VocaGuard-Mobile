@@ -135,6 +135,7 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.messaging)
+    implementation(libs.billing.ktx)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.linphone:linphone-sdk-android:5.3.+")
     implementation("com.alphacephei:vosk-android:0.3.47")
