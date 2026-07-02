@@ -23,6 +23,16 @@ TOKEN_FILE       = "/opt/vocaguard/fcm_token.txt"  # single-user fallback
 DB_PATH          = "/opt/vocaguard/users.db"
 PJSIP_USERS_FILE = "/etc/asterisk/pjsip_users.conf"
 DID_NUMBER       = "+97233741493"
+_DID_CC = "972"
+
+def _normalize_phone(number: str) -> str:
+    n = number.strip().replace(" ", "").replace("-", "")
+    n = n.lstrip("+")
+    if n.startswith("00"):
+        n = n[2:]
+    if n.startswith("0") and not n.startswith(_DID_CC):
+        n = _DID_CC + n[1:]
+    return n
 
 AMI_HOST = "127.0.0.1"
 AMI_PORT = 5038
@@ -43,6 +53,13 @@ with open(SECRET_FILE) as f:
 
 with open(AMI_SECRET_FILE) as f:
     AMI_SECRET = f.read().strip()
+
+with open("/opt/vocaguard/twilio_sid.txt") as f:
+    TWILIO_SID = f.read().strip()
+with open("/opt/vocaguard/twilio_token.txt") as f:
+    TWILIO_TOKEN = f.read().strip()
+with open("/opt/vocaguard/twilio_number.txt") as f:
+    TWILIO_NUMBER = f.read().strip()
 
 # ---------------------------------------------------------------------------
 # SQLite user database
@@ -145,6 +162,47 @@ def update_fcm_token(phone: str, fcm_token: str) -> bool:
         log.info("FCM token refreshed for %s", phone)
     return updated
 
+
+def delete_user(phone: str) -> bool:
+    """Remove a user from the DB and from pjsip_users.conf, then reload PJSIP."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        row = conn.execute(
+            "SELECT sip_extension FROM users WHERE phone_number=?", (phone,)
+        ).fetchone()
+        if not row:
+            return False
+        ext = row[0]
+        conn.execute("DELETE FROM users WHERE phone_number=?", (phone,))
+        conn.commit()
+    finally:
+        conn.close()
+
+    try:
+        with open(PJSIP_USERS_FILE, "r") as fh:
+            lines = fh.readlines()
+        skip_headers = {"[" + ext + "]", "[auth_" + ext + "]"}
+        out, skip = [], False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("[") and stripped.endswith("]"):
+                skip = stripped in skip_headers
+            if not skip:
+                out.append(line)
+        with open(PJSIP_USERS_FILE, "w") as fh:
+            fh.writelines(out)
+    except Exception as e:
+        log.error("delete_user: pjsip cleanup failed for %s: %s", ext, e)
+
+    result = subprocess.run(
+        ["asterisk", "-rx", "module reload res_pjsip.so"],
+        capture_output=True, text=True, timeout=10
+    )
+    log.info("PJSIP reload after delete %s: %s", ext, (result.stdout + result.stderr).strip())
+    log.info("User deleted: phone=%s ext=%s", phone, ext)
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Dynamic PJSIP provisioning
 # ---------------------------------------------------------------------------
@@ -163,7 +221,6 @@ def provision_pjsip_user(ext: str, password: str):
         f"direct_media=no\n"
         f"force_rport=yes\n"
         f"rewrite_contact=yes\n"
-        f"rtp_symmetric=yes\n"
         f"\n[auth_{ext}]\n"
         f"type=auth\n"
         f"auth_type=userpass\n"
@@ -237,6 +294,62 @@ def ami_originate(orig_channel: str, orig_caller: str, sip_extension: str, user_
     if "Response: Error" in resp:
         raise RuntimeError(f"AMI error: {resp[:200]}")
 
+
+
+# ---------------------------------------------------------------------------
+# Caregiver call alert helpers
+# ---------------------------------------------------------------------------
+
+def generate_alert_audio(scam_type: str, confidence_pct: int, senior_name: str) -> str:
+    import tempfile, subprocess, os
+    msg = (
+        f"VocaGuard alert. {senior_name}'s phone detected a {scam_type} "
+        f"with {confidence_pct} percent confidence. "
+        "Please check on them. This is an automated alert from VocaGuard."
+    )
+    raw_wav = tempfile.mktemp(suffix="_raw.wav", dir="/tmp")
+    final_wav = tempfile.mktemp(suffix="_alert.wav", dir="/tmp")
+    try:
+        subprocess.run(
+            ["/usr/bin/espeak-ng", "-w", raw_wav, msg],
+            check=True, timeout=15, capture_output=True
+        )
+        subprocess.run(
+            ["/usr/bin/sox", raw_wav, "-r", "8000", "-c", "1",
+             "-e", "signed-integer", "-b", "16", final_wav],
+            check=True, timeout=15, capture_output=True
+        )
+    finally:
+        if os.path.exists(raw_wav):
+            os.remove(raw_wav)
+    return final_wav[:-4]
+
+
+def ami_originate_caregiver(caregiver_number: str, alert_file_no_ext: str):
+    s = socket.create_connection((AMI_HOST, AMI_PORT), timeout=15)
+    try:
+        s.recv(1024)
+        s.sendall(
+            f"Action: Login\r\nUsername: {AMI_USER}\r\nSecret: {AMI_SECRET}\r\n\r\n"
+            .encode()
+        )
+        _ami_recv(s)
+        s.sendall(
+            f"Action: Originate\r\n"
+            f"Channel: PJSIP/{_normalize_phone(caregiver_number)}@didww-trunk\r\n"
+            f"Context: caregiver-alert\r\n"
+            f"Exten: s\r\nPriority: 1\r\n"
+            f"Variable: ALERT_FILE={alert_file_no_ext}\r\n"
+            f"CallerID: VocaGuard Alert <{DID_NUMBER}>\r\n"
+            f"Timeout: 45000\r\nAsync: yes\r\n\r\n"
+            .encode()
+        )
+        resp = _ami_recv(s)
+        s.sendall(b"Action: Logoff\r\n\r\n")
+    finally:
+        s.close()
+    if "Response: Error" in resp:
+        raise RuntimeError(f"AMI caregiver originate error: {resp[:200]}")
 
 def ami_hangup(channel: str, sip_extension: str):
     """Hang up the incoming channel and the user's SIP extension channels."""
@@ -388,6 +501,78 @@ class Handler(BaseHTTPRequestHandler):
                 log.error("hangup error: %s", e)
                 self._send(500)
 
+
+        elif self.path == "/call_caregiver":
+            try:
+                data       = self._read_json()
+                caregiver  = data.get("caregiver_number", "").strip()
+                scam_type  = data.get("scam_type", "Suspicious Call").strip()
+                confidence = int(data.get("confidence_pct", 0))
+                senior     = data.get("senior_name", "your family member").strip() or "your family member"
+                if not caregiver:
+                    self._send(400, {"error": "caregiver_number required"})
+                    return
+                import threading, os
+                caller_id = data.get("senior_number", "").strip() or TWILIO_NUMBER
+                log.info("call_caregiver: senior_number=%r caller_id=%s", data.get("senior_number"), caller_id)
+                def _do_call():
+                    try:
+                        from twilio.rest import Client
+                        msg = (
+                            f"VocaGuard alert. {senior}s phone detected a {scam_type} "
+                            f"with {confidence} percent confidence. "
+                            "Please check on them. This is an automated alert from VocaGuard."
+                        )
+                        twiml = (
+                            "<Response>"
+                            "<Pause length=\"1\"/>"+
+                            f"<Say voice=\"alice\">{msg}</Say>"+
+                            "<Pause length=\"2\"/>"+
+                            f"<Say voice=\"alice\">{msg}</Say>"+
+                            "</Response>"
+                        )
+                        to_number = _normalize_phone(caregiver)
+                        if not to_number.startswith("+"):
+                            to_number = "+" + to_number
+                        call = Client(TWILIO_SID, TWILIO_TOKEN).calls.create(
+                            to=to_number,
+                            from_=caller_id,
+                            twiml=twiml
+                        )
+                        log.info("Twilio call SID %s to %s", call.sid, to_number)
+                    except Exception as ex:
+                        log.error("call_caregiver twilio error: %s", ex)
+                threading.Thread(target=_do_call, daemon=True).start()
+                self._send(200, {"status": "calling"})
+            except Exception as e:
+                log.error("call_caregiver error: %s", e)
+                self._send(500, {"error": str(e)})
+
+        else:
+            self._send(404)
+
+
+    def do_DELETE(self):
+        if not self._auth_ok():
+            self._send(403)
+            return
+        if self.path == "/delete":
+            try:
+                data  = self._read_json()
+                phone = data.get("phone_number", "").strip()
+                if not phone:
+                    self._send(400, {"error": "phone_number required"})
+                    return
+                phone = _normalize_phone(phone)
+                found = delete_user(phone)
+                if found:
+                    log.info("Data deletion complete for %s", phone)
+                    self._send(200, {"status": "deleted"})
+                else:
+                    self._send(404, {"error": "user not found"})
+            except Exception as e:
+                log.error("delete error: %s", e)
+                self._send(500, {"error": str(e)})
         else:
             self._send(404)
 
