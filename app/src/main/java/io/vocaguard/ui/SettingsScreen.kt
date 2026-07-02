@@ -81,6 +81,8 @@ fun SettingsTab(
     var reportEndpointInput by remember(reportEndpointUrl) { mutableStateOf(reportEndpointUrl) }
     var showMessengerTipDialog by remember { mutableStateOf(false) }
     var advancedExpanded by remember { mutableStateOf(false) }
+    var showDeleteDataDialog by remember { mutableStateOf(false) }
+    val deleteDataStatus by viewModel.deleteDataStatus.collectAsStateWithLifecycle()
 
     // Family Guard local state
     var newContactName by remember { mutableStateOf("") }
@@ -681,6 +683,69 @@ fun SettingsTab(
                 }
             }
         }
+
+        // ── Data & Privacy card ───────────────────────────────────────────────
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Data & Privacy",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Delete all data stored by VocaGuard, including call history and your server registration.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (deleteDataStatus.isNotEmpty()) {
+                        Text(
+                            text = deleteDataStatus,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (deleteDataStatus.startsWith("All data"))
+                                MaterialTheme.colorScheme.secondary
+                            else
+                                MaterialTheme.colorScheme.error
+                        )
+                    }
+                    Button(
+                        onClick = { showDeleteDataDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) { Text("Delete all my data") }
+                }
+            }
+        }
+    }
+
+    if (showDeleteDataDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDataDialog = false },
+            title = { Text("Delete all data?") },
+            text = {
+                Text("This will permanently delete your call history, server registration, and all settings. This cannot be undone.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDataDialog = false
+                        viewModel.deleteAllData()
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDataDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
     SnackbarHost(
         hostState = snackbarHostState,

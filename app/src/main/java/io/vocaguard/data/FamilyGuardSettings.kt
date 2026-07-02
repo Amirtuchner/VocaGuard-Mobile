@@ -90,6 +90,10 @@ class FamilyGuardSettings private constructor(context: Context) {
         contacts = contacts.filter { it.phoneNumber != phoneNumber }
     }
 
+    fun reset() {
+        prefs.edit().clear().apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "vocaguard_family_guard"
         private const val KEY_ENABLED = "enabled"

@@ -125,6 +125,28 @@ object ServerDetectionManager {
         prefs.edit().clear().apply()
     }
 
+    /**
+     * Asks the server to delete all data associated with this phone number.
+     * Returns true on success or if the user was never registered on the server.
+     */
+    suspend fun deleteFromServer(): Boolean = withContext(Dispatchers.IO) {
+        val phone = getPhoneNumber()
+        if (phone.isEmpty()) return@withContext true
+        try {
+            val body = JSONObject().apply { put("phone_number", phone) }.toString()
+            val client = buildHttpClient()
+            val request = Request.Builder()
+                .url("https://${BuildConfig.TOKEN_SERVER_HOST}/delete")
+                .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                .delete(body.toRequestBody("application/json".toMediaType()))
+                .build()
+            val response = client.newCall(request).execute()
+            response.isSuccessful || response.code == 404
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     // Self-signed cert trust (same pattern as VocaGuardFcmService)
     private fun buildHttpClient(): OkHttpClient {
         val trustAll = object : X509TrustManager {

@@ -372,6 +372,34 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    // ── Data deletion ─────────────────────────────────────────────────────────
+
+    private val _deleteDataStatus = MutableStateFlow("")
+    val deleteDataStatus: StateFlow<String> = _deleteDataStatus.asStateFlow()
+
+    fun deleteAllData() {
+        viewModelScope.launch {
+            _deleteDataStatus.value = "Deleting…"
+            val db = io.vocaguard.data.db.VocaGuardDatabase.getInstance(context)
+            // 1. Delete from server
+            val serverOk = sdm.deleteFromServer()
+            // 2. Clear local DB
+            db.transcriptDao().clearAll()
+            // 3. Clear all local prefs and registration
+            sdm.clear()
+            detectionSettings.reset()
+            familySettings.reset()
+            _familyGuardEnabled.value = false
+            _familyContacts.value = emptyList()
+            _serverRegistered.value = false
+            _serverSipExtension.value = ""
+            _serverActivationCode.value = ""
+            // 4. Tear down SIP
+            io.vocaguard.service.VocaGuardSipManager.reinitialize(getApplication())
+            _deleteDataStatus.value = if (serverOk) "All data deleted" else "Local data deleted (server unreachable)"
+        }
+    }
+
     // ── Subscription status ───────────────────────────────────────────────────
 
     val billingStatus: StateFlow<SubscriptionStatus> =

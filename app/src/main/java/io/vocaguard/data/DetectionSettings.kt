@@ -98,6 +98,10 @@ class DetectionSettings private constructor(context: Context) {
         get() = prefs.getBoolean(KEY_CALL_FORWARDING, false)
         set(value) = prefs.edit().putBoolean(KEY_CALL_FORWARDING, value).apply()
 
+    fun reset() {
+        prefs.edit().clear().apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "vocaguard_settings"
         private const val KEY_SENSITIVITY = "sensitivity"
