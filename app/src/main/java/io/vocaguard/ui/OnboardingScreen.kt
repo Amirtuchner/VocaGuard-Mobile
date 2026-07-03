@@ -103,12 +103,16 @@ fun OnboardingScreen(
                     onEnable = { callScreeningLauncher.launch(permissionsManager.createCallScreeningIntent()) }
                 )
                 2 -> RegistrationStep(
-                    phoneInput    = serverPhoneInput,
-                    onPhoneChange = viewModel::updateServerPhoneInput,
-                    onRegister    = viewModel::registerWithServer,
-                    isRegistering = serverIsRegistering,
-                    isRegistered  = serverRegistered,
-                    status        = serverRegStatus
+                    phoneInput      = serverPhoneInput,
+                    onPhoneChange   = viewModel::updateServerPhoneInput,
+                    onRegister      = viewModel::registerWithServer,
+                    onChangeNumber  = {
+                        viewModel.unregisterFromServer()
+                        viewModel.updateServerPhoneInput("")
+                    },
+                    isRegistering   = serverIsRegistering,
+                    isRegistered    = serverRegistered,
+                    status          = serverRegStatus
                 )
                 3 -> CallForwardingStep(
                     activationCode = activationCode,
@@ -186,6 +190,7 @@ private fun RegistrationStep(
     phoneInput: String,
     onPhoneChange: (String) -> Unit,
     onRegister: () -> Unit,
+    onChangeNumber: () -> Unit,
     isRegistering: Boolean,
     isRegistered: Boolean,
     status: String
@@ -232,6 +237,11 @@ private fun RegistrationStep(
                 )
             } else {
                 Text(if (isRegistered) "Registered ✓" else "Register")
+            }
+        }
+        if (isRegistered) {
+            TextButton(onClick = onChangeNumber, modifier = Modifier.fillMaxWidth()) {
+                Text("Change number")
             }
         }
         if (status.isNotEmpty()) {
