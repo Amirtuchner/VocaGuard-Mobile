@@ -40,6 +40,7 @@
         <activity
             android:name=".ui.IncomingCallActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:showOnLockScreen="true"
             android:turnScreenOn="true"
             android:theme="@style/Theme.VocaGuard" />

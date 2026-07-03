@@ -22,7 +22,6 @@ import io.vocaguard.ui.ScamOverlayManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
@@ -99,13 +98,13 @@ class VocaGuardFcmService : FirebaseMessagingService() {
         }
 
         // Signal Asterisk to bridge the waiting incoming call to the user's SIP phone.
-        // Retries up to 3 times with a 2-second delay to handle momentary network
-        // unavailability when the device wakes from lock screen.
+        // No retry — a duplicate request would trigger a second AMI Originate,
+        // sending a second SIP INVITE to Linphone and causing a second incoming-call ring.
         fun acceptCall(channel: String, callerNumber: String) {
             CoroutineScope(Dispatchers.IO).launch {
                 val client = OkHttpClient.Builder()
                     .connectTimeout(4, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
                     .build()
                 val jsonBody = JSONObject().apply {
                     put("channel", channel)
@@ -113,25 +112,18 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                     val phone = ServerDetectionManager.getPhoneNumber()
                     if (phone.isNotEmpty()) put("phone_number", phone)
                 }.toString()
-                var lastError: Exception? = null
-                repeat(3) { attempt ->
-                    if (attempt > 0) delay(500L)
-                    try {
-                        val request = Request.Builder()
-                            .url("https://${BuildConfig.TOKEN_SERVER_HOST}/accept-call")
-                            .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
-                            .post(jsonBody.toRequestBody("application/json".toMediaType()))
-                            .build()
-                        client.newCall(request).execute().use { response ->
-                            Log.i(TAG, "Accept call signalled (attempt ${attempt + 1}): ${response.code}")
-                        }
-                        return@launch  // success — stop retrying
-                    } catch (e: Exception) {
-                        lastError = e
-                        Log.w(TAG, "Accept call attempt ${attempt + 1} failed: $e")
+                try {
+                    val request = Request.Builder()
+                        .url("https://${BuildConfig.TOKEN_SERVER_HOST}/accept-call")
+                        .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                        .post(jsonBody.toRequestBody("application/json".toMediaType()))
+                        .build()
+                    client.newCall(request).execute().use { response ->
+                        Log.i(TAG, "Accept call signalled: ${response.code}")
                     }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to signal accept call", e)
                 }
-                Log.e(TAG, "Failed to signal accept call after 3 attempts", lastError)
             }
         }
     }
@@ -195,6 +187,12 @@ class VocaGuardFcmService : FirebaseMessagingService() {
     }
 
     private fun showIncomingCallNotification(callerNumber: String, asteriskChannel: String) {
+        // Ignore duplicate FCM "incoming_call" messages while a call is already active.
+        if (VocaGuardSipManager.callState.value == VocaGuardSipManager.CallState.ACTIVE ||
+            VocaGuardSipManager.callState.value == VocaGuardSipManager.CallState.INCOMING) {
+            Log.i(TAG, "Ignoring incoming_call FCM — call already in progress")
+            return
+        }
         val channelId = "incoming_call_channel"
         val nm = getSystemService(NotificationManager::class.java)
 
@@ -230,9 +228,7 @@ class VocaGuardFcmService : FirebaseMessagingService() {
             .build()
 
         nm.notify(io.vocaguard.ui.IncomingCallActivity.NOTIFICATION_ID, notification)
-
-        startActivity(callIntent())
-        Log.i(TAG, "Incoming call screen launched for $displayNumber channel=$asteriskChannel")
+        Log.i(TAG, "Incoming call notification posted for $displayNumber channel=$asteriskChannel")
     }
 
     private fun inferScamType(keywords: String): ScamType {

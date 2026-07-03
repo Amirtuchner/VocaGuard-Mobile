@@ -387,6 +387,15 @@ def ami_hangup(channel: str, sip_extension: str):
     finally:
         s.close()
 
+def _ami_originate_safe(channel, caller, sip_ext, phone):
+    """Wrapper that logs errors from ami_originate without crashing the server."""
+    try:
+        ami_originate(channel, caller, sip_ext, phone)
+        log.info("Bridge originated: %s → %s (user=%s)", channel, sip_ext, phone)
+    except Exception as e:
+        log.error("ami_originate error: %s", e)
+
+
 # ---------------------------------------------------------------------------
 # HTTP handler
 # ---------------------------------------------------------------------------
@@ -474,9 +483,16 @@ class Handler(BaseHTTPRequestHandler):
                 user    = get_user_by_phone(phone) if phone else None
                 sip_ext = user["sip_extension"] if user else "vocaguard"  # single-user fallback
 
-                ami_originate(channel, caller, sip_ext, phone)
-                log.info("Bridge originated: %s → %s (user=%s)", channel, sip_ext, phone)
+                # Respond 200 immediately so the Android client doesn't time out and
+                # retry — a duplicate request would trigger a second AMI Originate and
+                # a second SIP INVITE (causing a double-ring on the user's phone).
                 self._send(200)
+                import threading
+                threading.Thread(
+                    target=_ami_originate_safe,
+                    args=(channel, caller, sip_ext, phone),
+                    daemon=True
+                ).start()
             except Exception as e:
                 log.error("accept-call error: %s", e)
                 self._send(500)
