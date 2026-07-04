@@ -2,6 +2,7 @@ package io.vocaguard.ui
 
 import android.app.KeyguardManager
 import android.app.NotificationChannel
+import android.media.AudioManager
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
@@ -11,8 +12,12 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -32,8 +37,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -55,9 +62,15 @@ class IncomingCallActivity : ComponentActivity() {
     private var callActive by mutableStateOf(false)
     private var activeCallerNumber: String = ""
     private var pendingCancel by mutableStateOf(false)
+    private var volumeLevel by mutableStateOf(0f)
+    private var showVolumeMeter by mutableStateOf(false)
+    private var volumeHideJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Volume buttons control the call audio, not ringtone/media
+        volumeControlStream = AudioManager.STREAM_VOICE_CALL
 
         // Show over lock screen
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -112,6 +125,8 @@ class IncomingCallActivity : ComponentActivity() {
                     callerNumber = activeCallerNumber,
                     connected = (sipState == VocaGuardSipManager.CallState.ACTIVE),
                     scamAlert = scamAlert,
+                    volumeLevel = volumeLevel,
+                    showVolumeMeter = showVolumeMeter,
                     onEndCall = { hangUpAndFinish() },
                     onCancelConnecting = { pendingCancel = true }
                 )
@@ -135,6 +150,25 @@ class IncomingCallActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (callActive && (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            val am = getSystemService(AudioManager::class.java)
+            val direction = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+            am.adjustStreamVolume(AudioManager.STREAM_VOICE_CALL, direction, 0)
+            val max = am.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+            val current = am.getStreamVolume(AudioManager.STREAM_VOICE_CALL)
+            volumeLevel = if (max > 0) current.toFloat() / max.toFloat() else 0f
+            showVolumeMeter = true
+            volumeHideJob?.cancel()
+            volumeHideJob = lifecycleScope.launch {
+                delay(2000)
+                showVolumeMeter = false
+            }
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     private fun hangUpAndFinish() {
@@ -199,6 +233,8 @@ private fun ActiveCallScreen(
     callerNumber: String,
     connected: Boolean,
     scamAlert: Pair<ScamType, Float>?,
+    volumeLevel: Float,
+    showVolumeMeter: Boolean,
     onEndCall: () -> Unit,
     onCancelConnecting: () -> Unit
 ) {
@@ -267,6 +303,48 @@ private fun ActiveCallScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(bottom = 64.dp)
         ) {
+            if (connected && showVolumeMeter) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 48.dp)
+                ) {
+                    Text("Volume", color = Color(0xFFAAAAAA), fontSize = 12.sp)
+                    Spacer(Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        progress = { volumeLevel },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(10.dp),
+                        color = Color(0xFF4CAF50),
+                        trackColor = Color(0xFF333333)
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+            if (connected) {
+                var speakerOn by remember { mutableStateOf(false) }
+                Button(
+                    onClick = {
+                        speakerOn = !speakerOn
+                        VocaGuardSipManager.setSpeaker(speakerOn)
+                    },
+                    modifier = Modifier.size(64.dp),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (speakerOn) Color(0xFF1565C0) else Color(0xFF444444)
+                    )
+                ) {
+                    Text("\uD83D\uDD0A", fontSize = 22.sp)
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (speakerOn) "Speaker On" else "Speaker",
+                    color = Color.White, fontSize = 12.sp
+                )
+                Spacer(Modifier.height(20.dp))
+            }
             Button(
                 onClick = if (connected) onEndCall else onCancelConnecting,
                 modifier = Modifier.size(80.dp),

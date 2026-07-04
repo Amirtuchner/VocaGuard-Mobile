@@ -1,6 +1,7 @@
 package io.vocaguard.service
 
 import android.content.Context
+import android.media.AudioManager
 import android.util.Log
 import io.vocaguard.BuildConfig
 import kotlinx.coroutines.CoroutineScope
@@ -39,12 +40,14 @@ object VocaGuardSipManager {
     private var retryCount = 0
 
     private var core: Core? = null
+    private var appContext: Context? = null
 
     /** Set to true when user taps Accept — SDK will auto-answer the next incoming INVITE. */
     @Volatile var pendingAccept = false
 
     fun initialize(context: Context) {
         if (core != null) return
+        appContext = context.applicationContext
         try {
             val factory = Factory.instance()
             factory.setDebugMode(false, "VocaGuard")
@@ -73,7 +76,8 @@ object VocaGuardSipManager {
             serverAddr?.transport = TransportType.Udp
             params.serverAddress = serverAddr
             params.isRegisterEnabled = true
-            params.expires = 60   // re-register every ~45s; limits gap after server restart
+            params.expires = 1800  // re-register every ~27min; short enough to recover after
+                                  // server restart, long enough to never disrupt an active call
 
             val account = c.createAccount(params)
             c.addAccount(account)
@@ -194,6 +198,14 @@ object VocaGuardSipManager {
             core.outputAudioDevice = core.audioDevices
                 .firstOrNull { it.type == AudioDevice.Type.Earpiece }
                 ?: core.outputAudioDevice
+            // Boost received audio to match regular call loudness
+            core.playbackGainDb = 6.0f
+            // Maximize the Android voice call stream volume
+            appContext?.let { ctx ->
+                val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                val max = am.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+                am.setStreamVolume(AudioManager.STREAM_VOICE_CALL, max, 0)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "acceptWithParams failed", e)
         }
