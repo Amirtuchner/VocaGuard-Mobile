@@ -112,6 +112,24 @@ def main():
 
     log.info(f"BG detector started: fifo={audio_path} caller={caller_number} user={user_phone}")
 
+    # Open FIFO in a background thread so Vosk/Whisper model loading runs in
+    # parallel.  Without this, model loading (~40s) blocks MixMonitor's write(),
+    # starving Asterisk's audio pipeline and causing poor call quality + RTP
+    # timeouts that drop the bridge.
+    import threading
+    fifo_holder = [None]
+    fifo_ready  = threading.Event()
+
+    def _open_fifo():
+        try:
+            fifo_holder[0] = open(audio_path, "rb")
+        except Exception as e:
+            log.error(f"BG: FIFO open error: {e}")
+        finally:
+            fifo_ready.set()
+
+    threading.Thread(target=_open_fifo, daemon=True).start()
+
     try:
         rec_en = KaldiRecognizer(Model(MODEL_PATH_EN), SAMPLE_RATE)
         log.info("BG: Vosk model loaded")
@@ -125,6 +143,11 @@ def main():
         log.info("BG: Whisper model loaded")
     except Exception as e:
         log.warning(f"BG: Whisper load error: {e}")
+
+    fifo_ready.wait(timeout=300)
+    if fifo_holder[0] is None:
+        log.error("BG: FIFO never connected — aborting")
+        return
 
     alerted        = False
     resample_state = None
@@ -157,10 +180,9 @@ def main():
                                 scam_type, caller_number, conf)
             alerted = True
 
-    # Open FIFO for reading — blocks until MixMonitor connects as writer.
-    # MixMonitor writes 8 kHz SLIN (raw PCM, no header), same format as EAGI fd3.
     try:
-        with open(audio_path, "rb") as audio_file:
+        audio_file = fifo_holder[0]
+        with audio_file:
             log.info("BG: FIFO connected, analysis running")
             while True:
                 data = audio_file.read(3200)

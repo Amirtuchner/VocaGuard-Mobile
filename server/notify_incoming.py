@@ -5,7 +5,7 @@
    Reads ORIGINAL_CALLED (from REDIRECTING(from-num)) to identify which user
    the call was originally for, then looks up their FCM token from the DB.
 """
-import sys, os, json, socket, re, sqlite3
+import sys, os, json, socket, re, sqlite3, time
 import firebase_admin
 from firebase_admin import credentials, messaging
 
@@ -102,14 +102,23 @@ def cleanup_stale_vocaguard_channels():
 
         stale = []
         for block in text.split("\r\n\r\n"):
+            lines = block.splitlines()
             channel_line = next(
-                (l for l in block.splitlines()
-                 if l.startswith("Channel: PJSIP/vocaguard")),
-                None
+                (l for l in lines if l.startswith("Channel: PJSIP/vocaguard")), None
             )
-            if channel_line:
-                ch = channel_line.split(": ", 1)[1].strip()
-                stale.append(ch)
+            if not channel_line:
+                continue
+            # Never kill a channel that is Up (actively bridged)
+            state_line = next(
+                (l for l in lines if l.startswith("ChannelStateDesc: ")), None
+            )
+            if state_line and "Up" in state_line:
+                ch_name = channel_line.split(": ", 1)[1].strip()
+                sys.stdout.write(f'VERBOSE "Skipping active channel {ch_name}" 1\n')
+                sys.stdout.flush()
+                continue
+            ch = channel_line.split(": ", 1)[1].strip()
+            stale.append(ch)
 
         for ch in stale:
             s.sendall(f"Action: Hangup\r\nChannel: {ch}\r\n\r\n".encode())
@@ -126,6 +135,33 @@ def cleanup_stale_vocaguard_channels():
         sys.stdout.flush()
 
 
+DEDUP_TTL = 120  # seconds — ignore duplicate FCMs for same caller within this window
+DEDUP_DIR  = "/tmp/vg_dedup"
+
+
+def _dedup_key(caller: str) -> str:
+    import hashlib
+    return os.path.join(DEDUP_DIR, "caller_" + hashlib.md5(caller.encode()).hexdigest())
+
+
+def _is_duplicate(caller: str) -> bool:
+    """Return True if this caller already triggered an FCM within DEDUP_TTL seconds."""
+    if not caller:
+        return False
+    try:
+        os.makedirs(DEDUP_DIR, exist_ok=True)
+        key = _dedup_key(caller)
+        if os.path.exists(key):
+            age = time.time() - os.path.getmtime(key)
+            if age < DEDUP_TTL:
+                return True
+        # Touch the file to mark this caller as recently notified
+        open(key, "w").close()
+    except Exception:
+        pass
+    return False
+
+
 def main():
     agi_vars = agi_init()
     caller  = agi_vars.get("agi_callerid", "")
@@ -133,6 +169,12 @@ def main():
 
     # Read original called number (set in extensions.conf from REDIRECTING(from-num))
     diversion_number = agi_get_variable("ORIGINAL_CALLED")
+
+    # Deduplicate: if same caller was notified recently, skip FCM (DIDWW/Twilio retry)
+    if _is_duplicate(caller):
+        sys.stdout.write(f'VERBOSE "Duplicate FCM suppressed for {caller}" 1\n')
+        sys.stdout.flush()
+        return
 
     cleanup_stale_vocaguard_channels()
 
