@@ -182,7 +182,7 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
     ) {
         StepIcon(icon = Icons.Default.Description, isDone = accepted)
         Text(
-            "Terms of Use",
+            "Terms of Use and Privacy Policy",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
@@ -204,7 +204,9 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
                     "Terms of Use",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.End
                 )
                 TermsBullet("VocaGuard routes your calls through a secure server to detect scams in real time.")
                 TermsBullet("No call audio is stored. Audio is processed in memory and discarded immediately after the call.")
@@ -218,7 +220,9 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
                     "Privacy Policy",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.End
                 )
                 TermsBullet("Your phone number and FCM device token are stored on our server (Hetzner, Germany) to route scam alerts to your device. You can request deletion at any time.")
                 TermsBullet("Call transcripts of flagged calls are stored locally on your device only and are never uploaded to our servers.")
@@ -234,7 +238,7 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
             Checkbox(checked = accepted, onCheckedChange = onAcceptChange)
             Spacer(Modifier.width(8.dp))
             Text(
-                "I am 18 years of age or older, and I have read and agree to the Terms of Use and Privacy Policy",
+                "I have read and agree to the Terms of Use and Privacy Policy",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -251,11 +255,13 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
 @Composable
 private fun TermsBullet(text: String) {
     Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
-        Text("•  ", style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(text, style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Start)
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(4.dp))
+        Text("  •", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
