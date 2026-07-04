@@ -6,8 +6,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -26,7 +28,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-private const val TOTAL_STEPS = 4  // Welcome · Call Screening · Registration · Forwarding
+private const val TOTAL_STEPS = 5  // Terms · Welcome · Call Screening · Registration · Forwarding
 
 /**
  * Full-screen setup wizard shown once after install.
@@ -39,6 +41,7 @@ fun OnboardingScreen(
     onFinish: () -> Unit
 ) {
     var step by remember { mutableStateOf(0) }
+    var termsAccepted by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     // Re-check system permission states whenever the user returns from system settings.
@@ -97,12 +100,16 @@ fun OnboardingScreen(
         // ── Step content ─────────────────────────────────────────────────────
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
             when (step) {
-                0 -> WelcomeStep()
-                1 -> CallScreeningStep(
+                0 -> TermsStep(
+                    accepted       = termsAccepted,
+                    onAcceptChange = { termsAccepted = it }
+                )
+                1 -> WelcomeStep()
+                2 -> CallScreeningStep(
                     isDone   = callScreeningOk,
                     onEnable = { callScreeningLauncher.launch(permissionsManager.createCallScreeningIntent()) }
                 )
-                2 -> RegistrationStep(
+                3 -> RegistrationStep(
                     phoneInput      = serverPhoneInput,
                     onPhoneChange   = viewModel::updateServerPhoneInput,
                     onRegister      = viewModel::registerWithServer,
@@ -114,7 +121,7 @@ fun OnboardingScreen(
                     isRegistered    = serverRegistered,
                     status          = serverRegStatus
                 )
-                3 -> CallForwardingStep(
+                4 -> CallForwardingStep(
                     activationCode = activationCode,
                     isEnabled      = callForwardingEnabled,
                     onDial         = {
@@ -143,12 +150,14 @@ fun OnboardingScreen(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (step < TOTAL_STEPS - 1) {
+                // No Skip on the Terms step — acceptance is required
+                if (step in 1 until TOTAL_STEPS - 1) {
                     TextButton(onClick = { step++ }) { Text("Skip") }
                     Spacer(Modifier.width(8.dp))
                 }
                 Button(
                     onClick = { if (step < TOTAL_STEPS - 1) step++ else onFinish() },
+                    enabled = step != 0 || termsAccepted,
                     modifier = Modifier.defaultMinSize(minWidth = 120.dp)
                 ) {
                     Text(when {
@@ -163,6 +172,96 @@ fun OnboardingScreen(
 }
 
 // ── Step composables ──────────────────────────────────────────────────────────
+
+@Composable
+private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
+    val context = LocalContext.current
+    val scrollState = rememberScrollState()
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        StepIcon(icon = Icons.Default.Description, isDone = accepted)
+        Text(
+            "Terms of Use",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 260.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(scrollState)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TermsBullet("VocaGuard routes your calls through a secure server to detect scams in real time.")
+                TermsBullet("No call audio is stored. Audio is processed in memory and discarded immediately after the call.")
+                TermsBullet("VocaGuard does not guarantee 100% scam detection. Some scam calls may not be identified.")
+                TermsBullet("By using this app you release VocaGuard from any claims or liability for undetected scam calls or resulting financial loss.")
+                TermsBullet("By enabling call forwarding you accept sole responsibility for compliance with call monitoring laws in your jurisdiction. The calling party is not notified of the analysis.")
+                TermsBullet("Your phone number is stored on our server to route alerts to your device and can be deleted on request.")
+                TermsBullet("Subscription billing is handled through Google Play.")
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    TextButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW,
+                                Uri.parse("https://github.com/Amirtuchner/VocaGuard-Mobile/blob/main/docs/terms-of-use.html"))
+                            context.startActivity(intent)
+                        },
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("Terms of Use →", style = MaterialTheme.typography.bodySmall)
+                    }
+                    TextButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW,
+                                Uri.parse("https://github.com/Amirtuchner/VocaGuard-Mobile/blob/main/docs/privacy-policy.html"))
+                            context.startActivity(intent)
+                        },
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("Privacy Policy →", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Checkbox(checked = accepted, onCheckedChange = onAcceptChange)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "I have read and agree to the Terms of Use and Privacy Policy",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+        if (!accepted) {
+            Text(
+                "* Required to continue",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+    }
+}
+
+@Composable
+private fun TermsBullet(text: String) {
+    Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+        Text("•  ", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
 
 @Composable
 private fun WelcomeStep() {
