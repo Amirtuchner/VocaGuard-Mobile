@@ -175,7 +175,6 @@ fun OnboardingScreen(
 
 @Composable
 private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
-    val context = LocalContext.current
     val scrollState = rememberScrollState()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -191,7 +190,7 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 260.dp),
+                .heightIn(max = 300.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
             shape = MaterialTheme.shapes.medium
         ) {
@@ -199,37 +198,33 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
                 modifier = Modifier
                     .verticalScroll(scrollState)
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                Text(
+                    "Terms of Use",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 TermsBullet("VocaGuard routes your calls through a secure server to detect scams in real time.")
                 TermsBullet("No call audio is stored. Audio is processed in memory and discarded immediately after the call.")
                 TermsBullet("VocaGuard does not guarantee 100% scam detection. Some scam calls may not be identified.")
                 TermsBullet("By using this app you release VocaGuard from any claims or liability for undetected scam calls or resulting financial loss.")
                 TermsBullet("By enabling call forwarding you accept sole responsibility for compliance with call monitoring laws in your jurisdiction. The calling party is not notified of the analysis.")
-                TermsBullet("Your phone number is stored on our server to route alerts to your device and can be deleted on request.")
                 TermsBullet("Subscription billing is handled through Google Play.")
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    TextButton(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW,
-                                Uri.parse("https://github.com/Amirtuchner/VocaGuard-Mobile/blob/main/docs/terms-of-use.html"))
-                            context.startActivity(intent)
-                        },
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text("Terms of Use →", style = MaterialTheme.typography.bodySmall)
-                    }
-                    TextButton(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW,
-                                Uri.parse("https://github.com/Amirtuchner/VocaGuard-Mobile/blob/main/docs/privacy-policy.html"))
-                            context.startActivity(intent)
-                        },
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text("Privacy Policy →", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Privacy Policy",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                TermsBullet("Your phone number and FCM device token are stored on our server (Hetzner, Germany) to route scam alerts to your device. You can request deletion at any time.")
+                TermsBullet("Call transcripts of flagged calls are stored locally on your device only and are never uploaded to our servers.")
+                TermsBullet("Anonymous crash reports are sent to Firebase Crashlytics. They contain no call audio or phone numbers.")
+                TermsBullet("We do not sell, rent, or share your personal data with third parties. We do not use advertising networks.")
+                TermsBullet("When the Notification Listener is enabled, only messages from unknown senders are analysed. Messages from saved contacts are never scanned and no message content is transmitted to our servers.")
             }
         }
         Row(
@@ -239,7 +234,7 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
             Checkbox(checked = accepted, onCheckedChange = onAcceptChange)
             Spacer(Modifier.width(8.dp))
             Text(
-                "I have read and agree to the Terms of Use and Privacy Policy",
+                "I am 18 years of age or older, and I have read and agree to the Terms of Use and Privacy Policy",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -259,7 +254,8 @@ private fun TermsBullet(text: String) {
         Text("•  ", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(text, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Start)
     }
 }
 
