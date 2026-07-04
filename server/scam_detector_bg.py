@@ -180,8 +180,50 @@ def main():
                                 scam_type, caller_number, conf)
             alerted = True
 
+    # Run Whisper in a background thread so it never blocks the FIFO read loop.
+    # Without this, transcribing a 4s chunk takes several seconds on CPU, the
+    # FIFO buffer fills up, MixMonitor's write() stalls, and Asterisk pauses
+    # the audio pipeline — causing brief disconnections the user can hear.
+    import queue as _queue
+    whisper_q = _queue.Queue(maxsize=1)  # drop chunks if Whisper can't keep up
+
+    def _whisper_worker():
+        while True:
+            item = whisper_q.get()
+            if item is None:
+                break
+            buf_bytes = item
+            try:
+                audio_np = (
+                    np.frombuffer(buf_bytes, dtype=np.int16)
+                      .astype(np.float32) / 32768.0
+                )
+                segments, info = whisper_model.transcribe(
+                    audio_np, beam_size=5, best_of=5,
+                    vad_filter=False, language="en",
+                )
+                text = " ".join(seg.text for seg in segments).strip()
+                if text:
+                    add_text(text, f"ML({info.language})")
+                    check_and_alert("whisper-ml")
+            except Exception as e:
+                log.warning(f"BG Whisper thread error: {e}")
+            finally:
+                whisper_q.task_done()
+
+    if whisper_model:
+        _wt = threading.Thread(target=_whisper_worker, daemon=True)
+        _wt.start()
+
     try:
         audio_file = fifo_holder[0]
+        # Enlarge pipe buffer to 1 MB so MixMonitor never stalls even if
+        # Vosk is briefly busy — Linux default is only 64 KB.
+        try:
+            import fcntl
+            fcntl.fcntl(audio_file.fileno(), 1031, 1024 * 1024)
+        except Exception:
+            pass
         with audio_file:
             log.info("BG: FIFO connected, analysis running")
             while True:
@@ -219,24 +261,25 @@ def main():
                 if len(whisper_buf) >= WHISPER_CHUNK_BYTES:
                     if whisper_model:
                         try:
-                            audio_np = (
-                                np.frombuffer(bytes(whisper_buf), dtype=np.int16)
-                                  .astype(np.float32) / 32768.0
-                            )
-                            segments, info = whisper_model.transcribe(
-                                audio_np, beam_size=5, best_of=5,
-                                vad_filter=False, language="en",
-                            )
-                            text = " ".join(seg.text for seg in segments).strip()
-                            if text:
-                                add_text(text, f"ML({info.language})")
-                                check_and_alert("whisper-ml")
-                        except Exception as e:
-                            log.warning(f"BG Whisper error: {e}")
+                            whisper_q.put_nowait(bytes(whisper_buf))
+                        except _queue.Full:
+                            log.debug("BG: Whisper busy, dropping chunk")
                     whisper_buf.clear()
+
+    finally:
+        if whisper_model:
+            try:
+                whisper_q.put_nowait(None)  # signal worker to stop
+            except _queue.Full:
+                pass
 
     except Exception as e:
         log.info(f"BG audio closed: {e}")
+        if whisper_model:
+            try:
+                whisper_q.put_nowait(None)
+            except Exception:
+                pass
 
     # Final flush
     final_en = json.loads(rec_en.FinalResult()).get("text", "").strip()
