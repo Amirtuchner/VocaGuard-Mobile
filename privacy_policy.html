@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VocaGuard Privacy Policy</title>
+  <style>
+    body { font-family: sans-serif; padding: 16px; line-height: 1.7; color: #212121; max-width: 800px; }
+    h1 { font-size: 1.4em; }
+    h2 { font-size: 1.1em; margin-top: 1.6em; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; }
+    p, ul { margin: 0.5em 0; }
+    ul { padding-left: 1.4em; }
+    li { margin-bottom: 0.3em; }
+    strong { color: #111; }
+  </style>
+</head>
+<body>
+
+<h1>VocaGuard Privacy Policy</h1>
+<p><em>Last updated: 2026-07-04</em></p>
+
+<p>VocaGuard ("we", "our", or "the app") is a real-time scam call detection service.
+This policy explains what data we collect, how we use it, and your rights.</p>
+
+<h2>1. How VocaGuard Works</h2>
+<p>VocaGuard detects scam calls by routing incoming calls through a secure private server
+hosted on Oracle Cloud (United States). When you enable call forwarding, your carrier
+forwards incoming calls to the VocaGuard server, which transcribes the audio using
+speech recognition and runs scam detection. If a scam is detected, a push notification
+is sent to your phone in real time.</p>
+<p>No call audio is recorded for storage. Audio is transcribed in memory and discarded
+immediately after analysis.</p>
+<p><strong>Call monitoring notice:</strong> When call forwarding is active, the audio of
+incoming calls is processed by the VocaGuard server for scam detection. The calling
+party is not notified of this analysis. By enabling call forwarding to VocaGuard, you
+accept sole responsibility for compliance with any applicable call recording or
+monitoring laws in your jurisdiction.</p>
+
+<h2>2. Data We Collect</h2>
+<ul>
+  <li><strong>Call audio (server-side)</strong> — When call forwarding is active, the
+  audio stream passes through the VocaGuard server for real-time transcription and
+  scam analysis. Audio is processed in memory only and is <em>never</em> stored or
+  retained after the call ends.</li>
+  <li><strong>Call transcripts (on-device)</strong> — A text transcript of calls flagged
+  as suspicious is stored locally on your device. The 50 most recent transcripts are
+  kept; older ones are deleted automatically. Transcripts are never uploaded to our
+  servers.</li>
+  <li><strong>Your phone number (server-side)</strong> — When you register with VocaGuard,
+  your phone number is stored on our server alongside your FCM token and a private SIP
+  extension. This is used to route scam alerts to the correct device and to bridge
+  incoming calls to your VocaGuard session. You can request deletion at any time (see
+  Section 6).</li>
+  <li><strong>Caller phone numbers</strong> — The phone number of incoming callers
+  flagged as potential scams is stored locally on your device as part of the call
+  history. This is the <em>caller's</em> number, never your own. Numbers are checked
+  against a local scam database and optionally against the NumVerify API (if you
+  configure an API key).</li>
+  <li><strong>FCM device token (server-side)</strong> — A Firebase Cloud Messaging token
+  is registered with the VocaGuard server to deliver real-time scam alerts to your
+  device. The token identifies your device to the notification service but contains no
+  personal information. It is stored on our server linked to your phone number.</li>
+  <li><strong>App settings</strong> — Sensitivity level, language preference, theme, and
+  other preferences are stored locally in SharedPreferences on your device and are
+  never transmitted to our servers.</li>
+  <li><strong>Crash reports</strong> — If the app crashes, an anonymous crash report is
+  sent to Firebase Crashlytics. Reports contain device model, Android version, and a
+  stack trace. They do not contain call audio, transcripts, or phone numbers.</li>
+</ul>
+
+<h2>3. Data Shared With Third Parties</h2>
+<ul>
+  <li><strong>Firebase Cloud Messaging (Google)</strong> — Used to deliver scam alert
+  push notifications. Governed by Google's Privacy Policy.</li>
+  <li><strong>Firebase Crashlytics (Google)</strong> — Used for anonymous crash
+  reporting to improve app stability. Governed by Google's Privacy Policy.</li>
+  <li><strong>Twilio</strong> — Used to provide the US phone number that receives
+  forwarded calls. Twilio processes the SIP audio stream in transit to our server.
+  Governed by Twilio's Privacy Policy.</li>
+  <li><strong>NumVerify</strong> (optional) — If you enter an API key, caller phone
+  numbers are sent to numverify.com for reputation lookup over HTTPS. You control
+  whether this key is configured.</li>
+  <li><strong>Community blocklist</strong> (optional) — If you tap "Sync Now", your
+  device downloads a list of known scam numbers from a public URL. No data is uploaded.</li>
+</ul>
+<p>We do not sell, rent, or share your personal data with any other third parties.
+We do not use advertising networks or profiling services.</p>
+
+<h2>4. Permissions Used</h2>
+<ul>
+  <li><strong>READ_PHONE_STATE, ANSWER_PHONE_CALLS</strong> — Identify
+  the caller and detect call state changes.</li>
+  <li><strong>RECORD_AUDIO</strong> — Used for on-device speech recognition as a
+  supplementary detection method on devices where call forwarding is not active.</li>
+  <li><strong>CALL_PHONE, SEND_SMS</strong> — Used by Family Guard Mode to alert
+  designated family contacts when a scam is detected.</li>
+  <li><strong>POST_NOTIFICATIONS</strong> — Display real-time scam alert notifications.</li>
+  <li><strong>INTERNET</strong> — Communicate with the VocaGuard server, deliver
+  FCM notifications, and perform optional NumVerify lookups.</li>
+  <li><strong>NOTIFICATION LISTENER SERVICE</strong> — Read notification content from
+  WhatsApp, Telegram, Facebook Messenger, and SMS apps to detect scam messages in
+  real time. Only the text of incoming messages from unknown senders is analysed;
+  messages from saved contacts are never scanned. No message content is stored or
+  transmitted to our servers.</li>
+  <li><strong>SYSTEM_ALERT_WINDOW</strong> (optional) — Display an on-screen warning
+  overlay during a detected scam call. Requires manual grant.</li>
+  <li><strong>RECEIVE_BOOT_COMPLETED</strong> — Restart background services after
+  device reboot so protection is always active.</li>
+  <li><strong>READ_CONTACTS</strong> — Identify known contacts so they can be
+  excluded from scam screening. Contact data is never transmitted to our servers.</li>
+</ul>
+
+<h2>5. Family Guard Mode</h2>
+<p>If Family Guard Mode is enabled, the names and phone numbers of designated family
+contacts are stored locally on the device. When a scam is detected, VocaGuard sends
+an SMS alert and optionally places a phone call to those contacts. Contact information
+is never transmitted to our servers.</p>
+
+<h2>6. Data Retention &amp; Deletion</h2>
+<p><strong>On-device data</strong> (transcripts, settings, call history) is stored
+exclusively on your device. You can delete individual call records from the History
+tab at any time. Uninstalling VocaGuard permanently removes all locally stored data.</p>
+<p><strong>Server-side data</strong> (your phone number and FCM token): call audio is
+processed in memory and never written to disk. To delete your phone number and FCM
+token from our server, use the <em>Delete My Data</em> option inside the app, or send
+a deletion request to <strong>support@vocaguard.com</strong>. Your data will be removed
+within 7 days.</p>
+
+<h2>7. Data Security</h2>
+<p>Call audio is transmitted to our server over an encrypted TLS connection.
+On-device data is stored in a local database on your device.
+FCM tokens and phone numbers are transmitted and stored over HTTPS.
+Our server is hosted on Oracle Cloud (United States) with access restricted by
+firewall rules and SSH key authentication.</p>
+
+<h2>8. Children's Privacy</h2>
+<p>VocaGuard is not directed at children under 13 and does not knowingly collect
+personal information from children.</p>
+
+<h2>9. Changes to This Policy</h2>
+<p>Material changes to this policy will be reflected with a revised "Last updated"
+date at the top of this page. Continued use of the app after changes constitutes
+acceptance of the updated policy.</p>
+
+<h2>10. Contact</h2>
+<p>For privacy questions or data deletion requests, contact us at:
+<strong>support@vocaguard.com</strong></p>
+
+</body>
+</html>
