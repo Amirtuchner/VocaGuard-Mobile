@@ -294,10 +294,6 @@ private fun ActiveCallScreen(
             Text(displayNumber, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Text("VocaGuard is monitoring this call", color = Color(0xFFAAAAAA), fontSize = 14.sp)
-            if (connected) {
-                Spacer(Modifier.height(8.dp))
-                Text("Press back to return to Linphone", color = Color(0xFF888888), fontSize = 12.sp)
-            }
         }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
