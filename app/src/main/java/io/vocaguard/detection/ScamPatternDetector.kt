@@ -151,6 +151,17 @@ class ScamPatternDetector() {
                 "assurance maladie", "assurance santé", "couverture médicale", "mutuelle"
             ),
             ScamType.INVESTMENT_SCAM to listOf(
+                // English — social-media-ad referencing (calm first-call pattern)
+                "saw your interest online", "left your details", "registered on our",
+                "saw our advertisement", "saw our ad", "from the advertisement",
+                "facebook ad", "instagram ad", "promoted post", "our promotion",
+                "you filled out our form", "you signed up on our",
+                "financial consultant", "investment consultant", "personal advisor",
+                "your capital is protected", "capital is always protected",
+                "no pressure", "no risk to your funds", "withdraw at any time",
+                "managed account", "fully managed", "our experts handle",
+                "consistent returns", "consistent profit", "monthly returns",
+                "profits are guaranteed", "returns are guaranteed",
                 // English — core investment fraud phrases
                 "guaranteed returns", "high returns", "risk free", "double your money",
                 "investment opportunity", "limited slots", "exclusive offer",
@@ -178,7 +189,14 @@ class ScamPatternDetector() {
                 "гарантированный доход", "криптовалютные инвестиции", "пассивный доход без риска",
                 "торговый робот", "личный брокер", "вывод прибыли", "пополнить счёт",
                 "сигналы форекс", "vip торговый аккаунт", "арбитраж криптовалюты",
-                // Hebrew
+                // Hebrew — social-media-ad referencing pattern
+                "השארת פרטים", "ראיתי שהתעניינת", "נרשמת דרך הפרסומת",
+                "פרסומת בפייסבוק", "פרסומת באינסטגרם", "ברשתות החברתיות",
+                "יועץ פיננסי אישי", "יועץ השקעות", "חשבון מנוהל",
+                "ההון שלך מוגן", "אין סיכון לכסף", "למשוך בכל עת",
+                "תשואה חודשית קבועה", "רווחים מובטחים", "אין לחץ",
+                "המומחים שלנו מטפלים", "הכנסה פסיבית ללא ניסיון",
+                // Hebrew — core
                 "תשואה מובטחת", "השקעה בקריפטו", "הכפלת כסף", "פורקס",
                 "מנהל חשבון", "רובוט מסחר", "משיכת רווחים", "הפקדה ראשונית",
                 "אות מסחר", "קבוצת טלגרם vip", "ארביטראז' קריפטו",
