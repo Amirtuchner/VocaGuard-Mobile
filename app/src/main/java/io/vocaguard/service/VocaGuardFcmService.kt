@@ -196,6 +196,9 @@ class VocaGuardFcmService : FirebaseMessagingService() {
             Log.i(TAG, "Ignoring incoming_call FCM — call already in progress (state=$sipState, isShowing=${io.vocaguard.ui.IncomingCallActivity.isShowing})")
             return
         }
+        // Set the flag here — before launching the activity — so any duplicate FCM that
+        // arrives in the milliseconds before onCreate() fires is already blocked.
+        io.vocaguard.ui.IncomingCallActivity.isShowing = true
         val channelId = "incoming_call_channel"
         val nm = getSystemService(NotificationManager::class.java)
 
