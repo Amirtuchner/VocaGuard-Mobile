@@ -24,5 +24,6 @@ ml_training/*.pyc
 google-services.json
 *.keystore
 *.jks
+*.jks.old
 app/google-services.json
 apk-download/*.apk
