@@ -187,10 +187,13 @@ class VocaGuardFcmService : FirebaseMessagingService() {
     }
 
     private fun showIncomingCallNotification(callerNumber: String, asteriskChannel: String) {
-        // Ignore duplicate FCM "incoming_call" messages while a call is already active.
-        if (VocaGuardSipManager.callState.value == VocaGuardSipManager.CallState.ACTIVE ||
-            VocaGuardSipManager.callState.value == VocaGuardSipManager.CallState.INCOMING) {
-            Log.i(TAG, "Ignoring incoming_call FCM — call already in progress")
+        // Ignore duplicate FCM "incoming_call" messages while a call is already active or ending.
+        val sipState = VocaGuardSipManager.callState.value
+        if (io.vocaguard.ui.IncomingCallActivity.isShowing ||
+            sipState == VocaGuardSipManager.CallState.ACTIVE ||
+            sipState == VocaGuardSipManager.CallState.INCOMING ||
+            sipState == VocaGuardSipManager.CallState.ENDED) {
+            Log.i(TAG, "Ignoring incoming_call FCM — call already in progress (state=$sipState, isShowing=${io.vocaguard.ui.IncomingCallActivity.isShowing})")
             return
         }
         val channelId = "incoming_call_channel"

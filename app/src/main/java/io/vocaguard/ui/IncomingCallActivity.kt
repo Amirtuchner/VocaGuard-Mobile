@@ -60,6 +60,9 @@ class IncomingCallActivity : ComponentActivity() {
         const val EXTRA_CALLER_NUMBER = "caller_number"
         const val EXTRA_CHANNEL       = "asterisk_channel"
         const val NOTIFICATION_ID     = 2001
+
+        /** True while an IncomingCallActivity instance is alive — used to block duplicate launches. */
+        @Volatile var isShowing = false
     }
 
     private var ringtone: Ringtone? = null
@@ -91,6 +94,8 @@ class IncomingCallActivity : ComponentActivity() {
         }
         val km = getSystemService(KeyguardManager::class.java)
         km.requestDismissKeyguard(this, null)
+
+        isShowing = true
 
         val callerNumber    = intent.getStringExtra(EXTRA_CALLER_NUMBER) ?: ""
         val asteriskChannel = intent.getStringExtra(EXTRA_CHANNEL) ?: ""
@@ -229,6 +234,7 @@ class IncomingCallActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         ringtone?.stop()
+        isShowing = false
         // Save a clean-call record when the call ends, so "calls analyzed" counts every
         // server-monitored call. Skip if a scam record was already saved by VocaGuardFcmService.
         if (callActive && VocaGuardFcmService.scamAlertFlow.value == null) {
