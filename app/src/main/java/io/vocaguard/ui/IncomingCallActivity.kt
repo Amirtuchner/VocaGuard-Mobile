@@ -28,10 +28,15 @@ import kotlinx.coroutines.delay
 import io.vocaguard.service.VocaGuardSipManager
 import androidx.core.app.NotificationCompat
 import io.vocaguard.R
+import io.vocaguard.data.CallTranscript
 import io.vocaguard.data.ScamType
+import io.vocaguard.data.TranscriptRepository
 import io.vocaguard.receiver.ActiveCallReceiver
 import io.vocaguard.service.ServerDetectionManager
 import io.vocaguard.service.VocaGuardFcmService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -224,6 +229,19 @@ class IncomingCallActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         ringtone?.stop()
+        // Save a clean-call record when the call ends, so "calls analyzed" counts every
+        // server-monitored call. Skip if a scam record was already saved by VocaGuardFcmService.
+        if (callActive && VocaGuardFcmService.scamAlertFlow.value == null) {
+            CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+                TranscriptRepository.getInstance(applicationContext).save(
+                    CallTranscript(
+                        text = "",
+                        detectedScamTypes = emptyList(),
+                        phoneNumber = activeCallerNumber
+                    )
+                )
+            }
+        }
         VocaGuardFcmService.scamAlertFlow.value = null
     }
 }
