@@ -6,12 +6,16 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
+import androidx.core.content.ContextCompat
 import org.json.JSONObject
 import org.vosk.Recognizer
 import androidx.core.app.NotificationCompat
@@ -173,7 +177,20 @@ class CallMonitoringService : Service() {
 
         // Start foreground service with notification
         val notification = createNotification("Monitoring call for scam patterns...")
-        startForeground(NOTIFICATION_ID, notification)
+        val hasAudio = ContextCompat.checkSelfPermission(
+            this, android.Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && hasAudio) {
+                startForeground(NOTIFICATION_ID, notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Cannot start foreground with microphone type: ${e.message}")
+            startForeground(NOTIFICATION_ID, notification)
+        }
 
         // Start Vosk offline speech recognition via AudioRecord
         startVoskRecognition()

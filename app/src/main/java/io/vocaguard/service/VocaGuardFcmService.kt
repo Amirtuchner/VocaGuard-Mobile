@@ -228,7 +228,13 @@ class VocaGuardFcmService : FirebaseMessagingService() {
             .build()
 
         nm.notify(io.vocaguard.ui.IncomingCallActivity.NOTIFICATION_ID, notification)
-        Log.i(TAG, "Incoming call notification posted for $displayNumber channel=$asteriskChannel")
+
+        // Also start the activity directly so the ringtone plays immediately,
+        // regardless of whether Android fires the full-screen intent.
+        // singleTop launch mode prevents a duplicate instance if the activity
+        // is already on top (full-screen intent + startActivity → one instance).
+        startActivity(callIntent())
+        Log.i(TAG, "Incoming call screen launched for $displayNumber channel=$asteriskChannel")
     }
 
     private fun inferScamType(keywords: String): ScamType {
