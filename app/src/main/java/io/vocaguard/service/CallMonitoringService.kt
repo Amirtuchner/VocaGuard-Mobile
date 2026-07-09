@@ -473,21 +473,23 @@ class CallMonitoringService : Service() {
     }
 
     private fun saveTranscript() {
-        if (transcriptBuilder.isNotEmpty()) {
-            val transcript = transcriptBuilder.toString()
-            val scamTypes = detectedScamTypes.toList()
-            val number = activePhoneNumber
-            // Clear state immediately so the service can handle the next call right away
-            transcriptBuilder.clear()
-            detectedScamTypes.clear()
-            activePhoneNumber = ""
-            Log.d(TAG, "Saving transcript (${transcript.length} chars)")
-            // Use a detached IO scope so the write completes even if the service is destroyed
-            CoroutineScope(Dispatchers.IO).launch {
-                transcriptRepository.save(
-                    CallTranscript(text = transcript, detectedScamTypes = scamTypes, phoneNumber = number)
-                )
-            }
+        // Save a record for every monitored call, even if no speech was recognized,
+        // so that "calls analyzed" in the home screen stats is always accurate.
+        if (callStartTime == 0L) return
+        val transcript = transcriptBuilder.toString()
+        val scamTypes = detectedScamTypes.toList()
+        val number = activePhoneNumber
+        // Clear state immediately so the service can handle the next call right away
+        transcriptBuilder.clear()
+        detectedScamTypes.clear()
+        activePhoneNumber = ""
+        callStartTime = 0L
+        Log.d(TAG, "Saving transcript (${transcript.length} chars)")
+        // Use a detached IO scope so the write completes even if the service is destroyed
+        CoroutineScope(Dispatchers.IO).launch {
+            transcriptRepository.save(
+                CallTranscript(text = transcript, detectedScamTypes = scamTypes, phoneNumber = number)
+            )
         }
     }
 
