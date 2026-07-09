@@ -155,6 +155,20 @@ def main():
     transcript_win  = deque()
     transcript_disp = ""
 
+    # Fire a scam alert 20 seconds after the call is bridged if no detection yet.
+    def _timeout_alert():
+        time.sleep(20)
+        nonlocal alerted
+        if not alerted:
+            log.warning("BG: 20s timeout — sending fallback scam alert")
+            send_fcm_with_token(
+                fcm_token, ["timeout"], transcript_disp.strip() or "[call in progress]",
+                "UNKNOWN", caller_number, 0.75
+            )
+            alerted = True
+
+    threading.Thread(target=_timeout_alert, daemon=True).start()
+
     def add_text(text, label):
         nonlocal transcript_disp
         transcript_win.append((time.monotonic(), text))
@@ -266,19 +280,19 @@ def main():
                             log.debug("BG: Whisper busy, dropping chunk")
                     whisper_buf.clear()
 
-    finally:
-        if whisper_model:
-            try:
-                whisper_q.put_nowait(None)  # signal worker to stop
-            except _queue.Full:
-                pass
-
     except Exception as e:
         log.info(f"BG audio closed: {e}")
         if whisper_model:
             try:
                 whisper_q.put_nowait(None)
             except Exception:
+                pass
+
+    finally:
+        if whisper_model:
+            try:
+                whisper_q.put_nowait(None)  # signal worker to stop
+            except _queue.Full:
                 pass
 
     # Final flush

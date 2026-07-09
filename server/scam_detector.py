@@ -94,6 +94,14 @@ SCAM_KEYWORDS_EN = [
     ("monthly returns", 2), ("doubled their capital", 2), ("double your capital", 2),
     ("exclusive opportunity", 1), ("window closes", 1), ("crypto arbitrage", 3),
     ("guaranteed monthly", 2), ("your position before", 1),
+    # Social-media ad investment scam (first-call, calm trust-building)
+    ("investment opportunity", 2), ("facebook page", 2), ("instagram", 2),
+    ("facebook ad", 2), ("social media", 1), ("financial consultant", 2),
+    ("your capital", 2), ("capital is protected", 3), ("capital protected", 2),
+    ("withdraw at any time", 2), ("withdraw whenever", 2),
+    ("registered for", 1), ("you registered", 1), ("no pressure", 1),
+    ("guaranteed profit", 3), ("managed account", 2), ("no risk", 1),
+    ("personal advisor", 2), ("dedicated advisor", 2),
 ]
 
 SCAM_KEYWORDS_HE = [

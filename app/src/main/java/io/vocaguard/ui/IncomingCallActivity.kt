@@ -6,6 +6,7 @@ import android.media.AudioManager
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.net.Uri
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
@@ -29,14 +30,20 @@ import io.vocaguard.service.VocaGuardSipManager
 import androidx.core.app.NotificationCompat
 import io.vocaguard.R
 import io.vocaguard.data.CallTranscript
+import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.ScamType
 import io.vocaguard.data.TranscriptRepository
 import io.vocaguard.receiver.ActiveCallReceiver
 import io.vocaguard.service.ServerDetectionManager
 import io.vocaguard.service.VocaGuardFcmService
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import io.vocaguard.service.ReEnableForwardingWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import java.util.concurrent.TimeUnit
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -121,6 +128,12 @@ class IncomingCallActivity : ComponentActivity() {
                         // ORIG_CHANNEL is never cleaned up (scammer keeps ringing).
                         delay(2000)
                         hangUpAndFinish()
+                    }
+                    sipState == VocaGuardSipManager.CallState.ACTIVE && callActive && !pendingCancel -> {
+                        // Bridge is established — the 200 OK was just sent, so Hot Mobile
+                        // has deactivated *21* forwarding. Re-enable it NOW while the call
+                        // is still active, so it's ready before the next call comes in.
+                        reEnableForwardingSilently()
                     }
                     sipState == VocaGuardSipManager.CallState.ENDED && callActive -> {
                         getSystemService(NotificationManager::class.java)
@@ -228,6 +241,15 @@ class IncomingCallActivity : ComponentActivity() {
         ringtone?.stop()
         ringtone = null
         getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
+        // Asterisk waits 60s then calls Answer() which deactivates *21*.
+        // Schedule a re-enable 70s from now to cover that case.
+        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+            ReEnableForwardingWorker.WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            OneTimeWorkRequestBuilder<ReEnableForwardingWorker>()
+                .setInitialDelay(70, TimeUnit.SECONDS)
+                .build()
+        )
         finish()
     }
 
@@ -249,6 +271,76 @@ class IncomingCallActivity : ComponentActivity() {
             }
         }
         VocaGuardFcmService.scamAlertFlow.value = null
+        // Attempt 1: immediate (may race with BYE processing on Hot Mobile's end)
+        reEnableForwardingSilently()
+        // Attempt 2: delayed 15 s — by then Hot Mobile has finished processing BYE
+        // and any deactivation it triggered. WorkManager survives activity teardown.
+        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+            "re_enable_forwarding_delayed",
+            ExistingWorkPolicy.REPLACE,
+            OneTimeWorkRequestBuilder<ReEnableForwardingWorker>()
+                .setInitialDelay(15, TimeUnit.SECONDS)
+                .build()
+        )
+    }
+
+    private fun showReEnableForwardingNotification() {
+        ServerDetectionManager.init(this)
+        val code = ServerDetectionManager.getActivationCode()
+        if (code.isEmpty()) return
+
+        val callIntent = Intent(Intent.ACTION_CALL, Uri.fromParts("tel", code, null))
+        val pi = PendingIntent.getActivity(
+            this, 9001, callIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val nm = getSystemService(NotificationManager::class.java)
+        val channelId = "forwarding_reminder"
+        if (nm.getNotificationChannel(channelId) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(channelId, "Call Forwarding", NotificationManager.IMPORTANCE_HIGH)
+                    .apply { description = "Re-enable call forwarding after each call" }
+            )
+        }
+        nm.notify(3001, NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("Re-enable Call Protection")
+            .setContentText("Hot Mobile disabled forwarding. Tap to re-enable.")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pi)
+            .addAction(R.drawable.ic_launcher_foreground, "Re-enable Now", pi)
+            .build()
+        )
+    }
+
+    /**
+     * Try to silently re-enable *21* forwarding using the USSD/MMI API (no user interaction).
+     * Falls back to a tap-to-call notification if the modem rejects the request.
+     */
+    private fun reEnableForwardingSilently() {
+        ServerDetectionManager.init(this)
+        val code = ServerDetectionManager.getActivationCode()
+        if (code.isEmpty()) return
+        try {
+            val tm = getSystemService(android.telephony.TelephonyManager::class.java)
+            tm.sendUssdRequest(code, object : android.telephony.TelephonyManager.UssdResponseCallback() {
+                override fun onReceiveUssdResponse(
+                    tm: android.telephony.TelephonyManager, request: String, response: CharSequence
+                ) {
+                    android.util.Log.i("VocaGuard", "Forwarding re-enabled silently: $response")
+                }
+                override fun onReceiveUssdResponseFailed(
+                    tm: android.telephony.TelephonyManager, request: String, failureCode: Int
+                ) {
+                    android.util.Log.w("VocaGuard", "Silent re-enable failed ($failureCode), showing notification")
+                    showReEnableForwardingNotification()
+                }
+            }, android.os.Handler(mainLooper))
+        } catch (e: Exception) {
+            android.util.Log.w("VocaGuard", "sendUssdRequest error: $e")
+            showReEnableForwardingNotification()
+        }
     }
 }
 
