@@ -1244,11 +1244,16 @@ private fun ServerDetectionCard(
                 OutlinedTextField(
                     value = phoneField,
                     onValueChange = onPhoneChange,
-                    label = { Text("Your Phone Number (E.164)") },
-                    placeholder = { Text("+1234567890") },
+                    label = { Text("Your Phone Number") },
+                    placeholder = { Text("+972501234567") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "Include the country code (e.g. +972501234567 for Israel, +12025551234 for the US).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
