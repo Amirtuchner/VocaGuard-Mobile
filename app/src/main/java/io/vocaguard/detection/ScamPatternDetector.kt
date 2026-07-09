@@ -415,6 +415,45 @@ class ScamPatternDetector() {
             "n'appelez pas la police"
         )
 
+        // Social-media-ad investment scam phrases.
+        // Calm first-call pattern: scammer references a Facebook/Instagram ad, presents as a
+        // financial consultant, and emphasises capital protection — no urgency or threats.
+        private val SOCIAL_AD_PHRASES = listOf(
+            // English — ad reference
+            "facebook", "instagram", "social media", "our advertisement", "our ad",
+            "our promotion", "promoted post", "you registered", "you signed up",
+            "left your details", "filled out our form", "our website",
+            // English — role / trust language
+            "financial consultant", "investment consultant", "personal advisor",
+            "personal financial", "your dedicated", "dedicated consultant",
+            // English — capital protection / calm pitch
+            "capital is protected", "capital is always", "no pressure",
+            "no risk to your", "withdraw at any time", "your funds are safe",
+            "consistent returns", "monthly returns", "managed account",
+            // Hebrew
+            "פייסבוק", "אינסטגרם", "רשתות חברתיות", "הפרסומת שלנו",
+            "נרשמת", "השארת פרטים", "מילאת את הטופס",
+            "יועץ פיננסי", "יועץ השקעות", "יועץ אישי",
+            "ההון שלך מוגן", "אין לחץ", "למשוך בכל עת",
+            "תשואה חודשית", "חשבון מנוהל",
+            // Russian
+            "фейсбук", "инстаграм", "наша реклама", "вы зарегистрировались",
+            "оставили данные", "финансовый консультант", "личный советник",
+            "ваш капитал защищён", "без давления", "ежемесячная доходность",
+            // Arabic
+            "فيسبوك", "إنستغرام", "إعلاننا", "سجلت اهتمامك",
+            "تركت بياناتك", "مستشار مالي", "رأس مالك محمي",
+            "لا ضغط", "عائد شهري",
+            // Spanish
+            "facebook", "instagram", "nuestro anuncio", "se registró",
+            "dejó sus datos", "consultor financiero", "capital protegido",
+            "sin presión", "rendimiento mensual",
+            // French
+            "facebook", "instagram", "notre annonce", "vous êtes inscrit",
+            "laissé vos coordonnées", "conseiller financier", "capital protégé",
+            "sans pression", "rendement mensuel"
+        )
+
         // Payment request keywords.
         private val PAYMENT_KEYWORDS = listOf(
             // English
@@ -740,6 +779,9 @@ class ScamPatternDetector() {
         val hasInfo     = INFO_REQUEST_KEYWORDS.any { containsWord(lowerText, it) }
         // Secrecy demands: legitimate callers never ask you to hide the call from others.
         val hasSecrecy  = SECRECY_KEYWORDS.any  { containsWord(lowerText, it) }
+        // Social-media-ad reference: scammer mentions Facebook/Instagram ad, financial consultant role,
+        // or capital protection — hallmarks of the calm first-call investment scam.
+        val hasSocialAdRef = SOCIAL_AD_PHRASES.any { containsWord(lowerText, it) }
 
         // Score every scam type and keep the best match
         var bestType: ScamType = ScamType.UNKNOWN
@@ -761,8 +803,12 @@ class ScamPatternDetector() {
             val infoBoost     = if (hasInfo)     0.10f else 0f
             // Secrecy demand: unusually strong signal — legitimate callers never ask for silence
             val secrecyBoost  = if (hasSecrecy)  0.25f else 0f
+            // Social-media-ad investment scam: calm first-call pattern — no urgency/threat/payment,
+            // but references a Facebook/Instagram ad, financial consultant role, or capital protection.
+            // Only applies to INVESTMENT_SCAM to stay precise.
+            val socialAdBoost = if (scamType == ScamType.INVESTMENT_SCAM && hasSocialAdRef) 0.30f else 0f
 
-            val confidence = (keywordScore + urgencyBoost + threatBoost + paymentBoost + infoBoost + secrecyBoost)
+            val confidence = (keywordScore + urgencyBoost + threatBoost + paymentBoost + infoBoost + secrecyBoost + socialAdBoost)
                 .coerceAtMost(1.0f)
 
             if (confidence > bestConfidence) {
