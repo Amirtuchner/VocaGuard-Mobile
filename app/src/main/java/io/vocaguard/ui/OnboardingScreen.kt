@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import android.telephony.TelephonyManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -67,6 +68,15 @@ fun OnboardingScreen(
     val callScreeningLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { callScreeningOk = permissionsManager.isCallScreeningEnabled() }
+
+    // Carrier detection — hoisted so navigation buttons can also use these values
+    val tm = context.getSystemService(TelephonyManager::class.java)
+    val simOperator  = tm?.simOperator ?: ""
+    val operatorName = tm?.networkOperatorName?.lowercase() ?: ""
+    val isHotMobile  = simOperator == "42507" || simOperator == "42577"
+        || operatorName.contains("hot mobile")
+    val isVerizon    = operatorName.contains("verizon")
+    val simCountry   = tm?.simCountryIso?.lowercase() ?: ""
 
     Column(
         modifier = Modifier
@@ -121,17 +131,28 @@ fun OnboardingScreen(
                     isRegistered    = serverRegistered,
                     status          = serverRegStatus
                 )
-                4 -> CallForwardingStep(
-                    activationCode = activationCode,
-                    isEnabled      = callForwardingEnabled,
-                    onDial         = {
-                        val code = activationCode.ifEmpty { "*21*+97233741493#" }
-                        val intent = Intent(Intent.ACTION_DIAL,
-                            Uri.parse("tel:" + code.replace("#", "%23")))
-                        context.startActivity(intent)
-                    },
-                    onToggle = viewModel::setCallForwardingEnabled
-                )
+                4 -> {
+                    val fallbackDid = if (simCountry == "us" || simCountry == "ca")
+                        "+13373828491" else "+97233741493"
+                    val fallbackCode = when {
+                        isHotMobile -> ""
+                        isVerizon   -> "*72$fallbackDid"
+                        else        -> "*21*$fallbackDid#"
+                    }
+                    CallForwardingStep(
+                        activationCode = activationCode.ifEmpty { fallbackCode },
+                        isHotMobile    = isHotMobile,
+                        isVerizon      = isVerizon,
+                        isEnabled      = callForwardingEnabled || isHotMobile,
+                        onDial         = {
+                            val code = activationCode.ifEmpty { fallbackCode }
+                            val intent = Intent(Intent.ACTION_DIAL,
+                                Uri.parse("tel:" + code.replace("#", "%23")))
+                            context.startActivity(intent)
+                        },
+                        onToggle = viewModel::setCallForwardingEnabled
+                    )
+                }
             }
         }
 
@@ -161,9 +182,9 @@ fun OnboardingScreen(
                     modifier = Modifier.defaultMinSize(minWidth = 120.dp)
                 ) {
                     Text(when {
-                        step < TOTAL_STEPS - 1 -> "Next"
-                        callForwardingEnabled  -> "Get Started"
-                        else                   -> "Skip (not recommended)"
+                        step < TOTAL_STEPS - 1               -> "Next"
+                        callForwardingEnabled || isHotMobile -> "Get Started"
+                        else                                 -> "Skip (not recommended)"
                     })
                 }
             }
@@ -317,9 +338,9 @@ private fun RegistrationStep(
             value = phoneInput,
             onValueChange = onPhoneChange,
             label = { Text("Phone number with country code") },
-            placeholder = { Text("+972 50 1234567") },
+            placeholder = { Text("+1 (555) 123-4567") },
             supportingText = {
-                Text("Include your country code and omit the leading zero.\nExample (Israel): +972 50 1234567  (not 050-1234567)")
+                Text("Include your country code. Examples:\nUS: +1 555 123 4567 · Israel: +972 50 123 4567")
             },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             singleLine = true,
@@ -362,11 +383,51 @@ private fun RegistrationStep(
 @Composable
 private fun CallForwardingStep(
     activationCode: String,
+    isHotMobile: Boolean,
+    isVerizon: Boolean,
     isEnabled: Boolean,
     onDial: () -> Unit,
     onToggle: (Boolean) -> Unit
 ) {
-    val code = activationCode.ifEmpty { "*21*+97233741493#" }
+    if (isHotMobile) {
+        // Hot Mobile deactivates CFU on answer — use on-device detection instead
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            StepIcon(icon = Icons.Default.Shield, isDone = true)
+            Text(
+                text = "On-Device Protection Active",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Your carrier (Hot Mobile) doesn't support VocaGuard's call-forwarding method. VocaGuard will protect you using on-device scam detection: known scam numbers are blocked before your phone rings, and your microphone is monitored during calls to detect if you are sharing sensitive information with a scammer.",
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "✓ You're protected — tap Get Started",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+        }
+        return
+    }
+
+    // Standard call-forwarding flow (all other carriers)
+    val code = activationCode
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -379,7 +440,10 @@ private fun CallForwardingStep(
             textAlign = TextAlign.Center
         )
         Text(
-            text = "Forward your incoming calls through VocaGuard's server so scammer voices can be analyzed in real time.",
+            text = if (isVerizon)
+                "Forward your incoming calls through VocaGuard's server so scammer voices can be analyzed in real time. After dialing, wait for the confirmation tone, then hang up."
+            else
+                "Forward your incoming calls through VocaGuard's server so scammer voices can be analyzed in real time.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -2,6 +2,7 @@ package io.vocaguard.service
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.telephony.TelephonyManager
 import io.vocaguard.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -50,10 +51,26 @@ object ServerDetectionManager {
     fun getSipPassword(): String  = prefs.getString(KEY_SIP_PASS, "") ?: ""
     fun getDidNumber(): String    = prefs.getString(KEY_DID,     "") ?: ""
 
-    /** Activation code the user dials to enable call forwarding. */
-    fun getActivationCode(): String {
+    /**
+     * Activation code the user dials to enable call forwarding.
+     * Returns "" for Hot Mobile (server route not supported).
+     * Verizon uses *72+number (no # suffix).
+     * All other carriers use *21*+number#.
+     */
+    fun getActivationCode(context: Context? = null): String {
         val did = getDidNumber().trimStart('+')
-        return if (did.isNotEmpty()) "*21*+$did#" else ""
+        if (did.isEmpty()) return ""
+        if (context != null) {
+            val tm = context.getSystemService(TelephonyManager::class.java)
+            val simOperator  = tm?.simOperator ?: ""
+            val operatorName = tm?.networkOperatorName?.lowercase() ?: ""
+            val isHotMobile  = simOperator == "42507" || simOperator == "42577"
+                || operatorName.contains("hot mobile")
+            val isVerizon    = operatorName.contains("verizon")
+            if (isHotMobile) return ""
+            if (isVerizon)   return "*72+$did"
+        }
+        return "*21*+$did#"
     }
 
     data class RegistrationResult(

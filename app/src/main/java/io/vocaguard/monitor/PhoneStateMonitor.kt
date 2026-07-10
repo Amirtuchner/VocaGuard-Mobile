@@ -12,6 +12,7 @@ import android.util.Log
 import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.ScamDatabaseManager
 import io.vocaguard.service.CallMonitoringService
+import io.vocaguard.service.ServerDetectionManager
 
 @Suppress("DEPRECATION") // PhoneStateListener used only on API < 31; TelephonyCallback used on 31+
 class PhoneStateMonitor(private val context: Context) {
@@ -100,11 +101,14 @@ class PhoneStateMonitor(private val context: Context) {
     }
 
     private fun onCallActive() {
-        // Only run local monitoring when call forwarding is active.
-        // If forwarding is off, the user has deliberately disabled monitoring —
-        // starting local analysis would cause false positives on normal calls.
-        if (!DetectionSettings.getInstance(context).callForwardingEnabled) {
-            Log.i(TAG, "Call answered but call forwarding is disabled — skipping local monitoring")
+        val settings = DetectionSettings.getInstance(context)
+        // Hot Mobile users can't use call forwarding (carrier deactivates CFU on answer),
+        // so they rely entirely on on-device Vosk + TFLite detection via VOICE_COMMUNICATION.
+        // Allow monitoring to start for them even though callForwardingEnabled is false.
+        val isOnDeviceOnlyMode = ServerDetectionManager.isRegistered() &&
+            ServerDetectionManager.getActivationCode(context).isEmpty()
+        if (!settings.callForwardingEnabled && !isOnDeviceOnlyMode) {
+            Log.i(TAG, "Call answered but monitoring not active — skipping")
             return
         }
         // Call answered (OFFHOOK) — start audio monitoring now so we capture call audio,

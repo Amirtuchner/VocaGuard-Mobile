@@ -128,6 +128,18 @@ class HybridScamDetector(private val context: Context) {
         return ruleResult
     }
 
+    /**
+     * Analyses the VICTIM's speech for scam signals (used in mic-only mode).
+     *
+     * The ML model was trained on scammer-side transcripts and would degrade
+     * accuracy on victim speech, so rule-based detection is used exclusively here.
+     *
+     * @param chunk         Latest Vosk recognition chunk.
+     * @param fullTranscript Full accumulated call transcript.
+     */
+    fun analyzeVictimSpeech(chunk: String, fullTranscript: String): DetectionResult =
+        ruleBasedDetector.analyzeVictimSpeech(chunk, fullTranscript)
+
     fun getDetectorInfo(): String {
         val mlInfo = if (mlClassifier.isModelAvailable()) {
             "ML enabled (${mlClassifier.getModelInfo()})"

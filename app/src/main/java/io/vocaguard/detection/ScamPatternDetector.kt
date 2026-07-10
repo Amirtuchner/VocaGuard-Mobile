@@ -472,6 +472,253 @@ class ScamPatternDetector() {
             "carte cadeau", "virement bancaire", "western union", "payez maintenant"
         )
 
+        // ── Victim-side detection ─────────────────────────────────────────────────
+        // Patterns for what a VICTIM says during a scam call, not the scammer.
+        // Used in VOICE_COMMUNICATION mic-only mode (e.g. Hot Mobile) where only
+        // the user's microphone is captured.  An alert requires ≥2 categories to
+        // be present in the accumulated transcript, preventing false positives from
+        // normal banking calls or everyday speech.
+
+        /** Victim reads back sensitive data they were asked to provide. */
+        private val VICTIM_DISCLOSING = listOf(
+            // English
+            "the code is", "verification code is", "otp is", "one time password is",
+            "my pin is", "the pin is", "my password is", "the password is",
+            "my account number is", "account ending in", "card number is",
+            "my credit card number", "my social security", "date of birth is",
+            "my id number is", "the cvv is", "security code on the back",
+            "the six digit code", "the four digit code", "my routing number",
+            "expiry date is", "expiration date is", "the three digits",
+            // Hebrew
+            "הקוד הוא", "קוד האימות הוא", "הסיסמה שלי היא",
+            "מספר החשבון שלי", "מספר הכרטיס שלי", "תאריך הלידה שלי",
+            "מספר תעודת הזהות שלי", "קוד חד פעמי", "הפין שלי", "הסיסמה היא"
+        )
+
+        /** Victim actively performs a dangerous financial or remote-access action. */
+        private val VICTIM_COMPLYING = listOf(
+            // English — ATM / cash
+            "i'm at the atm", "going to the atm", "i went to the atm", "at the atm right now",
+            "i withdrew the cash", "withdrawing the cash", "withdrew the money",
+            "i'm at the bank withdrawing", "went to the bank to withdraw",
+            // English — gift cards
+            "i bought gift cards", "i have the gift cards", "i got the gift cards",
+            "bought a gift card", "purchasing gift cards", "gift card numbers are",
+            "numbers on the back of the card", "reading the numbers off the back",
+            // English — money transfer
+            "i transferred the money to them", "i sent the money to you",
+            "i wired the money", "i completed the transfer", "i sent the wire",
+            "the money has been sent", "transfer has been completed",
+            // English — remote access
+            "i downloaded anydesk", "i installed anydesk", "i downloaded teamviewer",
+            "i installed teamviewer", "you can see my screen", "you have access to my computer",
+            "i allowed the remote", "i clicked allow", "i installed the app you sent",
+            "i granted access", "you have control of my",
+            // English — crypto
+            "i'm sending the bitcoin", "i bought bitcoin", "i purchased bitcoin",
+            "sending to the wallet address", "the bitcoin has been sent",
+            // Hebrew — ATM / cash
+            "אני בכספומט", "הלכתי לכספומט", "משכתי מזומן", "אני מושך מזומן",
+            "הלכתי לבנק למשוך",
+            // Hebrew — gift cards
+            "קניתי כרטיסי מתנה", "קניתי גיפט קארד", "יש לי את הכרטיסים",
+            "מספרי הגיפט קארד", "הספרות מאחורי הכרטיס",
+            // Hebrew — transfer
+            "העברתי את הכסף אליהם", "שלחתי את הכסף אליך", "ביצעתי העברה בנקאית",
+            "ההעברה הושלמה",
+            // Hebrew — remote access
+            "הורדתי אניידסק", "הורדתי טימויוור", "התקנתי את האפליקציה שלחת",
+            "אתה רואה את המסך שלי", "יש לך גישה למחשב שלי",
+            // Hebrew — crypto
+            "קניתי ביטקוין", "שולח ביטקוין", "הביטקוין נשלח",
+            // English — investment action (victim following scammer instructions)
+            "i already transferred the money", "i sent the money already",
+            "did you receive the payment", "have you received my payment",
+            "which wallet address should i use", "what wallet address do i send to",
+            "do i need to convert the money to cryptocurrency", "do i need to buy crypto",
+            "can i pay by bank transfer", "can i do a bank transfer",
+            "where should i send the money", "where do i send the money",
+            "what is anydesk", "what is team viewer",
+            "i've opened the crypto wallet", "i opened the crypto wallet",
+            "i set up the wallet", "i created the wallet",
+            "i'm installing anydesk", "i installed the anydesk",
+            // Hebrew — investment actions
+            "כבר העברתי את הכסף", "שלחתי את הכסף כבר",
+            "קיבלת את התשלום", "האם קיבלת את הכסף",
+            "איזה כתובת ארנק אני שולח", "לאיזה כתובת ארנק",
+            "אני צריך להמיר את הכסף לקריפטו", "אני צריך לקנות קריפטו",
+            "אפשר לשלם בהעברה בנקאית", "אפשר להעביר בנקאית",
+            "לאן אני שולח את הכסף", "לאן אני צריך לשלוח",
+            "מה זה אניידסק", "מה זה טימויוור",
+            "פתחתי את ארנק הקריפטו", "פתחתי ארנק קריפטו",
+            "יצרתי את הארנק", "התקנתי אניידסק"
+        )
+
+        /** Victim expresses fear in response to arrest / legal threats. */
+        private val VICTIM_FEARING = listOf(
+            // English
+            "please don't arrest me", "i don't want to be arrested",
+            "i don't want to go to jail", "i'm scared", "i am very scared",
+            "i'm terrified", "i'm very worried about this",
+            "i'll cooperate fully", "i'll do whatever you say",
+            "i'll do anything you ask", "please don't take me to court",
+            "i don't want any trouble", "i'll do whatever it takes",
+            "i don't want to lose everything", "please help me resolve this",
+            // Hebrew
+            "אנא אל תעצור אותי", "אני לא רוצה ללכת לכלא",
+            "אני פוחד מאוד", "אני מפחד מאוד", "אני מפחדת מאוד",
+            "אעשה כל מה שתגיד", "אשתף פעולה באופן מלא",
+            "אני לא רוצה בעיות", "אנא עזור לי לפתור את זה",
+            "אני לא רוצה לאבד הכל"
+        )
+
+        /** Victim agrees to hide the call from family / police (very strong signal). */
+        private val VICTIM_CONCEALING = listOf(
+            // English
+            "i won't tell anyone", "i won't tell my family",
+            "i'll keep it between us", "i'll keep it a secret",
+            "i won't mention this to anyone", "okay i won't say anything",
+            "i understand i shouldn't tell", "i won't say a word",
+            "i promise i won't tell", "i'll stay quiet about this",
+            "i won't call the police", "i won't contact my bank about this",
+            // Hebrew
+            "לא אספר לאף אחד", "לא אספר למשפחה שלי",
+            "אשמור את זה בסוד", "לא אגיד לאף אחד",
+            "אני מבין שלא אמור לספר", "לא אגלה לאיש", "אשתוק על זה"
+        )
+
+        /**
+         * Victim phrases that are virtually impossible in a legitimate call.
+         * A single match triggers a high-confidence alert without needing a second category.
+         */
+        private val VICTIM_CRITICAL_PHRASES = setOf(
+            // Authority / arrest threats
+            "please don't arrest me",
+            "i don't want to go to jail",
+            "i don't want to be arrested",
+            // Gift card / cash extraction
+            "reading the numbers off the back",
+            "the gift card numbers are",
+            // Crypto sending
+            "i'm sending you the bitcoin",
+            // Investment scam: sharing an OTP with a "financial advisor" is never legitimate
+            "i received a verification code",
+            "i got a verification code",
+            "the verification code i received",
+            // Investment scam: bank flagged the transfer in real-time — very specific signal
+            "the bank is asking why i'm transferring",
+            "the bank wants to know why i'm sending",
+            "the bank is blocking my transfer",
+            "the teller is asking why",
+            // Investment scam: crypto wallet opened at scammer's direction
+            "i've opened the crypto wallet",
+            "i just opened the crypto wallet",
+            // Hebrew
+            "אנא אל תעצור אותי",
+            "אני לא רוצה ללכת לכלא",
+            "קיבלתי קוד אימות",
+            "הבנק שואל למה אני מעביר את הכסף",
+            "הבנק חוסם לי את ההעברה",
+            "פתחתי את ארנק הקריפטו"
+        )
+
+        /**
+         * Questions and statements a victim makes while being coached through an
+         * investment scam.  These phrases CAN appear in legitimate financial
+         * conversations, so this category alone never triggers an alert — it must
+         * combine with at least one other victim category (COMPLYING, DISCLOSING,
+         * FEARING, or CONCEALING).
+         */
+        private val VICTIM_INVESTMENT_COACHING = listOf(
+            // English — due-diligence questions victims ask while being pitched
+            "how will i know that i won't lose money",
+            "how do i know i won't lose my money",
+            "what do i need to do to get started",
+            "what do i need to do next",
+            "when will i be able to withdraw my money",
+            "when can i withdraw my money",
+            "when can i take out my money",
+            "when will the financial consultant call me",
+            "when will my advisor call me",
+            "when will my account manager call me",
+            "how much do i need to invest",
+            "what is the minimum investment",
+            "how much profit will i make",
+            "how much can i earn",
+            "what return will i get",
+            // English — withdrawal block / fee extortion (victim pushes back)
+            "why do i need to send more money",
+            "why do i have to pay more",
+            "i thought i already paid everything",
+            "i don't have that amount available",
+            "i don't have that much money",
+            "i can't afford to send that much",
+            "why has my account manager stopped answering",
+            "why isn't my account manager responding",
+            "why can't i access my account",
+            "why can't i withdraw",
+            "i've been trying to withdraw for weeks",
+            // English — legitimacy / skepticism signals
+            "how do i know this is legitimate",
+            "how do i know you're real",
+            "can you prove this is a real company",
+            "why are you calling from a different number",
+            "why is the number different",
+            "can i call you back using the official number",
+            "can i verify this with the company directly",
+            "can you send me the documents",
+            "can you send me something in writing",
+            "can i think about it first",
+            "i need more time to think",
+            "i'm not comfortable making this decision now",
+            "i need to speak to someone i trust first",
+            "i want to ask my family first",
+            // English — payment / logistics
+            "can i pay in installments",
+            "can i split the payment",
+            "can we continue tomorrow",
+            "can we talk again tomorrow",
+            // English — disengagement (victim trying to stop)
+            "stop contacting me",
+            "please stop calling me",
+            "i want to stop",
+            "i don't want to continue",
+            "i've changed my mind",
+            // Hebrew — due-diligence / pitch
+            "מאיפה אני יודע שלא אפסיד כסף",
+            "איך אני יודע שלא אפסיד",
+            "מה אני צריך לעשות",
+            "מתי אוכל למשוך את הכסף שלי",
+            "מתי אפשר למשוך את הכסף",
+            "מתי היועץ הפיננסי יתקשר אלי",
+            "מתי מנהל החשבון שלי יתקשר",
+            "כמה אני צריך להשקיע",
+            "כמה רווח אני ארוויח",
+            "מה התשואה שאקבל",
+            // Hebrew — withdrawal block
+            "למה אני צריך לשלוח עוד כסף",
+            "למה אני צריך לשלם עוד",
+            "אין לי את הסכום הזה",
+            "למה מנהל החשבון שלי הפסיק לענות",
+            "למה אני לא יכול למשוך את הכסף",
+            "ניסיתי למשוך כבר שבועות",
+            // Hebrew — skepticism
+            "איך אני יודע שזה לגיטימי",
+            "איך אני יודע שאתם חברה אמיתית",
+            "למה אתה מתקשר ממספר אחר",
+            "אפשר להתקשר אליך דרך המספר הרשמי",
+            "אתה יכול לשלוח לי את המסמכים",
+            "אפשר לחשוב על זה קודם",
+            "אני לא נוח לקבל החלטה עכשיו",
+            "אני רוצה לשאול את המשפחה שלי",
+            // Hebrew — payment / disengagement
+            "אפשר לשלם בתשלומים",
+            "אפשר להמשיך מחר",
+            "הפסק להתקשר אלי",
+            "אני לא רוצה להמשיך",
+            "שיניתי את דעתי"
+        )
+
         // Personal info request keywords
         private val INFO_REQUEST_KEYWORDS = listOf(
             // English
@@ -920,6 +1167,112 @@ class ScamPatternDetector() {
             scamType = ScamType.UNKNOWN,
             confidence = bestConfidence,
             reason = "No scam message patterns detected"
+        )
+    }
+
+    /**
+     * Detects scam patterns from the VICTIM's side of the call.
+     *
+     * Called when only microphone audio is available (e.g. Hot Mobile users
+     * without call forwarding). Rather than looking for scammer phrases, this
+     * method analyses what the VICTIM says — sensitive data disclosures,
+     * compliance with dangerous instructions, fear responses to threats, and
+     * agreements to conceal the call.
+     *
+     * An alert requires ≥2 distinct categories in [fullTranscript], or a single
+     * match from [VICTIM_CRITICAL_PHRASES] which are virtually impossible in a
+     * legitimate call.  Single-category matches (e.g. "my account number is")
+     * are intentionally below threshold to avoid false positives on normal
+     * banking calls.
+     *
+     * @param chunk         The latest Vosk recognition result (a few words).
+     * @param fullTranscript The entire accumulated transcript for the call so far.
+     */
+    fun analyzeVictimSpeech(chunk: String, fullTranscript: String): DetectionResult {
+        val lowerChunk      = chunk.lowercase()
+        val lowerTranscript = fullTranscript.lowercase()
+
+        // 1. Critical phrase in the latest chunk — one match is enough
+        val criticalMatch = VICTIM_CRITICAL_PHRASES.firstOrNull { containsWord(lowerChunk, it) }
+        if (criticalMatch != null) {
+            Log.w(TAG, "Victim critical phrase: \"$criticalMatch\"")
+            // Investment-related critical phrases → INVESTMENT_SCAM; authority threats → SOCIAL_ENGINEERING
+            val criticalScamType = when {
+                "verification code" in criticalMatch || "wallet" in criticalMatch ||
+                "crypto" in criticalMatch || "bank is asking" in criticalMatch ||
+                "bank wants to know" in criticalMatch || "bank is blocking" in criticalMatch ||
+                "teller is asking" in criticalMatch -> ScamType.INVESTMENT_SCAM
+                else -> ScamType.SOCIAL_ENGINEERING
+            }
+            return DetectionResult(
+                isScam     = true,
+                scamType   = criticalScamType,
+                confidence = 0.88f,
+                reason     = "Victim critical phrase detected: \"$criticalMatch\"",
+                keywords   = listOf(criticalMatch)
+            )
+        }
+
+        // 2. Multi-category analysis on the full accumulated transcript
+        val disclosing  = VICTIM_DISCLOSING.filter           { containsWord(lowerTranscript, it) }
+        val complying   = VICTIM_COMPLYING.filter            { containsWord(lowerTranscript, it) }
+        val fearing     = VICTIM_FEARING.filter              { containsWord(lowerTranscript, it) }
+        val concealing  = VICTIM_CONCEALING.filter           { containsWord(lowerTranscript, it) }
+        // Investment coaching: questions/statements while being pitched a fraudulent investment.
+        // Safe alone — requires combination with any other category to fire.
+        val coaching    = VICTIM_INVESTMENT_COACHING.filter  { containsWord(lowerTranscript, it) }
+
+        val categoriesPresent = listOf(disclosing, complying, fearing, concealing, coaching)
+            .count { it.isNotEmpty() }
+
+        // Require ≥2 categories — a single category is intentionally below threshold.
+        // e.g. "how much do I need to invest?" alone is a normal financial question;
+        //      combined with "I already transferred the money" it is a strong scam signal.
+        if (categoriesPresent < 2) {
+            return DetectionResult(
+                isScam     = false,
+                scamType   = ScamType.UNKNOWN,
+                confidence = 0f,
+                reason     = "Insufficient victim-side signals ($categoriesPresent category)"
+            )
+        }
+
+        val allMatches = disclosing + complying + fearing + concealing + coaching
+        val baseConfidence = when (categoriesPresent) {
+            2    -> 0.72f
+            3    -> 0.82f
+            4    -> 0.89f
+            else -> 0.93f
+        }
+        // Small bonus per extra match (capped) — more signals = more certain
+        val confidence = (baseConfidence + (allMatches.size * 0.02f).coerceAtMost(0.07f))
+            .coerceAtMost(0.95f)
+
+        // Investment coaching + any action/disclosure = investment scam;
+        // fear/secrecy signals = social engineering (authority impersonation);
+        // everything else defaults to social engineering.
+        val scamType = when {
+            coaching.isNotEmpty() && (complying.isNotEmpty() || disclosing.isNotEmpty()) ->
+                ScamType.INVESTMENT_SCAM
+            coaching.isNotEmpty() -> ScamType.INVESTMENT_SCAM
+            fearing.isNotEmpty() || concealing.isNotEmpty() -> ScamType.SOCIAL_ENGINEERING
+            complying.any { "bitcoin" in it || "crypto" in it || "wallet" in it } ->
+                ScamType.INVESTMENT_SCAM
+            complying.any { "gift card" in it || "wire" in it } -> ScamType.SOCIAL_ENGINEERING
+            disclosing.isNotEmpty() && complying.isNotEmpty() -> ScamType.BANK_FRAUD
+            else -> ScamType.SOCIAL_ENGINEERING
+        }
+
+        Log.w(TAG, "Victim-side scam: $categoriesPresent categories, ${allMatches.size} signals, " +
+            "type=$scamType, confidence=$confidence")
+        return DetectionResult(
+            isScam     = true,
+            scamType   = scamType,
+            confidence = confidence,
+            reason     = "Victim-side signals — D:${disclosing.size} C:${complying.size} " +
+                "F:${fearing.size} S:${concealing.size} I:${coaching.size}; " +
+                "samples: ${allMatches.take(3).joinToString(", ")}",
+            keywords   = allMatches.take(5)
         )
     }
 

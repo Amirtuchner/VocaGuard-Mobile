@@ -418,7 +418,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _serverSipExtension = MutableStateFlow(sdm.getSipExtension())
     val serverSipExtension: StateFlow<String> = _serverSipExtension.asStateFlow()
 
-    private val _serverActivationCode = MutableStateFlow(sdm.getActivationCode())
+    private val _serverActivationCode = MutableStateFlow(sdm.getActivationCode(getApplication()))
     val serverActivationCode: StateFlow<String> = _serverActivationCode.asStateFlow()
 
     private val _serverRegStatus = MutableStateFlow("")
@@ -442,9 +442,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     if (result.success) {
                         _serverRegistered.value = true
                         _serverSipExtension.value = result.sipExtension
-                        _serverActivationCode.value = sdm.getActivationCode()
+                        _serverActivationCode.value = sdm.getActivationCode(getApplication())
                         _serverRegStatus.value =
-                            "Registered! Dial ${sdm.getActivationCode()} to activate call forwarding."
+                            "Registered! Dial ${sdm.getActivationCode(getApplication())} to activate call forwarding."
                         io.vocaguard.service.VocaGuardSipManager.reinitialize(getApplication())
                     } else {
                         _serverRegStatus.value = "Registration failed: ${result.error}"

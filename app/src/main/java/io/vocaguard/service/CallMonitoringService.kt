@@ -25,6 +25,7 @@ import io.vocaguard.alert.ScamAlertManager
 import io.vocaguard.data.CallTranscript
 import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.ScamDatabaseManager
+import io.vocaguard.service.ServerDetectionManager
 import io.vocaguard.data.TranscriptRepository
 import io.vocaguard.ui.ScamOverlayManager
 import io.vocaguard.detection.HybridScamDetector
@@ -122,6 +123,10 @@ class CallMonitoringService : Service() {
     // DTMF / IVR detection
     private var dtmfDetected = false
 
+    // True when call forwarding is unavailable (e.g. Hot Mobile) and we are
+    // capturing only the local microphone.  Enables victim-side pattern analysis.
+    private var isVictimSideOnly = false
+
     // Family Guard: ensure the scam-action sequence runs only once per call
     @Volatile private var scamActionTaken = false
     @Volatile private var lastDetectedScamType: io.vocaguard.data.ScamType? = null
@@ -158,6 +163,8 @@ class CallMonitoringService : Service() {
         Log.i(TAG, "Starting call monitoring")
         isMonitoring = true
         activePhoneNumber = scamDatabaseManager.activeCallPhoneNumber
+        isVictimSideOnly = ServerDetectionManager.isRegistered() &&
+            ServerDetectionManager.getActivationCode(this).isEmpty()
 
         // Reset all per-call accumulators
         rmsReadings.clear()
@@ -265,6 +272,13 @@ class CallMonitoringService : Service() {
                         totalWordsRecognized += text.split(" ").count { it.isNotEmpty() }
                         throttledUpdateNotification("Listening: ${text.take(50)}...")
                         analyzeForScamPatterns(text)
+                        // Victim-side analysis: detect scam from what the USER says.
+                        // Runs for all carriers as a fast on-device layer — catches cases
+                        // where the victim is being led to an ATM, crypto wallet, OTP
+                        // disclosure, etc. before the server-side Whisper analysis fires.
+                        if (!scamActionTaken) {
+                            analyzeVictimPatterns(text, transcriptBuilder.toString())
+                        }
                         consecutiveLowRmsCount = 0
                     }
                 }
@@ -427,6 +441,46 @@ class CallMonitoringService : Service() {
                 delay(2_000L)
                 endScamCall()
                 // Brief pause so the OS registers the call as ended before we dial out
+                delay(1_000L)
+                io.vocaguard.alert.FamilyAlertSender(this@CallMonitoringService)
+                    .makeCallAlert(scamType, confidence, delayBeforeCallMs = 0L)
+            }
+        }
+    }
+
+    /**
+     * Analyses the victim's side of the call for scam indicators.
+     * Called only when [isVictimSideOnly] is true (mic-only, no call forwarding).
+     * Uses the accumulated [transcript] so patterns that span multiple Vosk chunks
+     * are still detectable.
+     */
+    private fun analyzeVictimPatterns(chunk: String, transcript: String) {
+        val result = scamDetector.analyzeVictimSpeech(chunk, transcript)
+        if (!result.isScam) return
+
+        Log.w(TAG, "VICTIM-SIDE SCAM DETECTED: ${result.scamType} — ${result.reason}")
+        detectedScamTypes.add(result.scamType.name)
+
+        if (result.confidence > lastDetectedConfidence) {
+            lastDetectedScamType  = result.scamType
+            lastDetectedConfidence = result.confidence
+        }
+
+        if (!scamActionTaken) {
+            scamActionTaken = true
+            alertManager.triggerScamAlert(
+                scamType    = result.scamType,
+                transcript  = transcript,
+                confidence  = result.confidence,
+                phoneNumber = activePhoneNumber
+            )
+            overlayManager.show(result.scamType, result.confidence)
+            updateNotification("⚠️ SCAM ALERT: ${result.scamType}")
+            val scamType   = result.scamType
+            val confidence = result.confidence
+            serviceScope.launch {
+                delay(2_000L)
+                endScamCall()
                 delay(1_000L)
                 io.vocaguard.alert.FamilyAlertSender(this@CallMonitoringService)
                     .makeCallAlert(scamType, confidence, delayBeforeCallMs = 0L)
