@@ -8,7 +8,6 @@ import android.telephony.PhoneStateListener
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import android.util.Log
-import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.ScamDatabaseManager
 import io.vocaguard.ui.ScamOverlayManager
 
@@ -26,18 +25,6 @@ class ScamCallScreeningService : CallScreeningService() {
     override fun onScreenCall(callDetails: Call.Details) {
         val phoneNumber = callDetails.handle?.schemeSpecificPart ?: ""
         Log.d(TAG, "Screening call from: $phoneNumber")
-
-        // When call forwarding is active, the server already handles scam detection
-        // and sends FCM alerts. All incoming PSTN calls arrive from the server's DID,
-        // so local screening would only generate false positives — skip it entirely.
-        if (DetectionSettings.getInstance(applicationContext).callForwardingEnabled) {
-            Log.i(TAG, "Call forwarding active — skipping local screening, server handles detection")
-            respondToCall(
-                callDetails,
-                CallResponse.Builder().setDisallowCall(false).setRejectCall(false).build()
-            )
-            return
-        }
 
         val scamDatabaseManager = ScamDatabaseManager.getInstance(applicationContext)
         val scamInfo = scamDatabaseManager.checkNumber(phoneNumber)
