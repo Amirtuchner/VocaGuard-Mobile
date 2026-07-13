@@ -11,6 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.linphone.core.*
 
@@ -41,6 +42,7 @@ object VocaGuardSipManager {
 
     private var core: Core? = null
     private var appContext: Context? = null
+    private var iterateJob: Job? = null
 
     /** Set to true when user taps Accept — SDK will auto-answer the next incoming INVITE. */
     @Volatile var pendingAccept = false
@@ -57,6 +59,9 @@ object VocaGuardSipManager {
             // Audio-only — disable video
             c.isVideoCaptureEnabled = false
             c.isVideoDisplayEnabled = false
+
+            // Keep NAT pinhole open with UDP CRLF keep-alives
+            c.isKeepAliveEnabled = true
 
             // Use per-user SIP credentials if registered, otherwise fall back to legacy
             val serverIp = BuildConfig.TOKEN_SERVER_HOST
@@ -76,8 +81,7 @@ object VocaGuardSipManager {
             serverAddr?.transport = TransportType.Udp
             params.serverAddress = serverAddr
             params.isRegisterEnabled = true
-            params.expires = 1800  // re-register every ~27min; short enough to recover after
-                                  // server restart, long enough to never disrupt an active call
+            params.expires = 120  // re-register every 2min to keep NAT pinhole open
 
             val account = c.createAccount(params)
             c.addAccount(account)
@@ -128,6 +132,15 @@ object VocaGuardSipManager {
 
             c.start()
             core = c
+
+            // Linphone requires periodic iterate() calls to process SIP messages
+            iterateJob = scope.launch(Dispatchers.Main) {
+                while (isActive) {
+                    core?.iterate()
+                    delay(20)
+                }
+            }
+
             Log.i(TAG, "SIP core initialised and registered")
         } catch (e: Exception) {
             Log.e(TAG, "SIP init failed", e)
@@ -155,6 +168,7 @@ object VocaGuardSipManager {
      * Call after a successful server registration to switch to the per-user extension.
      */
     fun reinitialize(context: Context) {
+        iterateJob?.cancel()
         core?.stop()
         core = null
         retryJob?.cancel()

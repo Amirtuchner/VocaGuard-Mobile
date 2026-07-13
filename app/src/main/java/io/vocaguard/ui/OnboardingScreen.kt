@@ -29,7 +29,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-private const val TOTAL_STEPS = 5  // Terms · Welcome · Call Screening · Registration · Forwarding
+private const val TOTAL_STEPS = 6  // Terms · Welcome · Call Screening · Notification Access · Registration · Forwarding
 
 /**
  * Full-screen setup wizard shown once after install.
@@ -48,10 +48,12 @@ fun OnboardingScreen(
     // Re-check system permission states whenever the user returns from system settings.
     val lifecycleOwner = LocalLifecycleOwner.current
     var callScreeningOk  by remember { mutableStateOf(permissionsManager.isCallScreeningEnabled()) }
+    var notificationListenerOk by remember { mutableStateOf(permissionsManager.hasNotificationListenerAccess()) }
     DisposableEffect(lifecycleOwner) {
         val obs = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 callScreeningOk = permissionsManager.isCallScreeningEnabled()
+                notificationListenerOk = permissionsManager.hasNotificationListenerAccess()
             }
         }
         lifecycleOwner.lifecycle.addObserver(obs)
@@ -71,12 +73,14 @@ fun OnboardingScreen(
 
     // Carrier detection — hoisted so navigation buttons can also use these values
     val tm = context.getSystemService(TelephonyManager::class.java)
-    val simOperator  = tm?.simOperator ?: ""
     val operatorName = tm?.networkOperatorName?.lowercase() ?: ""
-    val isHotMobile  = simOperator == "42507" || simOperator == "42577"
-        || operatorName.contains("hot mobile")
     val isVerizon    = operatorName.contains("verizon")
     val simCountry   = tm?.simCountryIso?.lowercase() ?: ""
+
+    val totalSteps = TOTAL_STEPS
+    val displayStep = step
+    fun nextStep() { step += 1 }
+    fun prevStep() { step -= 1 }
 
     Column(
         modifier = Modifier
@@ -90,12 +94,12 @@ fun OnboardingScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            repeat(TOTAL_STEPS) { index ->
+            repeat(totalSteps) { index ->
                 Box(
                     modifier = Modifier
-                        .size(if (index == step) 12.dp else 8.dp)
+                        .size(if (index == displayStep) 12.dp else 8.dp)
                         .background(
-                            color = if (index == step)
+                            color = if (index == displayStep)
                                 MaterialTheme.colorScheme.primary
                             else
                                 MaterialTheme.colorScheme.outlineVariant,
@@ -119,7 +123,11 @@ fun OnboardingScreen(
                     isDone   = callScreeningOk,
                     onEnable = { callScreeningLauncher.launch(permissionsManager.createCallScreeningIntent()) }
                 )
-                3 -> RegistrationStep(
+                3 -> NotificationListenerStep(
+                    isDone   = notificationListenerOk,
+                    onEnable = { permissionsManager.openNotificationListenerSettings() }
+                )
+                4 -> RegistrationStep(
                     phoneInput      = serverPhoneInput,
                     onPhoneChange   = viewModel::updateServerPhoneInput,
                     onRegister      = viewModel::registerWithServer,
@@ -131,19 +139,15 @@ fun OnboardingScreen(
                     isRegistered    = serverRegistered,
                     status          = serverRegStatus
                 )
-                4 -> {
+                5 -> {
                     val fallbackDid = if (simCountry == "us" || simCountry == "ca")
                         "+13373828491" else "+97233741493"
-                    val fallbackCode = when {
-                        isHotMobile -> ""
-                        isVerizon   -> "*72$fallbackDid"
-                        else        -> "*21*$fallbackDid#"
-                    }
+                    val fallbackCode = if (isVerizon) "*72$fallbackDid"
+                        else "*21*$fallbackDid#"
                     CallForwardingStep(
                         activationCode = activationCode.ifEmpty { fallbackCode },
-                        isHotMobile    = isHotMobile,
                         isVerizon      = isVerizon,
-                        isEnabled      = callForwardingEnabled || isHotMobile,
+                        isEnabled      = callForwardingEnabled,
                         onDial         = {
                             val code = activationCode.ifEmpty { fallbackCode }
                             val intent = Intent(Intent.ACTION_DIAL,
@@ -165,26 +169,27 @@ fun OnboardingScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (step > 0) {
-                TextButton(onClick = { step-- }) { Text("Back") }
+                TextButton(onClick = { prevStep() }) { Text("Back") }
             } else {
                 Spacer(Modifier.width(64.dp))
             }
 
+            val lastStep = TOTAL_STEPS - 1  // step 5
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // No Skip on the Terms step — acceptance is required
-                if (step in 1 until TOTAL_STEPS - 1) {
-                    TextButton(onClick = { step++ }) { Text("Skip") }
+                if (step in 1 until lastStep) {
+                    TextButton(onClick = { nextStep() }) { Text("Skip") }
                     Spacer(Modifier.width(8.dp))
                 }
                 Button(
-                    onClick = { if (step < TOTAL_STEPS - 1) step++ else onFinish() },
+                    onClick = { if (step < lastStep) nextStep() else onFinish() },
                     enabled = step != 0 || termsAccepted,
                     modifier = Modifier.defaultMinSize(minWidth = 120.dp)
                 ) {
                     Text(when {
-                        step < TOTAL_STEPS - 1               -> "Next"
-                        callForwardingEnabled || isHotMobile -> "Get Started"
-                        else                                 -> "Skip (not recommended)"
+                        step < lastStep        -> "Next"
+                        callForwardingEnabled  -> "Get Started"
+                        else                   -> "Skip (not recommended)"
                     })
                 }
             }
@@ -308,6 +313,18 @@ private fun CallScreeningStep(isDone: Boolean, onEnable: () -> Unit) {
 }
 
 @Composable
+private fun NotificationListenerStep(isDone: Boolean, onEnable: () -> Unit) {
+    StepLayout(
+        icon        = Icons.Default.Notifications,
+        title       = "Enable Message Scanning",
+        description = "Allow VocaGuard to read notifications from messaging apps so it can detect scam messages from unknown senders in real time.",
+        isDone      = isDone,
+        actionLabel = "Enable",
+        onAction    = onEnable
+    )
+}
+
+@Composable
 private fun RegistrationStep(
     phoneInput: String,
     onPhoneChange: (String) -> Unit,
@@ -383,50 +400,11 @@ private fun RegistrationStep(
 @Composable
 private fun CallForwardingStep(
     activationCode: String,
-    isHotMobile: Boolean,
     isVerizon: Boolean,
     isEnabled: Boolean,
     onDial: () -> Unit,
     onToggle: (Boolean) -> Unit
 ) {
-    if (isHotMobile) {
-        // Hot Mobile deactivates CFU on answer — use on-device detection instead
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            StepIcon(icon = Icons.Default.Shield, isDone = true)
-            Text(
-                text = "On-Device Protection Active",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = "Your carrier (Hot Mobile) doesn't support VocaGuard's call-forwarding method. VocaGuard will protect you using on-device scam detection: known scam numbers are blocked before your phone rings, and your microphone is monitored during calls to detect if you are sharing sensitive information with a scammer.",
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                shape = MaterialTheme.shapes.medium,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "✓ You're protected — tap Get Started",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(16.dp)
-                )
-            }
-        }
-        return
-    }
-
-    // Standard call-forwarding flow (all other carriers)
     val code = activationCode
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

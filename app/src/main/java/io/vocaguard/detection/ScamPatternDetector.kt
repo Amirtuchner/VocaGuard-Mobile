@@ -474,7 +474,7 @@ class ScamPatternDetector() {
 
         // ── Victim-side detection ─────────────────────────────────────────────────
         // Patterns for what a VICTIM says during a scam call, not the scammer.
-        // Used in VOICE_COMMUNICATION mic-only mode (e.g. Hot Mobile) where only
+        // Used in mic-only mode (when call forwarding is unavailable) where only
         // the user's microphone is captured.  An alert requires ≥2 categories to
         // be present in the accumulated transcript, preventing false positives from
         // normal banking calls or everyday speech.
@@ -610,16 +610,16 @@ class ScamPatternDetector() {
             "the bank wants to know why i'm sending",
             "the bank is blocking my transfer",
             "the teller is asking why",
-            // Investment scam: crypto wallet opened at scammer's direction
-            "i've opened the crypto wallet",
-            "i just opened the crypto wallet",
+            // Investment scam: crypto wallet opened + asking for wallet address
+            "i've opened the crypto wallet which wallet address should i use",
+            "i opened the crypto wallet which wallet address should i use",
             // Hebrew
             "אנא אל תעצור אותי",
             "אני לא רוצה ללכת לכלא",
             "קיבלתי קוד אימות",
             "הבנק שואל למה אני מעביר את הכסף",
             "הבנק חוסם לי את ההעברה",
-            "פתחתי את ארנק הקריפטו"
+            "פתחתי את ארנק הקריפטו לאיזה כתובת לשלוח"
         )
 
         /**
@@ -1173,8 +1173,8 @@ class ScamPatternDetector() {
     /**
      * Detects scam patterns from the VICTIM's side of the call.
      *
-     * Called when only microphone audio is available (e.g. Hot Mobile users
-     * without call forwarding). Rather than looking for scammer phrases, this
+     * Called when only microphone audio is available (no call forwarding).
+     * Rather than looking for scammer phrases, this
      * method analyses what the VICTIM says — sensitive data disclosures,
      * compliance with dangerous instructions, fear responses to threats, and
      * agreements to conceal the call.

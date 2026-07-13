@@ -85,7 +85,7 @@ class ReEnableForwardingWorker(
         nm.notify(NOTIF_ID, NotificationCompat.Builder(ctx, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("Re-enable Call Protection")
-            .setContentText("Hot Mobile disabled forwarding. Tap to re-enable.")
+            .setContentText("Call forwarding was disabled. Tap to re-enable.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pi)

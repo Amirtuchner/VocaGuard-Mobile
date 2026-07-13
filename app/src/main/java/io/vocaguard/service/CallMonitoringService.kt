@@ -10,10 +10,15 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.util.Log
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
@@ -46,6 +51,7 @@ class CallMonitoringService : Service() {
         private const val TAG = "CallMonitoringService"
         const val ACTION_START_MONITORING = "io.vocaguard.START_MONITORING"
         const val ACTION_STOP_MONITORING = "io.vocaguard.STOP_MONITORING"
+        const val EXTRA_SKIP_FOREGROUND = "skip_foreground"
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "call_monitoring_channel"
         // VAD (Voice Activity Detection) constants
@@ -84,6 +90,11 @@ class CallMonitoringService : Service() {
     private var audioRecord: AudioRecord? = null
     private var voskRecognizer: Recognizer? = null
     private var audioLoopJob: kotlinx.coroutines.Job? = null
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var usingSpeechRecognizer = false
+    private var speechRecognizerErrorCount = 0
+    private val MAX_SPEECH_RECOGNIZER_ERRORS = 5
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
     private var isMonitoring = false
     private var lastNotificationUpdate = 0L
@@ -123,8 +134,8 @@ class CallMonitoringService : Service() {
     // DTMF / IVR detection
     private var dtmfDetected = false
 
-    // True when call forwarding is unavailable (e.g. Hot Mobile) and we are
-    // capturing only the local microphone.  Enables victim-side pattern analysis.
+    // True when registered but no activation code is available.
+    // Enables victim-side pattern analysis using local microphone only.
     private var isVictimSideOnly = false
 
     // Family Guard: ensure the scam-action sequence runs only once per call
@@ -148,19 +159,38 @@ class CallMonitoringService : Service() {
         when (intent?.action) {
             ACTION_START_MONITORING -> {
                 if (!isMonitoring) {
-                    startMonitoring()
+                    val skipForeground = intent.getBooleanExtra(EXTRA_SKIP_FOREGROUND, false)
+                    startMonitoring(skipForeground)
                 }
             }
             ACTION_STOP_MONITORING -> {
                 stopMonitoring()
                 stopSelf()
             }
+            "io.vocaguard.A11Y_TEXT" -> {
+                // Text forwarded from AccessibilityService audio capture
+                val text = intent.getStringExtra("text") ?: ""
+                if (text.isNotEmpty() && isMonitoring) {
+                    Log.i(TAG, "A11y text received: $text")
+                    processRecognizedText(text)
+                }
+            }
         }
         return START_STICKY
     }
 
-    private fun startMonitoring() {
-        Log.i(TAG, "Starting call monitoring")
+    private fun startMonitoring(skipForeground: Boolean = false) {
+        Log.i(TAG, "Starting call monitoring (skipForeground=$skipForeground)")
+
+        val hasAudio = ContextCompat.checkSelfPermission(
+            this, android.Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!hasAudio) {
+            Log.w(TAG, "RECORD_AUDIO not granted — cannot monitor call, skipping")
+            stopSelf()
+            return
+        }
+
         isMonitoring = true
         activePhoneNumber = scamDatabaseManager.activeCallPhoneNumber
         isVictimSideOnly = ServerDetectionManager.isRegistered() &&
@@ -182,37 +212,179 @@ class CallMonitoringService : Service() {
         totalWordsRecognized = 0
         dtmfDetected = false
 
-        // Start foreground service with notification
-        val notification = createNotification("Monitoring call for scam patterns...")
-        val hasAudio = ContextCompat.checkSelfPermission(
-            this, android.Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && hasAudio) {
-                startForeground(NOTIFICATION_ID, notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
+        // Start foreground service with notification — skip if running inside
+        // PhoneMonitorService's FGS which already has microphone type.
+        if (!skipForeground) {
+            val notification = createNotification("Monitoring call for scam patterns...")
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(NOTIFICATION_ID, notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Cannot start foreground: ${e.message}")
+                stopSelf()
+                return
             }
-        } catch (e: SecurityException) {
-            Log.e(TAG, "Cannot start foreground with microphone type: ${e.message}")
-            startForeground(NOTIFICATION_ID, notification)
         }
 
-        // Start Vosk offline speech recognition via AudioRecord
-        startVoskRecognition()
+        // If AccessibilityService is available, let it handle audio capture —
+        // Samsung Android 15 blocks AudioRecord from regular FGS during calls,
+        // but AccessibilityService runs in a privileged context that may bypass this.
+        if (VocaGuardAccessibilityService.instance != null) {
+            Log.i(TAG, "AccessibilityService available — skipping FGS AudioRecord (Samsung blocks it)")
+            updateNotification("Monitoring call for scam patterns...")
+        } else {
+            // Fallback: start Vosk offline speech recognition via AudioRecord
+            startVoskRecognition()
+        }
     }
 
     private fun startVoskRecognition() {
-        audioLoopJob = serviceScope.launch(Dispatchers.IO) {
-            // Skip detection for known contacts — scammers are never in the victim's contact list.
-            if (activePhoneNumber.isNotBlank() &&
-                ContactsHelper.isKnownContact(this@CallMonitoringService, activePhoneNumber)) {
-                Log.i(TAG, "Known contact ($activePhoneNumber) — scam detection skipped")
-                updateNotification("Call with known contact — monitoring inactive")
-                return@launch
-            }
+        // Skip detection for known contacts — scammers are never in the victim's contact list.
+        if (activePhoneNumber.isNotBlank() &&
+            ContactsHelper.isKnownContact(this@CallMonitoringService, activePhoneNumber)) {
+            Log.i(TAG, "Known contact ($activePhoneNumber) — scam detection skipped")
+            updateNotification("Call with known contact — monitoring inactive")
+            return
+        }
 
+        // Use Vosk directly — Android SpeechRecognizer interferes with call audio
+        // (causes audible clicks and can't capture speech during calls)
+        Log.i(TAG, "Starting Vosk speech recognition")
+        startVoskFallback()
+    }
+
+    /** Starts Android's built-in SpeechRecognizer for continuous recognition. */
+    private fun startAndroidSpeechRecognizer() {
+        usingSpeechRecognizer = true
+        mainHandler.post {
+            val sr = SpeechRecognizer.createSpeechRecognizer(this)
+            speechRecognizer = sr
+
+            sr.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    Log.i(TAG, "SpeechRecognizer ready")
+                    updateNotification("Monitoring call for scam patterns...")
+                }
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {
+                    // Convert dB to approximate raw amplitude for prosody tracking
+                    val amplitude = (Math.pow(10.0, rmsdB.toDouble() / 20.0) * 1000).toFloat()
+                    totalRmsReadings++
+                    if (amplitude < SILENCE_THRESHOLD_DB) {
+                        consecutiveLowRmsCount++
+                        silentRmsReadings++
+                        if (consecutiveLowRmsCount >= LONG_SILENCE_THRESHOLD) hadLongSilence = true
+                    } else {
+                        consecutiveLowRmsCount = 0
+                        if (rmsReadings.size < MAX_RMS_SAMPLES) rmsReadings.add(amplitude / 1000f)
+                    }
+                }
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {}
+
+                override fun onError(error: Int) {
+                    val errorName = when (error) {
+                        SpeechRecognizer.ERROR_NO_MATCH -> "NO_MATCH"
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "SPEECH_TIMEOUT"
+                        SpeechRecognizer.ERROR_AUDIO -> "AUDIO"
+                        SpeechRecognizer.ERROR_CLIENT -> "CLIENT"
+                        SpeechRecognizer.ERROR_NETWORK -> "NETWORK"
+                        SpeechRecognizer.ERROR_SERVER -> "SERVER"
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "BUSY"
+                        else -> "UNKNOWN($error)"
+                    }
+                    Log.w(TAG, "SpeechRecognizer error: $errorName")
+                    speechRecognizerErrorCount++
+                    // Fall back to Vosk after too many consecutive errors
+                    if (speechRecognizerErrorCount >= MAX_SPEECH_RECOGNIZER_ERRORS && isMonitoring) {
+                        Log.w(TAG, "SpeechRecognizer failed $speechRecognizerErrorCount times, falling back to Vosk")
+                        sr.destroy()
+                        speechRecognizer = null
+                        usingSpeechRecognizer = false
+                        startVoskFallback()
+                        return
+                    }
+                    // Restart listening on recoverable errors
+                    if (isMonitoring && error != SpeechRecognizer.ERROR_CLIENT) {
+                        restartSpeechRecognizer()
+                    }
+                }
+
+                override fun onResults(results: Bundle?) {
+                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    val text = matches?.firstOrNull()?.trim() ?: ""
+                    if (text.isNotEmpty()) {
+                        Log.d(TAG, "Speech result: $text")
+                        speechRecognizerErrorCount = 0
+                        processRecognizedText(text)
+                    }
+                    // Restart listening for continuous recognition
+                    if (isMonitoring) {
+                        restartSpeechRecognizer()
+                    }
+                }
+
+                override fun onPartialResults(partialResults: Bundle?) {
+                    val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    val text = matches?.firstOrNull()?.trim() ?: ""
+                    if (text.isNotEmpty()) {
+                        Log.d(TAG, "Speech partial: $text")
+                        throttledUpdateNotification("Listening: ${text.take(50)}...")
+                    }
+                }
+
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+
+            startListening(sr)
+        }
+    }
+
+    private fun startListening(sr: SpeechRecognizer) {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
+            // Prefer on-device recognition for privacy and speed
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, false)
+            }
+            // Allow online recognition — offline en-US model may not be downloaded
+            // putExtra("android.speech.extra.PREFER_OFFLINE", true)
+        }
+        sr.startListening(intent)
+    }
+
+    private fun restartSpeechRecognizer() {
+        mainHandler.postDelayed({
+            if (isMonitoring) {
+                speechRecognizer?.let { startListening(it) }
+            }
+        }, 300)
+    }
+
+    /** Processes text from either SpeechRecognizer or Vosk. */
+    private fun processRecognizedText(text: String) {
+        transcriptBuilder.append(text).append(" ")
+        totalWordsRecognized += text.split(" ").count { it.isNotEmpty() }
+        throttledUpdateNotification("Listening: ${text.take(50)}...")
+        analyzeForScamPatterns(text)
+        if (!scamActionTaken) {
+            analyzeVictimPatterns(text, transcriptBuilder.toString())
+        }
+        consecutiveLowRmsCount = 0
+    }
+
+    /** Vosk fallback — used when Android SpeechRecognizer is unavailable. */
+    private fun startVoskFallback() {
+        audioLoopJob = serviceScope.launch(Dispatchers.IO) {
             val model = VoskModelManager.getModel(this@CallMonitoringService)
             if (model == null) {
                 Log.e(TAG, "Vosk model unavailable")
@@ -227,7 +399,7 @@ class CallMonitoringService : Service() {
             val bufSize = minBuf.coerceAtLeast(8192)
 
             val record = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+                MediaRecorder.AudioSource.MIC,
                 sampleRate,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT,
@@ -247,44 +419,39 @@ class CallMonitoringService : Service() {
             val shortBuf = ShortArray(bufSize / 2)
 
             record.startRecording()
-            Log.i(TAG, "Vosk audio loop started")
+            Log.i(TAG, "Vosk audio loop started (source=VOICE_COMMUNICATION)")
             updateNotification("Monitoring call for scam patterns...")
 
+            var loopCount = 0
             while (isActive && isMonitoring) {
                 val read = record.read(shortBuf, 0, shortBuf.size)
                 if (read <= 0) continue
 
-                // Update RMS / prosody accumulators from raw PCM
+                // Log RMS every ~2 seconds to verify audio capture
+                loopCount++
+                if (loopCount % 30 == 0) {
+                    var sum = 0L
+                    for (i in 0 until read) sum += shortBuf[i].toLong() * shortBuf[i]
+                    val rms = Math.sqrt(sum.toDouble() / read).toInt()
+                    Log.d(TAG, "Audio RMS=$rms (read=$read samples) loop=$loopCount")
+                }
+
                 updateRmsFromPcm(shortBuf, read)
 
-                // DTMF detection via Goertzel (only until first hit to save CPU)
                 if (!dtmfDetected && detectDtmf(shortBuf.copyOf(read))) {
                     dtmfDetected = true
                     Log.d(TAG, "DTMF tone detected")
                 }
 
-                // Feed to Vosk
                 if (recognizer.acceptWaveForm(shortBuf, read)) {
                     val text = JSONObject(recognizer.result).optString("text").trim()
                     if (text.isNotEmpty()) {
                         Log.d(TAG, "Vosk result: $text")
-                        transcriptBuilder.append(text).append(" ")
-                        totalWordsRecognized += text.split(" ").count { it.isNotEmpty() }
-                        throttledUpdateNotification("Listening: ${text.take(50)}...")
-                        analyzeForScamPatterns(text)
-                        // Victim-side analysis: detect scam from what the USER says.
-                        // Runs for all carriers as a fast on-device layer — catches cases
-                        // where the victim is being led to an ATM, crypto wallet, OTP
-                        // disclosure, etc. before the server-side Whisper analysis fires.
-                        if (!scamActionTaken) {
-                            analyzeVictimPatterns(text, transcriptBuilder.toString())
-                        }
-                        consecutiveLowRmsCount = 0
+                        processRecognizedText(text)
                     }
                 }
             }
 
-            // Flush final result
             val finalText = JSONObject(recognizer.finalResult).optString("text").trim()
             if (finalText.isNotEmpty()) {
                 transcriptBuilder.append(finalText).append(" ")
@@ -508,6 +675,16 @@ class CallMonitoringService : Service() {
     private fun stopMonitoring() {
         Log.i(TAG, "Stopping call monitoring")
         isMonitoring = false
+
+        // Clean up SpeechRecognizer (must be on main thread)
+        if (usingSpeechRecognizer) {
+            mainHandler.post {
+                speechRecognizer?.stopListening()
+                speechRecognizer?.destroy()
+                speechRecognizer = null
+            }
+            usingSpeechRecognizer = false
+        }
 
         audioLoopJob?.cancel()
         audioLoopJob = null

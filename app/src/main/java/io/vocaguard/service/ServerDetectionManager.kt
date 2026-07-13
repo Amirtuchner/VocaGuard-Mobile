@@ -53,7 +53,6 @@ object ServerDetectionManager {
 
     /**
      * Activation code the user dials to enable call forwarding.
-     * Returns "" for Hot Mobile (server route not supported).
      * Verizon uses *72+number (no # suffix).
      * All other carriers use *21*+number#.
      */
@@ -62,12 +61,8 @@ object ServerDetectionManager {
         if (did.isEmpty()) return ""
         if (context != null) {
             val tm = context.getSystemService(TelephonyManager::class.java)
-            val simOperator  = tm?.simOperator ?: ""
             val operatorName = tm?.networkOperatorName?.lowercase() ?: ""
-            val isHotMobile  = simOperator == "42507" || simOperator == "42577"
-                || operatorName.contains("hot mobile")
             val isVerizon    = operatorName.contains("verizon")
-            if (isHotMobile) return ""
             if (isVerizon)   return "*72+$did"
         }
         return "*21*+$did#"

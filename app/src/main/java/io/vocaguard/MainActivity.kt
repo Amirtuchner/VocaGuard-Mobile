@@ -39,7 +39,6 @@ import io.vocaguard.billing.SubscriptionStatus
 import io.vocaguard.data.CommunityScamSyncWorker
 import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.FamilyGuardSettings
-import io.vocaguard.monitor.PhoneStateMonitor
 import io.vocaguard.service.PhoneMonitorService
 import io.vocaguard.ui.CrashReporter
 import io.vocaguard.ui.HistoryTab
@@ -57,7 +56,6 @@ import io.vocaguard.widget.VocaGuardWidget
 class MainActivity : ComponentActivity() {
 
     private lateinit var permissionsManager: PermissionsManager
-    private lateinit var phoneStateMonitor: PhoneStateMonitor
 
     // Reactive tab index — hoisted so onNewIntent can drive it from outside setContent.
     private val selectedTab = mutableStateOf(0)
@@ -72,7 +70,6 @@ class MainActivity : ComponentActivity() {
         CrashReporter.init()
 
         permissionsManager = PermissionsManager(this)
-        phoneStateMonitor = PhoneStateMonitor(this)
 
         // Keep TelephonyCallback-based call detection alive in background
         // (fallback for Samsung devices where CallScreeningService is not invoked)
@@ -165,7 +162,6 @@ class MainActivity : ComponentActivity() {
         }.toTypedArray()
         if (missing.isNotEmpty()) requestPermissionsLauncher.launch(missing)
 
-        phoneStateMonitor.startMonitoring()
         VocaGuardSipManager.ensureRegistered()
 
         val manager = AppWidgetManager.getInstance(this)

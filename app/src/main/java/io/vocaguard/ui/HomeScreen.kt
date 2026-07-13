@@ -196,7 +196,7 @@ fun HomeTab(
         }
 
         // Call forwarding warning banner
-        if (!callForwardingEnabled) item {
+        if (!callForwardingEnabled && serverActivationCode.isNotEmpty()) item {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()

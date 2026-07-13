@@ -12,10 +12,13 @@ import android.util.Log
 import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.ScamDatabaseManager
 import io.vocaguard.service.CallMonitoringService
-import io.vocaguard.service.ServerDetectionManager
 
 @Suppress("DEPRECATION") // PhoneStateListener used only on API < 31; TelephonyCallback used on 31+
-class PhoneStateMonitor(private val context: Context) {
+class PhoneStateMonitor(
+    private val context: Context,
+    private val onCallStarted: (() -> Unit)? = null,
+    private val onCallEnded: (() -> Unit)? = null
+) {
 
     companion object {
         private const val TAG = "PhoneStateMonitor"
@@ -32,27 +35,32 @@ class PhoneStateMonitor(private val context: Context) {
         Log.d(TAG, "Starting phone state monitoring")
 
         try {
+            // Force PhoneStateListener on all API levels — Samsung's TelephonyCallback
+            // silently stops delivering events when the app is in background, even with FGS.
+            phoneStateListener = object : PhoneStateListener() {
+                @Deprecated("Deprecated in API 31")
+                override fun onCallStateChanged(state: Int, phoneNumber: String?) {
+                    handleCallStateChange(state, phoneNumber)
+                }
+            }
+            @Suppress("DEPRECATION")
+            telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE)
+            Log.i(TAG, "Registered PhoneStateListener on default subscription")
+
+            // Also try TelephonyCallback as a backup (may work when activity is visible)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                // Use TelephonyCallback for Android 12+
-                val callback = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
-                    override fun onCallStateChanged(state: Int) {
-                        handleCallStateChange(state)
+                try {
+                    val callback = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
+                        override fun onCallStateChanged(state: Int) {
+                            handleCallStateChange(state)
+                        }
                     }
+                    telephonyManager.registerTelephonyCallback(context.mainExecutor, callback)
+                    telephonyCallback = callback
+                    Log.i(TAG, "Also registered TelephonyCallback")
+                } catch (e: Exception) {
+                    Log.w(TAG, "TelephonyCallback registration failed: ${e.message}")
                 }
-                telephonyManager.registerTelephonyCallback(context.mainExecutor, callback)
-                // Only assign after successful registration so stopMonitoring never
-                // tries to unregister a callback that was never registered.
-                telephonyCallback = callback
-            } else {
-                // Use PhoneStateListener for older versions
-                phoneStateListener = object : PhoneStateListener() {
-                    @Deprecated("Deprecated in API 31")
-                    override fun onCallStateChanged(state: Int, phoneNumber: String?) {
-                        handleCallStateChange(state, phoneNumber)
-                    }
-                }
-                @Suppress("DEPRECATION")
-                telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE)
             }
             isMonitoring = true
         } catch (e: SecurityException) {
@@ -79,7 +87,13 @@ class PhoneStateMonitor(private val context: Context) {
         isMonitoring = false
     }
 
+    private var lastReportedState = -1
+
     private fun handleCallStateChange(state: Int, phoneNumber: String? = null) {
+        // Deduplicate — both PhoneStateListener and TelephonyCallback may fire
+        if (state == lastReportedState) return
+        lastReportedState = state
+
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
                 Log.i(TAG, "Incoming call: ${phoneNumber ?: "unknown"}")
@@ -91,7 +105,7 @@ class PhoneStateMonitor(private val context: Context) {
             }
             TelephonyManager.CALL_STATE_IDLE -> {
                 Log.i(TAG, "Call ended or idle")
-                onCallEnded()
+                handleCallEnded()
             }
         }
     }
@@ -102,31 +116,30 @@ class PhoneStateMonitor(private val context: Context) {
 
     private fun onCallActive() {
         val settings = DetectionSettings.getInstance(context)
-        // Hot Mobile users can't use call forwarding (carrier deactivates CFU on answer),
-        // so they rely entirely on on-device Vosk + TFLite detection via VOICE_COMMUNICATION.
-        // Allow monitoring to start for them even though callForwardingEnabled is false.
-        val isOnDeviceOnlyMode = ServerDetectionManager.isRegistered() &&
-            ServerDetectionManager.getActivationCode(context).isEmpty()
-        if (!settings.callForwardingEnabled && !isOnDeviceOnlyMode) {
-            Log.i(TAG, "Call answered but monitoring not active — skipping")
+        if (!settings.callForwardingEnabled) {
+            Log.i(TAG, "Call answered but call forwarding not enabled — skipping")
             return
         }
-        // Call answered (OFFHOOK) — start audio monitoring now so we capture call audio,
-        // not the ringing silence. Primary fallback on Samsung where
-        // CallScreeningService.onScreenCall() is not invoked by the firmware.
         Log.i(TAG, "Call answered — starting audio monitoring")
-        context.startForegroundService(
-            Intent(context, CallMonitoringService::class.java).apply {
-                action = CallMonitoringService.ACTION_START_MONITORING
-            }
-        )
+        if (onCallStarted != null) {
+            // Use callback to run monitoring within the existing FGS (avoids background FGS restriction)
+            onCallStarted.invoke()
+        } else {
+            // Legacy path: start separate FGS
+            context.startForegroundService(
+                Intent(context, CallMonitoringService::class.java).apply {
+                    action = CallMonitoringService.ACTION_START_MONITORING
+                }
+            )
+        }
     }
 
-    private fun onCallEnded() {
+    private fun handleCallEnded() {
         Log.d(TAG, "Call ended")
         val number = scamDatabaseManager.activeCallPhoneNumber
         if (number.isNotEmpty()) {
             scamDatabaseManager.stopMonitoringCall(number)
         }
+        onCallEnded?.invoke()
     }
 }

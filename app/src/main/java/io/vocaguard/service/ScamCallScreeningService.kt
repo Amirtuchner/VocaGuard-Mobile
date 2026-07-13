@@ -1,6 +1,5 @@
 package io.vocaguard.service
 
-import android.content.Intent
 import android.os.Build
 import android.telecom.Call
 import android.telecom.CallScreeningService
@@ -46,18 +45,22 @@ class ScamCallScreeningService : CallScreeningService() {
                 isScam = true,
                 scamType = scamInfo.scamType
             )
-            registerCallEndListener()
         }
+        // Always register call-end listener to notify PhoneMonitorService when call ends
+        registerCallEndListener()
 
-        // Start audio monitoring for non-scammer calls (unknown / suspicious)
+        // Mark call for monitoring and notify PhoneMonitorService to start audio
+        // monitoring. We can't start a microphone FGS from here (background restriction
+        // on Android 14+), but PhoneMonitorService already has a running FGS that can
+        // upgrade to include microphone type.
         if (!scamInfo.isKnownScammer) {
             scamDatabaseManager.markCallForMonitoring(phoneNumber, scamInfo.isSuspicious)
-            startForegroundService(
-                Intent(applicationContext, CallMonitoringService::class.java).apply {
-                    action = CallMonitoringService.ACTION_START_MONITORING
-                }
-            )
         }
+        // Directly tell PhoneMonitorService to start monitoring NOW.
+        // Samsung freezes background processes, so we can't rely on delayed
+        // OFFHOOK detection. Vosk will capture silence until the call is answered.
+        Log.i(TAG, "Notifying PhoneMonitorService to start monitoring immediately")
+        notifyPhoneMonitorService(PhoneMonitorService.ACTION_CALL_OFFHOOK)
     }
 
     /** Registers a one-shot listener that dismisses the overlay when the call ends. */
@@ -68,8 +71,12 @@ class ScamCallScreeningService : CallScreeningService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val callback = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
                 override fun onCallStateChanged(state: Int) {
-                    if (state == TelephonyManager.CALL_STATE_IDLE) {
+                    if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
+                        Log.i(TAG, "Call answered (TelephonyCallback in ScreeningService)")
+                        notifyPhoneMonitorService(PhoneMonitorService.ACTION_CALL_OFFHOOK)
+                    } else if (state == TelephonyManager.CALL_STATE_IDLE) {
                         overlayManager.dismissIncomingCall()
+                        notifyPhoneMonitorService(PhoneMonitorService.ACTION_CALL_IDLE)
                         tm.unregisterTelephonyCallback(this)
                         telephonyCallback = null
                     }
@@ -82,8 +89,12 @@ class ScamCallScreeningService : CallScreeningService() {
             val listener = object : PhoneStateListener() {
                 @Deprecated("Deprecated in API 31")
                 override fun onCallStateChanged(state: Int, number: String?) {
-                    if (state == TelephonyManager.CALL_STATE_IDLE) {
+                    if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
+                        Log.i(TAG, "Call answered (PhoneStateListener in ScreeningService)")
+                        notifyPhoneMonitorService(PhoneMonitorService.ACTION_CALL_OFFHOOK)
+                    } else if (state == TelephonyManager.CALL_STATE_IDLE) {
                         overlayManager.dismissIncomingCall()
+                        notifyPhoneMonitorService(PhoneMonitorService.ACTION_CALL_IDLE)
                         @Suppress("DEPRECATION")
                         tm.listen(this, PhoneStateListener.LISTEN_NONE)
                         phoneStateListener = null
@@ -93,6 +104,18 @@ class ScamCallScreeningService : CallScreeningService() {
             phoneStateListener = listener
             @Suppress("DEPRECATION")
             tm.listen(listener, PhoneStateListener.LISTEN_CALL_STATE)
+        }
+    }
+
+    private fun notifyPhoneMonitorService(action: String) {
+        try {
+            startService(
+                android.content.Intent(this, PhoneMonitorService::class.java).apply {
+                    this.action = action
+                }
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Cannot notify PhoneMonitorService ($action): ${e.message}")
         }
     }
 

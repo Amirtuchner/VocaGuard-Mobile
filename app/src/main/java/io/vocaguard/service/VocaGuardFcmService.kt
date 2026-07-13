@@ -187,14 +187,17 @@ class VocaGuardFcmService : FirebaseMessagingService() {
     }
 
     private fun showIncomingCallNotification(callerNumber: String, asteriskChannel: String) {
-        // Ignore duplicate FCM "incoming_call" messages while a call is already active or ending.
+        // Ignore duplicate FCM "incoming_call" messages while a call is already active.
         val sipState = VocaGuardSipManager.callState.value
         if (io.vocaguard.ui.IncomingCallActivity.isShowing ||
             sipState == VocaGuardSipManager.CallState.ACTIVE ||
-            sipState == VocaGuardSipManager.CallState.INCOMING ||
-            sipState == VocaGuardSipManager.CallState.ENDED) {
+            sipState == VocaGuardSipManager.CallState.INCOMING) {
             Log.i(TAG, "Ignoring incoming_call FCM — call already in progress (state=$sipState, isShowing=${io.vocaguard.ui.IncomingCallActivity.isShowing})")
             return
+        }
+        // Reset stale ENDED state from previous call
+        if (sipState == VocaGuardSipManager.CallState.ENDED) {
+            VocaGuardSipManager.resetState()
         }
         // Set the flag here — before launching the activity — so any duplicate FCM that
         // arrives in the milliseconds before onCreate() fires is already blocked.

@@ -1,7 +1,6 @@
 package io.vocaguard.ml
 
 import android.content.Context
-import android.telephony.TelephonyManager
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -15,16 +14,13 @@ import java.util.zip.ZipInputStream
 object VoskModelManager {
     private const val TAG = "VoskModelManager"
 
-    // English model (default)
-    private const val MODEL_URL_EN      = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
-    private const val MODEL_DIR_NAME_EN = "vosk-model-small-en-us"
-
-    // Hebrew model — used for Israeli SIM cards (Hot Mobile and other IL carriers)
-    private const val MODEL_URL_HE      = "https://alphacephei.com/vosk/models/vosk-model-small-he.zip"
-    private const val MODEL_DIR_NAME_HE = "vosk-model-small-he"
+    // English model — used for all users. Vosk does not offer a Hebrew model;
+    // the English model still captures Hebrew-accented speech well enough for
+    // keyword-based victim pattern detection.
+    private const val MODEL_URL      = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
+    private const val MODEL_DIR_NAME = "vosk-model-small-en-us"
 
     @Volatile private var cachedModel: Model? = null
-    @Volatile private var cachedModelDir: String? = null
 
     /**
      * Returns a loaded [Model] appropriate for the device's SIM country.
@@ -32,22 +28,15 @@ object VoskModelManager {
      * Downloads the model on first use (~40–50 MB). Returns null on failure.
      */
     suspend fun getModel(context: Context): Model? = withContext(Dispatchers.IO) {
-        val tm         = context.getSystemService(TelephonyManager::class.java)
-        val simCountry = tm?.simCountryIso?.lowercase() ?: ""
-        val isIsraeli  = simCountry == "il"
-        val modelUrl     = if (isIsraeli) MODEL_URL_HE      else MODEL_URL_EN
-        val modelDirName = if (isIsraeli) MODEL_DIR_NAME_HE else MODEL_DIR_NAME_EN
-
-        // Return cached model only if it is the same language
-        if (cachedModel != null && cachedModelDir == modelDirName) {
+        if (cachedModel != null) {
             return@withContext cachedModel
         }
 
-        val modelDir = File(context.filesDir, modelDirName)
+        val modelDir = File(context.filesDir, MODEL_DIR_NAME)
         if (!isReady(modelDir)) {
-            Log.i(TAG, "Downloading Vosk model ($modelDirName) from $modelUrl")
+            Log.i(TAG, "Downloading Vosk model ($MODEL_DIR_NAME) from $MODEL_URL")
             try {
-                download(modelUrl, modelDir)
+                download(MODEL_URL, modelDir)
             } catch (e: Exception) {
                 Log.e(TAG, "Vosk model download failed", e)
                 modelDir.deleteRecursively()
@@ -57,9 +46,8 @@ object VoskModelManager {
 
         return@withContext try {
             Model(modelDir.absolutePath).also {
-                cachedModel    = it
-                cachedModelDir = modelDirName
-                Log.i(TAG, "Vosk model loaded: $modelDirName")
+                cachedModel = it
+                Log.i(TAG, "Vosk model loaded: $MODEL_DIR_NAME")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Vosk model load failed", e)

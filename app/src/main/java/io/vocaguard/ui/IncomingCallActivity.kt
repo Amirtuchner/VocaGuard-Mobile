@@ -130,8 +130,8 @@ class IncomingCallActivity : ComponentActivity() {
                         hangUpAndFinish()
                     }
                     sipState == VocaGuardSipManager.CallState.ACTIVE && callActive && !pendingCancel -> {
-                        // Bridge is established — the 200 OK was just sent, so Hot Mobile
-                        // has deactivated *21* forwarding. Re-enable it NOW while the call
+                        // Bridge is established — some carriers deactivate *21* forwarding
+                        // when a call is answered. Re-enable it NOW while the call
                         // is still active, so it's ready before the next call comes in.
                         reEnableForwardingSilently()
                     }
@@ -271,17 +271,19 @@ class IncomingCallActivity : ComponentActivity() {
             }
         }
         VocaGuardFcmService.scamAlertFlow.value = null
-        // Attempt 1: immediate (may race with BYE processing on Hot Mobile's end)
+        // Re-enable forwarding aggressively: immediate + 3s + 6s + 10s
+        // The carrier disables *21* when a call ends; the first attempt that
+        // lands after the carrier finishes processing the BYE wins.
         reEnableForwardingSilently()
-        // Attempt 2: delayed 15 s — by then Hot Mobile has finished processing BYE
-        // and any deactivation it triggered. WorkManager survives activity teardown.
-        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-            "re_enable_forwarding_delayed",
-            ExistingWorkPolicy.REPLACE,
-            OneTimeWorkRequestBuilder<ReEnableForwardingWorker>()
-                .setInitialDelay(15, TimeUnit.SECONDS)
-                .build()
-        )
+        for ((i, delaySec) in longArrayOf(3, 6, 10).withIndex()) {
+            WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+                "re_enable_forwarding_$i",
+                ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequestBuilder<ReEnableForwardingWorker>()
+                    .setInitialDelay(delaySec, TimeUnit.SECONDS)
+                    .build()
+            )
+        }
     }
 
     private fun showReEnableForwardingNotification() {
@@ -305,7 +307,7 @@ class IncomingCallActivity : ComponentActivity() {
         nm.notify(3001, NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("Re-enable Call Protection")
-            .setContentText("Hot Mobile disabled forwarding. Tap to re-enable.")
+            .setContentText("Call forwarding was disabled. Tap to re-enable.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pi)
