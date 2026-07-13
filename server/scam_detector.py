@@ -253,14 +253,35 @@ _TYPE_SIGNALS = [
         "donation", "donate",
         "תרומה",
     ]),
+    ("INVESTMENT_SCAM", [
+        "invest", "investment", "trading", "stock market", "deposit",
+        "guaranteed return", "guaranteed profit", "high return",
+        "minimum deposit", "bitcoin", "crypto", "forex", "broker",
+        "financial advisor", "portfolio", "roi", "returns",
+        "eurotrade", "capital",
+        "השקעה", "מסחר", "בורסה", "הפקדה", "תשואה", "ברוקר",
+    ]),
+    ("ROMANCE_SCAM", [
+        "send me money", "western union", "moneygram", "gift card",
+        "i love you", "stranded", "need money",
+    ]),
+    ("INSURANCE", [
+        "insurance claim", "insurance policy", "extended warranty",
+        "car warranty", "health insurance",
+    ]),
+    ("SOCIAL_ENGINEERING", [
+        "transfer money", "wire transfer", "act now", "urgent matter",
+    ]),
 ]
 
-def classify_scam_type(matched_keywords: list) -> str:
-    joined = " ".join(matched_keywords).lower()
+def classify_scam_type(matched_keywords: list, transcript: str = "") -> str:
+    # Check both matched keyword names AND transcript text for type signals
+    joined = (" ".join(matched_keywords) + " " + transcript).lower()
     for scam_type, signals in _TYPE_SIGNALS:
         if any(sig in joined for sig in signals):
             return scam_type
     return "UNKNOWN"
+
 
 # ---------------------------------------------------------------------------
 # Detection — sliding window
@@ -532,7 +553,7 @@ def main():
         is_scam, all_signals, total_score, mode = detect_scam_combined(get_window_text())
         if is_scam:
             conf = score_to_confidence(total_score)
-            scam_type = classify_scam_type(all_signals)
+            scam_type = classify_scam_type(all_signals, transcript_disp)
             log.warning(
                 f"SCAM DETECTED ({label}): type={scam_type} mode={mode} "
                 f"score={total_score} confidence={conf} signals={all_signals}"

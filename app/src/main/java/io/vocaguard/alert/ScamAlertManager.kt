@@ -10,6 +10,7 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -153,25 +154,34 @@ class ScamAlertManager(private val context: Context) {
         }
 
         val alertMessage = when (scamType) {
-            ScamType.IRS_SCAM -> "Warning! Potential IRS scam detected. The IRS never calls to demand immediate payment."
-            ScamType.TECH_SUPPORT -> "Warning! Tech support scam detected. Legitimate companies don't call unsolicited about viruses."
-            ScamType.BANK_FRAUD -> "Warning! Banking scam detected. Banks never ask for passwords or PINs over the phone."
-            ScamType.LOTTERY_PRIZE -> "Warning! Lottery scam detected. You cannot win a lottery you didn't enter."
-            ScamType.SOCIAL_SECURITY -> "Warning! Social Security scam detected. Your Social Security number cannot be suspended."
-            ScamType.ROBOCALL -> "Warning! Robocall scam detected. This may be a fraudulent automated call."
-            ScamType.PHISHING -> "Warning! Phishing attempt detected. Do not provide personal information."
-            ScamType.INSURANCE -> "Warning! Insurance scam detected. Verify legitimacy before providing information."
-            ScamType.INVESTMENT_SCAM -> "Warning! Investment scam detected. Guaranteed returns are a common fraud tactic."
-            ScamType.DONATION_FRAUD -> "Warning! Donation scam detected. Research charities before donating."
-            ScamType.ROMANCE_SCAM -> "Warning! Romance or grandparent scam detected. Do not send money to someone you met online."
-            ScamType.DELIVERY_SCAM -> "Warning! Delivery scam detected. Legitimate couriers do not demand payment by phone."
-            ScamType.JOB_SCAM -> "Warning! Job scam detected. Legitimate employers never ask for upfront fees."
-            ScamType.SOCIAL_ENGINEERING -> "Warning! Social engineering scam detected. Do not transfer money or share information — hang up and call your bank directly."
+            ScamType.IRS_SCAM -> "Warning! IRS scam detected. Be cautious with this call. The IRS never calls to demand immediate payment."
+            ScamType.TECH_SUPPORT -> "Warning! Tech support scam detected. Be cautious with this call. Legitimate companies don't call unsolicited."
+            ScamType.BANK_FRAUD -> "Warning! Banking scam detected. Be cautious with this call. Banks never ask for passwords over the phone."
+            ScamType.LOTTERY_PRIZE -> "Warning! Lottery scam detected. Be cautious with this call. You cannot win a lottery you didn't enter."
+            ScamType.SOCIAL_SECURITY -> "Warning! Social Security scam detected. Be cautious with this call."
+            ScamType.ROBOCALL -> "Warning! Robocall scam detected. Be cautious with this call."
+            ScamType.PHISHING -> "Warning! Phishing attempt detected. Be cautious with this call. Do not provide personal information."
+            ScamType.INSURANCE -> "Warning! Insurance scam detected. Be cautious with this call."
+            ScamType.INVESTMENT_SCAM -> "Warning! Investment scam detected. Be cautious with this call. Do not send money or share financial details."
+            ScamType.DONATION_FRAUD -> "Warning! Donation scam detected. Be cautious with this call."
+            ScamType.ROMANCE_SCAM -> "Warning! Romance scam detected. Be cautious with this call. Do not send money."
+            ScamType.DELIVERY_SCAM -> "Warning! Delivery scam detected. Be cautious with this call."
+            ScamType.JOB_SCAM -> "Warning! Job scam detected. Be cautious with this call. Legitimate employers never ask for upfront fees."
+            ScamType.SOCIAL_ENGINEERING -> "Warning! Social engineering scam detected. Be cautious with this call. Hang up and call your bank directly."
             ScamType.UNKNOWN -> "Warning! Suspicious activity detected. Be cautious with this call."
         }
 
         try {
-            textToSpeech?.speak(alertMessage, TextToSpeech.QUEUE_FLUSH, null, "scamAlert")
+            // Route TTS through STREAM_ALARM so it's audible during a SIP call
+            val params = Bundle().apply {
+                putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_ALARM)
+            }
+            // Ensure alarm stream volume is at max
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val maxVol = am.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+            am.setStreamVolume(AudioManager.STREAM_ALARM, maxVol, 0)
+
+            textToSpeech?.speak(alertMessage, TextToSpeech.QUEUE_FLUSH, params, "scamAlert")
         } catch (e: Exception) {
             Log.e(TAG, "Error speaking alert", e)
         }

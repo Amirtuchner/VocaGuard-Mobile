@@ -188,7 +188,7 @@ def main():
         is_scam, all_signals, total_score, mode = detect_scam_combined(get_window_text())
         if is_scam:
             conf = score_to_confidence(total_score)
-            scam_type = classify_scam_type(all_signals)
+            scam_type = classify_scam_type(all_signals, transcript_disp)
             log.warning(f"BG SCAM ({label}): {scam_type} mode={mode} score={total_score} signals={all_signals}")
             send_fcm_with_token(fcm_token, all_signals, transcript_disp.strip(),
                                 scam_type, caller_number, conf)
@@ -265,7 +265,7 @@ def main():
                         )
                         if is_scam and not alerted:
                             conf = score_to_confidence(total_score)
-                            scam_type = classify_scam_type(all_signals)
+                            scam_type = classify_scam_type(all_signals, partial + " " + get_window_text())
                             log.warning(f"BG SCAM (vosk-partial): {scam_type} mode={mode} score={total_score}")
                             send_fcm_with_token(fcm_token, all_signals, partial,
                                                 scam_type, caller_number, conf)
