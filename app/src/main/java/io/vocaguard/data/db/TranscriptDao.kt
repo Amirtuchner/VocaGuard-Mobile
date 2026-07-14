@@ -50,4 +50,13 @@ interface TranscriptDao {
 
     @Query("UPDATE call_transcripts SET isFalsePositive = 1 WHERE id = :id")
     suspend fun markAsFalsePositive(id: Long)
+
+    @Query("SELECT COUNT(*) FROM call_transcripts")
+    fun countAllCallsLifetime(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM call_transcripts WHERE detectedScamTypesJson != '' AND isFalsePositive = 0")
+    fun countScamCallsLifetime(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM call_transcripts WHERE detectedScamTypesJson = '' OR isFalsePositive = 1")
+    fun countCallsScreenedClean(): Flow<Int>
 }

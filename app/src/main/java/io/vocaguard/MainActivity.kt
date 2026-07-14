@@ -29,9 +29,12 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import io.vocaguard.billing.BillingManager
@@ -67,7 +70,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        CrashReporter.init()
+        CrashReporter.init(this)
 
         permissionsManager = PermissionsManager(this)
 
@@ -98,6 +101,7 @@ class MainActivity : ComponentActivity() {
             }
 
             VocaGuardTheme(darkTheme = darkTheme, seniorMode = seniorMode.value) {
+              CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 var onboardingDone by remember { mutableStateOf(detectionSettings.onboardingComplete) }
                 val billing = BillingManager.getInstance(this@MainActivity)
                 val billingStatus by billing.status.collectAsState()
@@ -115,6 +119,7 @@ class MainActivity : ComponentActivity() {
                         permissionsManager = permissionsManager,
                         onFinish = {
                             detectionSettings.onboardingComplete = true
+                            detectionSettings.installTimestamp = System.currentTimeMillis()
                             onboardingDone = true
                         }
                     )
@@ -135,6 +140,7 @@ class MainActivity : ComponentActivity() {
                         themePreference     = themePreference
                     )
                 }
+              } // CompositionLocalProvider
             }
         }
     }

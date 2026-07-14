@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.collect
 import io.vocaguard.BuildConfig
 import io.vocaguard.data.DetectionSettings
+import android.telephony.TelephonyManager
 import io.vocaguard.data.FamilyContact
 import io.vocaguard.data.ScamType
 
@@ -37,6 +38,9 @@ fun SettingsTab(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val tm = context.getSystemService(TelephonyManager::class.java)
+    val simCountry = tm?.simCountryIso?.lowercase() ?: ""
+    val isUS = simCountry == "us" || simCountry == "ca"
 
     val sensitivity    by viewModel.sensitivity.collectAsStateWithLifecycle()
     val locale         by viewModel.locale.collectAsStateWithLifecycle()
@@ -136,7 +140,8 @@ fun SettingsTab(
                 status         = serverRegStatus,
                 isRegistering  = serverIsRegistering,
                 onRegister     = { viewModel.registerWithServer() },
-                onUnregister   = { viewModel.unregisterFromServer() }
+                onUnregister   = { viewModel.unregisterFromServer() },
+                isUS           = isUS
             )
         }
 
@@ -166,6 +171,7 @@ fun SettingsTab(
             FamilyGuardCard(
                 enabled          = familyGuardEnabled,
                 onEnabledChange  = { viewModel.setFamilyGuardEnabled(it) },
+                isUS             = isUS,
                 seniorNameInput  = seniorNameInput,
                 onSeniorNameChange = { seniorNameInput = it; viewModel.updateSeniorName(it) },
                 onSeniorNameSave = {
@@ -850,6 +856,7 @@ private fun SeniorModeCard(
 private fun FamilyGuardCard(
     enabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
+    isUS: Boolean = false,
     seniorNameInput: String,
     onSeniorNameChange: (String) -> Unit,
     onSeniorNameSave: () -> Unit,
@@ -971,7 +978,8 @@ private fun FamilyGuardCard(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "Used as the caller ID when alerting the caregiver (e.g. +972528233354).",
+                    text = if (isUS) "Used as the caller ID when alerting the caregiver (e.g. +12025551234)."
+                           else "Used as the caller ID when alerting the caregiver (e.g. +972528233354).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -980,7 +988,7 @@ private fun FamilyGuardCard(
                     OutlinedTextField(
                         value = seniorPhoneInput,
                         onValueChange = onSeniorPhoneChange,
-                        label = { Text("+972...") },
+                        label = { Text(if (isUS) "+1..." else "+972...") },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
@@ -1215,7 +1223,8 @@ private fun ServerDetectionCard(
     status: String,
     isRegistering: Boolean,
     onRegister: () -> Unit,
-    onUnregister: () -> Unit
+    onUnregister: () -> Unit,
+    isUS: Boolean = false
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1245,13 +1254,14 @@ private fun ServerDetectionCard(
                     value = phoneField,
                     onValueChange = onPhoneChange,
                     label = { Text("Your Phone Number") },
-                    placeholder = { Text("+972501234567") },
+                    placeholder = { Text(if (isUS) "+12025551234" else "+972501234567") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
-                    text = "Include the country code (e.g. +972501234567 for Israel, +12025551234 for the US).",
+                    text = if (isUS) "Include the country code (e.g. +12025551234)."
+                           else "Include the country code (e.g. +972501234567).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

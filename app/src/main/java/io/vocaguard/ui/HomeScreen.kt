@@ -250,9 +250,44 @@ fun HomeTab(
             }
         }
 
+        // Protection Score
+        item {
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                ProtectionScoreCard(stats.protectionScore, stats.protectionDays)
+            }
+        }
+
+        // Estimated Money Saved
+        if (stats.estimatedMoneySaved > 0) item {
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                MoneySavedCard(stats.estimatedMoneySaved)
+            }
+        }
+
         item {
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 StatsCard(stats)
+            }
+        }
+
+        // Lifetime stats
+        item {
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                LifetimeStatsCard(stats)
+            }
+        }
+
+        // Message scanning stats
+        item {
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                MessageStatsCard(stats.messagesScanned, stats.messagesFlagged)
+            }
+        }
+
+        // Blocklist size
+        if (stats.blocklistSize > 0) item {
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                BlocklistCard(stats.blocklistSize)
             }
         }
 
@@ -417,6 +452,149 @@ private fun StatItem(label: String, value: String) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+private fun ProtectionScoreCard(score: Int, days: Int) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Protection Score",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "$score / 100",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = when {
+                    score >= 80 -> MaterialTheme.colorScheme.primary
+                    score >= 50 -> MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.error
+                }
+            )
+            if (days > 0) {
+                Spacer(modifier = Modifier.height(4.dp))
+                val minutes = days.toLong() * 1440
+                Text(
+                    text = "Protected for $days day${if (days != 1) "s" else ""} \u00B7 %,d minutes".format(minutes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoneySavedCard(amount: Int) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Estimated Money Saved",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "$${"%,d".format(amount)}",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.tertiary
+            )
+            Text(
+                text = "Based on FTC average loss of $1,480 per scam call blocked",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun LifetimeStatsCard(stats: HomeStats) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Lifetime Protection",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatItem(label = "Total Calls", value = stats.totalCallsLifetime.toString())
+                StatItem(label = "Scams Blocked", value = stats.scamCallsLifetime.toString())
+                StatItem(label = "Clean Calls", value = stats.callsScreenedClean.toString())
+            }
+        }
+    }
+}
+
+@Composable
+private fun MessageStatsCard(scanned: Long, flagged: Long) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Message Scanning",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatItem(label = "Messages Scanned", value = scanned.toString())
+                StatItem(label = "Scams Caught", value = flagged.toString())
+            }
+        }
+    }
+}
+
+@Composable
+private fun BlocklistCard(size: Int) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Community Blocklist",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = "%,d".format(size),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "known scam numbers",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 

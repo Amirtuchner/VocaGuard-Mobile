@@ -1,40 +1,54 @@
 package io.vocaguard.ui
 
+import android.content.Context
 import android.util.Log
+import io.vocaguard.service.ErrorReporter
 
 /**
  * Thin wrapper around Firebase Crashlytics that degrades gracefully when
  * Firebase is not configured (i.e. `google-services.json` is absent).
  *
- * **To fully enable Crashlytics:**
- * 1. Create a Firebase project at console.firebase.google.com and register the app.
- * 2. Place `app/google-services.json` in this module.
- * 3. In `app/build.gradle.kts`, apply both plugins:
- *    ```kotlin
- *    id("com.google.gms.google-services")
- *    id("com.google.firebase.crashlytics")
- *    ```
- * 4. In the root `build.gradle.kts` (or `settings.gradle.kts` plugin management block),
- *    declare the plugin versions.
+ * Also installs a global uncaught exception handler that reports crashes
+ * to the VocaGuard server via [ErrorReporter].
  */
 object CrashReporter {
 
     private const val TAG = "CrashReporter"
     private var enabled = false
+    private var appContext: Context? = null
 
     /**
-     * Call once from [android.app.Application.onCreate] or [android.app.Activity.onCreate].
+     * Call once from [android.app.Activity.onCreate].
      * Safe to call even when Firebase is not configured — it will silently no-op.
      */
-    fun init() {
+    fun init(context: Context? = null) {
+        if (context != null) {
+            appContext = context.applicationContext
+            installUncaughtHandler()
+        }
         try {
-            // Accessing getInstance() throws IllegalStateException if FirebaseApp is not
-            // initialised (which happens when google-services.json is absent).
             com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance()
             enabled = true
             Log.i(TAG, "Firebase Crashlytics initialised")
         } catch (t: Throwable) {
             Log.d(TAG, "Crashlytics not available (add google-services.json to enable): ${t.message}")
+        }
+    }
+
+    private fun installUncaughtHandler() {
+        val default = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                val ctx = appContext
+                if (ctx != null) {
+                    val msg = "CRASH: ${throwable.javaClass.simpleName}: ${throwable.message}"
+                    ErrorReporter.report(ctx, msg)
+                    // Give the background thread a moment to send
+                    Thread.sleep(2000)
+                }
+            } catch (_: Throwable) { }
+            // Pass to the default handler (shows crash dialog / kills app)
+            default?.uncaughtException(thread, throwable)
         }
     }
 

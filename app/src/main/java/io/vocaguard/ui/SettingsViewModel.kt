@@ -8,6 +8,7 @@ import io.vocaguard.billing.BillingManager
 import io.vocaguard.billing.SubscriptionStatus
 import io.vocaguard.data.CommunityScamSync
 import io.vocaguard.data.DetectionSettings
+import io.vocaguard.service.ErrorReporter
 import io.vocaguard.data.FamilyContact
 import io.vocaguard.data.FamilyGuardSettings
 import io.vocaguard.data.NetworkScamChecker
@@ -96,6 +97,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 if (result.contains("updated", ignoreCase = true) ||
                     result.contains("failed", ignoreCase = true)) {
                     _modelUpdateStatus.value = result
+                    if (result.contains("failed", ignoreCase = true)) {
+                        ErrorReporter.report(getApplication(), "Model update failed: $result")
+                    }
                 }
             }
         }
@@ -190,6 +194,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 count >= 0 -> "Imported $count numbers"
                 communitySync.lastSyncError.isNotEmpty() -> "Sync failed: ${communitySync.lastSyncError}"
                 else -> "Sync failed — check your connection"
+            }
+            if (count < 0) {
+                ErrorReporter.report(getApplication(), "Blocklist sync failed: ${communitySync.lastSyncError}")
             }
             _isSyncing.value = false
         }
@@ -448,12 +455,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         io.vocaguard.service.VocaGuardSipManager.reinitialize(getApplication())
                     } else {
                         _serverRegStatus.value = "Registration failed: ${result.error}"
+                        ErrorReporter.report(getApplication(), "Registration failed: ${result.error}")
                     }
                     _serverIsRegistering.value = false
                 }
             }
             .addOnFailureListener { e ->
                 _serverRegStatus.value = "Could not get FCM token: ${e.message}"
+                ErrorReporter.report(getApplication(), "FCM token error: ${e.message}")
                 _serverIsRegistering.value = false
             }
     }

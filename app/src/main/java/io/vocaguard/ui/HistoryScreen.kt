@@ -310,7 +310,7 @@ fun TranscriptCard(
 ) {
     var expanded by remember { mutableStateOf(false) }
     var markedFalsePositive by remember(transcript.id) { mutableStateOf(transcript.isFalsePositive) }
-    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy  h:mm a", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy  h:mm a", Locale.ENGLISH) }
     val isScam = transcript.detectedScamTypes.isNotEmpty()
 
     Card(

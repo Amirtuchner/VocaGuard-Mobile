@@ -98,6 +98,33 @@ class DetectionSettings private constructor(context: Context) {
         get() = prefs.getBoolean(KEY_CALL_FORWARDING, false)
         set(value) = prefs.edit().putBoolean(KEY_CALL_FORWARDING, value).apply()
 
+    /** Timestamp of the first app launch (set once during onboarding). */
+    var installTimestamp: Long
+        get() = prefs.getLong(KEY_INSTALL_TIMESTAMP, 0L)
+        set(value) {
+            if (prefs.getLong(KEY_INSTALL_TIMESTAMP, 0L) == 0L) {
+                prefs.edit().putLong(KEY_INSTALL_TIMESTAMP, value).apply()
+            }
+        }
+
+    /** Total number of messages scanned by the notification listener (lifetime). */
+    var messagesScannedTotal: Long
+        get() = prefs.getLong(KEY_MESSAGES_SCANNED, 0L)
+        private set(value) = prefs.edit().putLong(KEY_MESSAGES_SCANNED, value).apply()
+
+    /** Total number of scam messages flagged (lifetime). */
+    var messagesFlaggedTotal: Long
+        get() = prefs.getLong(KEY_MESSAGES_FLAGGED, 0L)
+        private set(value) = prefs.edit().putLong(KEY_MESSAGES_FLAGGED, value).apply()
+
+    fun incrementMessagesScanned() {
+        messagesScannedTotal = messagesScannedTotal + 1
+    }
+
+    fun incrementMessagesFlagged() {
+        messagesFlaggedTotal = messagesFlaggedTotal + 1
+    }
+
     fun reset() {
         prefs.edit().clear().apply()
     }
@@ -116,6 +143,9 @@ class DetectionSettings private constructor(context: Context) {
         private const val KEY_REPORT_ENDPOINT = "report_endpoint_url"
         private const val KEY_THEME = "theme_preference"
         private const val KEY_CALL_FORWARDING = "call_forwarding_enabled"
+        private const val KEY_INSTALL_TIMESTAMP = "install_timestamp"
+        private const val KEY_MESSAGES_SCANNED = "messages_scanned_total"
+        private const val KEY_MESSAGES_FLAGGED = "messages_flagged_total"
         /** Valid values: "system", "dark", "light". */
         const val THEME_SYSTEM = "system"
         const val THEME_DARK   = "dark"

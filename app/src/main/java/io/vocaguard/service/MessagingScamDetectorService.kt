@@ -173,12 +173,16 @@ class MessagingScamDetectorService : NotificationListenerService() {
         val text = extractText(sbn.notification) ?: return
         if (text.length < MIN_TEXT_LENGTH) return
 
+        settings.incrementMessagesScanned()
+
         val result = detector.analyzeMessage(text)
 
         // Require isScam AND a confidence above the message-scanning floor.
         // The ensemble threshold (user sensitivity) may be as low as 0.40; for messages we
         // enforce a stricter minimum to avoid false-positive alerts on normal chat.
         if (!result.isScam || result.confidence < MIN_MESSAGE_CONFIDENCE) return
+
+        settings.incrementMessagesFlagged()
 
         Log.w(
             TAG,

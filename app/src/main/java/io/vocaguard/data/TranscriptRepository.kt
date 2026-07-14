@@ -71,4 +71,8 @@ class TranscriptRepository(private val dao: TranscriptDao) {
     /** Lightweight stream for the trend chart — no full transcript text loaded. */
     fun observeSummariesSince(since: Long): Flow<List<TranscriptSummary>> =
         dao.observeSummariesSince(since)
+
+    fun countAllCallsLifetime(): Flow<Int> = dao.countAllCallsLifetime()
+    fun countScamCallsLifetime(): Flow<Int> = dao.countScamCallsLifetime()
+    fun countCallsScreenedClean(): Flow<Int> = dao.countCallsScreenedClean()
 }
