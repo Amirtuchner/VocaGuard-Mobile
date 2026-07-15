@@ -125,9 +125,7 @@ fun HomeTab(
     val allGranted = permissions.values.all { it }
     var permissionsExpanded by remember { mutableStateOf(!allGranted) }
     val context = LocalContext.current
-    val callForwardingEnabled = remember(refreshKey) {
-        DetectionSettings.getInstance(context).callForwardingEnabled
-    }
+    val callForwardingEnabled by settingsViewModel.callForwardingEnabled.collectAsStateWithLifecycle()
     val serverActivationCode by settingsViewModel.serverActivationCode.collectAsStateWithLifecycle()
     val forwardingCode = serverActivationCode.ifEmpty { "*21*+97233741493#" }
 

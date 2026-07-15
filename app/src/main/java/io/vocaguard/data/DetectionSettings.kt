@@ -99,6 +99,17 @@ class DetectionSettings private constructor(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_CALL_FORWARDING, value).apply()
 
     /** Timestamp of the first app launch (set once during onboarding). */
+    init {
+        // One-time reset of message counters (v1 had inflated values)
+        if (!prefs.getBoolean("msg_counters_reset_v1", false)) {
+            prefs.edit()
+                .putLong(KEY_MESSAGES_SCANNED, 0L)
+                .putLong(KEY_MESSAGES_FLAGGED, 0L)
+                .putBoolean("msg_counters_reset_v1", true)
+                .apply()
+        }
+    }
+
     var installTimestamp: Long
         get() = prefs.getLong(KEY_INSTALL_TIMESTAMP, 0L)
         set(value) {
@@ -123,6 +134,13 @@ class DetectionSettings private constructor(context: Context) {
 
     fun incrementMessagesFlagged() {
         messagesFlaggedTotal = messagesFlaggedTotal + 1
+    }
+
+    fun resetMessageCounters() {
+        prefs.edit()
+            .putLong(KEY_MESSAGES_SCANNED, 0L)
+            .putLong(KEY_MESSAGES_FLAGGED, 0L)
+            .apply()
     }
 
     fun reset() {

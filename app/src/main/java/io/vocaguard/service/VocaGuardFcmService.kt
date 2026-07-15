@@ -143,6 +143,14 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                 showIncomingCallNotification(callerNumber, asteriskChannel)
                 return
             }
+            "error_report" -> {
+                showErrorReportNotification(
+                    phone = message.data["phone"] ?: "",
+                    error = message.data["error"] ?: "",
+                    timestamp = message.data["timestamp"] ?: ""
+                )
+                return
+            }
             "scam_alert" -> { /* handled below */ }
             else -> return
         }
@@ -244,6 +252,35 @@ class VocaGuardFcmService : FirebaseMessagingService() {
         // is already on top (full-screen intent + startActivity → one instance).
         startActivity(callIntent())
         Log.i(TAG, "Incoming call screen launched for $displayNumber channel=$asteriskChannel")
+    }
+
+    private fun showErrorReportNotification(phone: String, error: String, timestamp: String) {
+        val channelId = "error_report_channel"
+        val nm = getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(channelId) == null) {
+            val channel = NotificationChannel(channelId, "Error Reports", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "User error reports from VocaGuard"
+            }
+            nm.createNotificationChannel(channel)
+        }
+        val intent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setContentTitle("Error: $phone")
+            .setContentText(error)
+            .setSubText(timestamp)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(intent)
+            .setAutoCancel(true)
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$error\n\nPhone: $phone\nTime: $timestamp"))
+            .build()
+        nm.notify(System.currentTimeMillis().toInt(), notification)
     }
 
     private fun inferScamType(keywords: String): ScamType {

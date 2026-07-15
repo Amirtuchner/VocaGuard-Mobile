@@ -161,6 +161,8 @@ class MessagingScamDetectorService : NotificationListenerService() {
         if (!settings.messageScanEnabled) return
         if (sbn.packageName !in WATCHED_PACKAGES) return
 
+        settings.incrementMessagesScanned()
+
         // Skip known contacts — scammers are never saved in the victim's contact list.
         val sender = extractSender(sbn)
         if (sender.isNotBlank() &&
@@ -172,8 +174,6 @@ class MessagingScamDetectorService : NotificationListenerService() {
 
         val text = extractText(sbn.notification) ?: return
         if (text.length < MIN_TEXT_LENGTH) return
-
-        settings.incrementMessagesScanned()
 
         val result = detector.analyzeMessage(text)
 
