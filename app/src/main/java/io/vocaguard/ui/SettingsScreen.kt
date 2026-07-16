@@ -1171,15 +1171,9 @@ private fun CallForwardingCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
-                        try {
-                            context.startActivity(
-                                Intent(Intent.ACTION_CALL, Uri.fromParts("tel", activationCode, null))
-                            )
-                        } catch (_: Exception) {
-                            context.startActivity(
-                                Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", activationCode, null))
-                            )
-                        }
+                        context.startActivity(
+                            Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", activationCode, null))
+                        )
                         onEnabled()
                     },
                     enabled = !enabled,
@@ -1198,7 +1192,7 @@ private fun CallForwardingCard(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Enable dials automatically. To disable, the dialer opens pre-filled — tap Call to confirm.",
+                text = "Tap Enable or Disable, then tap the Call button in the dialer to apply.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

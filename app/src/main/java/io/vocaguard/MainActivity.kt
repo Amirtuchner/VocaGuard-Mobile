@@ -241,7 +241,7 @@ fun MainScreen(
         }
     ) {
         when (selectedTabValue) {
-            0 -> if (seniorMode.value) SeniorHomeScreen() else HomeTab(permissionsManager)
+            0 -> HomeTab(permissionsManager)
             1 -> HistoryTab()
             2 -> SettingsTab(
                 permissionsManager  = permissionsManager,
