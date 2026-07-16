@@ -77,6 +77,17 @@ def init_db():
             created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS community_blocklist (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            phone_number   TEXT    NOT NULL,
+            scam_type      TEXT    NOT NULL DEFAULT 'UNKNOWN',
+            reported_by    TEXT    DEFAULT '',
+            report_count   INTEGER DEFAULT 1,
+            created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(phone_number)
+        )
+    """)
     conn.commit()
     conn.close()
     log.info("DB initialised at %s", DB_PATH)
@@ -564,9 +575,63 @@ class Handler(BaseHTTPRequestHandler):
                 log.error("call_caregiver error: %s", e)
                 self._send(500, {"error": str(e)})
 
+        elif self.path == "/report-scam":
+            try:
+                data   = self._read_json()
+                number = data.get("number", "").strip()
+                stype  = data.get("type", "UNKNOWN").strip()
+                reporter = data.get("reporter", "").strip()
+                if not number:
+                    self._send(400, {"error": "number required"})
+                    return
+                conn = sqlite3.connect(DB_PATH)
+                conn.execute(
+                    "INSERT INTO community_blocklist (phone_number, scam_type, reported_by) "
+                    "VALUES (?, ?, ?) "
+                    "ON CONFLICT(phone_number) DO UPDATE SET "
+                    "report_count = report_count + 1, scam_type = excluded.scam_type",
+                    (number, stype, reporter)
+                )
+                conn.commit()
+                count = conn.execute("SELECT COUNT(*) FROM community_blocklist").fetchone()[0]
+                conn.close()
+                log.info("Scam reported: %s type=%s by=%s (total=%d)", number, stype, reporter, count)
+                self._send(200, {"status": "reported", "total": count})
+            except Exception as e:
+                log.error("report-scam error: %s", e)
+                self._send(500, {"error": str(e)})
+
+        elif self.path == "/blocklist":
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                rows = conn.execute(
+                    "SELECT phone_number, scam_type FROM community_blocklist"
+                ).fetchall()
+                conn.close()
+                result = [{"number": r[0], "type": r[1]} for r in rows]
+                self._send(200, result)
+            except Exception as e:
+                log.error("blocklist error: %s", e)
+                self._send(500, {"error": str(e)})
+
         else:
             self._send(404)
 
+    def do_GET(self):
+        if self.path == "/blocklist":
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                rows = conn.execute(
+                    "SELECT phone_number, scam_type FROM community_blocklist"
+                ).fetchall()
+                conn.close()
+                result = [{"number": r[0], "type": r[1]} for r in rows]
+                self._send(200, result)
+            except Exception as e:
+                log.error("blocklist error: %s", e)
+                self._send(500, {"error": str(e)})
+        else:
+            self._send(404)
 
     def do_DELETE(self):
         if not self._auth_ok():

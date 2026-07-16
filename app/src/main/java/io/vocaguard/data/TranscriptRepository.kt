@@ -53,6 +53,8 @@ class TranscriptRepository(private val dao: TranscriptDao) {
 
     suspend fun markAsFalsePositive(id: Long) = dao.markAsFalsePositive(id)
 
+    suspend fun markAsScam(id: Long, scamType: String) = dao.markAsScam(id, scamType)
+
     /** Update the transcript text for the most recent call from [phoneNumber] within the last [windowMs].
      *  Falls back to the most recent transcript if no phone match is found. */
     suspend fun updateRecentTranscript(phoneNumber: String, text: String, windowMs: Long = 5 * 60_000L) {

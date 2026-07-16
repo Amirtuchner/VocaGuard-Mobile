@@ -80,7 +80,7 @@ fun HistoryTab(viewModel: HistoryViewModel = viewModel()) {
         ReportScamDialog(
             initialPhoneNumber = transcript.phoneNumber,
             onConfirm = { phoneNumber, scamType ->
-                viewModel.reportScamNumber(phoneNumber, scamType)
+                viewModel.reportScamNumber(phoneNumber, scamType, transcript.id)
                 reportingTranscript = null
             },
             onDismiss = { reportingTranscript = null }
@@ -142,7 +142,7 @@ fun HistoryTab(viewModel: HistoryViewModel = viewModel()) {
     ) {
         // ── Header ────────────────────────────────────────────────────────────
         item {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(28.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

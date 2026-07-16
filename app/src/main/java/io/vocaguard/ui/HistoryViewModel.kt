@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -120,16 +122,44 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun reportScamNumber(phoneNumber: String, scamType: ScamType) {
+    fun reportScamNumber(phoneNumber: String, scamType: ScamType, transcriptId: Long = 0L) {
         viewModelScope.launch {
             try {
                 scamDb.reportScamNumber(phoneNumber, scamType)
+                // Flag the transcript as scam so card turns red and "Scams only" filter includes it
+                if (transcriptId != 0L) {
+                    repository.markAsScam(transcriptId, scamType.name)
+                }
                 _snackbarEvent.emit(SnackbarEvent.Success(
                     "Reported as ${scamType.name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }}"
                 ))
+                // Upload to community blocklist on the server
+                uploadScamReport(phoneNumber, scamType)
             } catch (e: Exception) {
                 CrashReporter.recordException(e)
                 _snackbarEvent.emit(SnackbarEvent.Error("Failed to report number: ${e.message}", e))
+            }
+        }
+    }
+
+    private fun uploadScamReport(phoneNumber: String, scamType: ScamType) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val body = org.json.JSONObject().apply {
+                    put("number", phoneNumber)
+                    put("type", scamType.name)
+                    put("reporter", io.vocaguard.service.ServerDetectionManager.getPhoneNumber())
+                }.toString()
+                val request = okhttp3.Request.Builder()
+                    .url("https://${io.vocaguard.BuildConfig.TOKEN_SERVER_HOST}/report-scam")
+                    .addHeader("Authorization", "Bearer ${io.vocaguard.BuildConfig.TOKEN_SERVER_SECRET}")
+                    .post(body.toRequestBody("application/json".toMediaType()))
+                    .build()
+                okhttp3.OkHttpClient().newCall(request).execute().use { response ->
+                    android.util.Log.i("HistoryViewModel", "Scam report uploaded: ${response.code}")
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("HistoryViewModel", "Failed to upload scam report: ${e.message}")
             }
         }
     }

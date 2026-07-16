@@ -51,6 +51,9 @@ interface TranscriptDao {
     @Query("UPDATE call_transcripts SET isFalsePositive = 1 WHERE id = :id")
     suspend fun markAsFalsePositive(id: Long)
 
+    @Query("UPDATE call_transcripts SET detectedScamTypesJson = :scamType, isFalsePositive = 0 WHERE id = :id")
+    suspend fun markAsScam(id: Long, scamType: String)
+
     /** Update the transcript text for the most recent call matching [phoneNumber] within the window.
      *  Falls back to updating the most recent transcript if no phone match is found,
      *  since caller ID format can differ between FCM and the saved record. */

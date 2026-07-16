@@ -37,14 +37,13 @@ class CommunityScamSync private constructor(context: Context) {
         private const val KEY_LAST_SYNC = "last_sync_ms"
         private const val KEY_LAST_ERROR = "last_sync_error"
         private const val CACHE_TTL_MS = 24L * 60 * 60 * 1000  // 24 hours
-        private const val DEFAULT_SYNC_URL =
-            "https://gist.githubusercontent.com/Amirtuchner/9afad64b4504a9a4a753859a47fc2e9d/raw/0d51cb2e90fbb3a680b12726f0a81bed0e7c0525/blocklist.json"
+        private val DEFAULT_SYNC_URL =
+            "https://${io.vocaguard.BuildConfig.TOKEN_SERVER_HOST}/blocklist"
         /**
-         * Fallback URL tried when [DEFAULT_SYNC_URL] is unreachable. Replace with your
-         * own CDN-hosted copy of the blocklist for production deployments.
+         * Fallback URL tried when [DEFAULT_SYNC_URL] is unreachable.
          */
         private const val FALLBACK_SYNC_URL =
-            "https://raw.githubusercontent.com/Amirtuchner/VocaGuard-Mobile/main/blocklist.json"
+            "https://gist.githubusercontent.com/Amirtuchner/9afad64b4504a9a4a753859a47fc2e9d/raw/0d51cb2e90fbb3a680b12726f0a81bed0e7c0525/blocklist.json"
         private const val CONNECT_TIMEOUT_MS = 10_000
         private const val READ_TIMEOUT_MS = 15_000
 
