@@ -1,6 +1,7 @@
 package io.vocaguard.ui
 
 import android.content.Intent
+import android.media.MediaPlayer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,7 +12,9 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material3.*
@@ -21,11 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.collect
 import io.vocaguard.data.CallTranscript
 import io.vocaguard.data.ScamType
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -259,6 +264,65 @@ fun HistoryTab(viewModel: HistoryViewModel = viewModel()) {
                                     typeDropdownExpanded = false
                                 }
                             )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Recordings ────────────────────────────────────────────────────────
+        item {
+            val recordingsDir = File(ctx.getExternalFilesDir(null), "recordings")
+            var recordings by remember {
+                mutableStateOf(
+                    recordingsDir.listFiles()
+                        ?.filter { it.extension == "wav" }
+                        ?.sortedByDescending { it.lastModified() }
+                        ?: emptyList()
+                )
+            }
+            if (recordings.isNotEmpty()) {
+                var recordingsExpanded by remember { mutableStateOf(false) }
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { recordingsExpanded = !recordingsExpanded },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Recordings (${recordings.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Icon(
+                                imageVector = if (recordingsExpanded) Icons.Default.KeyboardArrowUp
+                                              else Icons.Default.KeyboardArrowDown,
+                                contentDescription = null
+                            )
+                        }
+                        if (recordingsExpanded) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            recordings.forEach { file ->
+                                RecordingItem(
+                                    file = file,
+                                    onDelete = {
+                                        file.delete()
+                                        recordings = recordingsDir.listFiles()
+                                            ?.filter { it.extension == "wav" }
+                                            ?.sortedByDescending { it.lastModified() }
+                                            ?: emptyList()
+                                    }
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                            }
                         }
                     }
                 }
@@ -543,4 +607,92 @@ fun ReportScamDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Composable
+private fun RecordingItem(file: File, onDelete: () -> Unit) {
+    val ctx = LocalContext.current
+    val dateFmt = remember { SimpleDateFormat("MMM d, yyyy  h:mm a", Locale.ENGLISH) }
+    val sizeKb = file.length() / 1024
+    val sizeText = if (sizeKb > 1024) "%.1f MB".format(sizeKb / 1024f) else "$sizeKb KB"
+    var playing by remember { mutableStateOf(false) }
+    var player by remember { mutableStateOf<MediaPlayer?>(null) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Recording") },
+            text = { Text("Delete ${file.name}?") },
+            confirmButton = {
+                Button(
+                    onClick = { showDeleteConfirm = false; player?.release(); player = null; onDelete() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") } }
+        )
+    }
+
+    DisposableEffect(file.absolutePath) {
+        onDispose { player?.release(); player = null }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = dateFmt.format(Date(file.lastModified())),
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = sizeText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        // Play/Stop
+        IconButton(onClick = {
+            if (playing) {
+                player?.stop()
+                player?.release()
+                player = null
+                playing = false
+            } else {
+                val mp = MediaPlayer()
+                mp.setDataSource(file.absolutePath)
+                mp.prepare()
+                mp.setOnCompletionListener { playing = false; it.release(); player = null }
+                mp.start()
+                player = mp
+                playing = true
+            }
+        }) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = if (playing) "Stop" else "Play",
+                tint = if (playing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        // Share
+        IconButton(onClick = {
+            val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+            ctx.startActivity(Intent.createChooser(
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "audio/wav"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }, "Share recording"
+            ))
+        }) {
+            Icon(Icons.Default.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        // Delete
+        IconButton(onClick = { showDeleteConfirm = true }) {
+            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }

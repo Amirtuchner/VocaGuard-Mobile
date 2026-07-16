@@ -465,7 +465,7 @@ def send_fcm_alert(keywords, transcript, scam_type, caller_number="", confidence
             data={
                 "type":          "scam_alert",
                 "keywords":      ", ".join(keywords),
-                "transcript":    transcript[:200],
+                "transcript":    transcript[:1000],
                 "scam_type":     scam_type,
                 "caller_number": caller_number,
                 "confidence":    str(confidence),

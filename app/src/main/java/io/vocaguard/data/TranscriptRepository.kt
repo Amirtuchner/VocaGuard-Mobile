@@ -53,6 +53,13 @@ class TranscriptRepository(private val dao: TranscriptDao) {
 
     suspend fun markAsFalsePositive(id: Long) = dao.markAsFalsePositive(id)
 
+    /** Update the transcript text for the most recent call from [phoneNumber] within the last [windowMs]. */
+    suspend fun updateRecentTranscript(phoneNumber: String, text: String, windowMs: Long = 5 * 60_000L) {
+        val since = System.currentTimeMillis() - windowMs
+        dao.updateRecentTranscript(phoneNumber, text, since)
+        Log.d(TAG, "Updated transcript for $phoneNumber (${text.length} chars)")
+    }
+
     /** One-shot count for the widget — no Flow needed. */
     suspend fun countScamsSince(since: Long): Int = dao.countScamsSince(since)
 

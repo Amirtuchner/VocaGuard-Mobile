@@ -150,8 +150,8 @@ class VocaGuardAccessibilityService : AccessibilityService() {
                 if (read <= 0) continue
 
                 loopCount++
-                // Log RMS every ~2 seconds to verify audio capture
-                if (loopCount % 30 == 0) {
+                // Log RMS every ~10 seconds to verify audio capture
+                if (loopCount % 150 == 0) {
                     var sum = 0L
                     for (i in 0 until read) sum += shortBuf[i].toLong() * shortBuf[i]
                     val rms = Math.sqrt(sum.toDouble() / read).toInt()

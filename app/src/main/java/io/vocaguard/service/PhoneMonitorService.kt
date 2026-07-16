@@ -11,7 +11,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.os.PowerManager
 import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -26,6 +25,10 @@ import io.vocaguard.service.CallMonitoringService
  * On Samsung Galaxy devices Samsung's Telecom stack does not always invoke
  * [android.telecom.CallScreeningService], so this service acts as the primary
  * call-detection path via TelephonyCallback / PhoneStateListener.
+ *
+ * Battery optimization: no wake lock, no polling when idle.
+ * TelephonyCallback/PhoneStateListener deliver events without polling.
+ * Polling is only activated during an active call to catch edge cases.
  */
 class PhoneMonitorService : Service() {
 
@@ -35,13 +38,14 @@ class PhoneMonitorService : Service() {
         private const val CHANNEL_ID = "phone_monitor_channel"
         const val ACTION_CALL_OFFHOOK = "io.vocaguard.ACTION_CALL_OFFHOOK"
         const val ACTION_CALL_IDLE = "io.vocaguard.ACTION_CALL_IDLE"
+        /** Poll interval during an active call — only runs while call is in progress. */
+        private const val ACTIVE_CALL_POLL_MS = 5_000L
     }
 
     private lateinit var phoneStateMonitor: PhoneStateMonitor
     private var isCallActive = false
     private val pollHandler = Handler(Looper.getMainLooper())
     private var lastPolledState = -1
-    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -106,58 +110,52 @@ class PhoneMonitorService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
         phoneStateMonitor.startMonitoring()
-        acquireWakeLock()
-        startCallStatePolling()
-        Log.i(TAG, "Phone monitor service started")
+        // No wake lock, no polling at startup — TelephonyCallback delivers events.
+        // Polling is only started during active calls as a Samsung fallback.
+        Log.i(TAG, "Phone monitor service started (battery-optimized, no wake lock)")
         return START_STICKY
     }
 
     private var pollCount = 0
 
-    /** Polls every 2s to detect active calls via multiple APIs. */
+    /**
+     * Polls every [ACTIVE_CALL_POLL_MS] ms to detect call-end on Samsung devices
+     * that sometimes miss TelephonyCallback IDLE events. Only runs while a call
+     * is in progress — zero battery impact when idle.
+     */
     private val callStatePollRunnable = object : Runnable {
         override fun run() {
-            val audioManager = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
-            val audioMode = audioManager.mode
+            if (!isCallActive) return  // stop polling when call ended
+
+            val telecomManager = getSystemService(TELECOM_SERVICE) as android.telecom.TelecomManager
+            val telecomInCall = try { telecomManager.isInCall } catch (_: SecurityException) { false }
 
             val tm = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
             @Suppress("DEPRECATION")
             val callState = tm.callState
 
-            // TelecomManager.isInCall() — most reliable on Samsung
-            val telecomManager = getSystemService(TELECOM_SERVICE) as android.telecom.TelecomManager
-            val telecomInCall = try { telecomManager.isInCall } catch (_: SecurityException) { false }
-
             val inCall = telecomInCall
-                || audioMode == android.media.AudioManager.MODE_IN_CALL
-                || audioMode == android.media.AudioManager.MODE_IN_COMMUNICATION
                 || callState == TelephonyManager.CALL_STATE_OFFHOOK
                 || callState == TelephonyManager.CALL_STATE_RINGING
 
-            val newState = if (inCall) TelephonyManager.CALL_STATE_OFFHOOK
-                else TelephonyManager.CALL_STATE_IDLE
-
-            // Log every 5th poll for debugging
             pollCount++
-            if (pollCount % 5 == 0) {
-                Log.d(TAG, "Poll #$pollCount: audioMode=$audioMode callState=$callState telecom=$telecomInCall inCall=$inCall")
+            if (pollCount % 6 == 0) {
+                Log.d(TAG, "Active-call poll #$pollCount: callState=$callState telecom=$telecomInCall")
             }
 
-            if (newState != lastPolledState) {
-                Log.i(TAG, "Poll state change: audioMode=$audioMode callState=$callState telecom=$telecomInCall inCall=$inCall")
-                lastPolledState = newState
-                when (newState) {
-                    TelephonyManager.CALL_STATE_OFFHOOK -> handleCallAnswered()
-                    TelephonyManager.CALL_STATE_IDLE -> handleCallEnded()
-                }
+            if (!inCall) {
+                Log.i(TAG, "Poll detected call ended")
+                handleCallEnded()
+                return  // stop polling
             }
-            pollHandler.postDelayed(this, 2000)
+            pollHandler.postDelayed(this, ACTIVE_CALL_POLL_MS)
         }
     }
 
-    private fun startCallStatePolling() {
+    private fun startActiveCallPolling() {
+        pollCount = 0
         pollHandler.removeCallbacks(callStatePollRunnable)
-        pollHandler.post(callStatePollRunnable)
+        pollHandler.postDelayed(callStatePollRunnable, ACTIVE_CALL_POLL_MS)
     }
 
     private fun stopCallStatePolling() {
@@ -175,6 +173,20 @@ class PhoneMonitorService : Service() {
             isCallActive = false
             return
         }
+
+        // When the SIP bridge is active, the server handles scam detection via
+        // scam_detector_bg.py. Starting local AudioRecord/Vosk would compete with
+        // Linphone for the mic, causing periodic audio clicks/pops.
+        val sipState = VocaGuardSipManager.callState.value
+        if (sipState == VocaGuardSipManager.CallState.ACTIVE ||
+            sipState == VocaGuardSipManager.CallState.INCOMING) {
+            Log.i(TAG, "SIP bridge active (state=$sipState) — skipping local audio monitoring")
+            isCallActive = false
+            return
+        }
+
+        // Start polling only during active calls — catches Samsung IDLE misses
+        startActiveCallPolling()
 
         upgradeFgsForMicrophone()
         Log.i(TAG, "Starting CallMonitoringService (embedded in PhoneMonitorService FGS)")
@@ -198,6 +210,7 @@ class PhoneMonitorService : Service() {
     private fun handleCallEnded() {
         if (!isCallActive) return
         isCallActive = false
+        stopCallStatePolling()
         // Stop AccessibilityService audio capture
         VocaGuardAccessibilityService.instance?.stopAudioCapture()
         startService(
@@ -210,28 +223,8 @@ class PhoneMonitorService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         stopCallStatePolling()
-        releaseWakeLock()
         phoneStateMonitor.stopMonitoring()
         Log.i(TAG, "Phone monitor service stopped")
-    }
-
-    private fun acquireWakeLock() {
-        if (wakeLock == null) {
-            val pm = getSystemService(POWER_SERVICE) as PowerManager
-            wakeLock = pm.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK,
-                "VocaGuard::PhoneMonitorWakeLock"
-            ).apply { acquire() }
-            Log.i(TAG, "WakeLock acquired")
-        }
-    }
-
-    private fun releaseWakeLock() {
-        wakeLock?.let {
-            if (it.isHeld) it.release()
-            wakeLock = null
-            Log.i(TAG, "WakeLock released")
-        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

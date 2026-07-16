@@ -51,6 +51,11 @@ interface TranscriptDao {
     @Query("UPDATE call_transcripts SET isFalsePositive = 1 WHERE id = :id")
     suspend fun markAsFalsePositive(id: Long)
 
+    /** Update the transcript text for the most recent call from [phoneNumber] within the last 5 minutes.
+     *  Uses suffix matching to handle +/country-code format differences (e.g. +972... vs 972...). */
+    @Query("UPDATE call_transcripts SET text = :text WHERE id = (SELECT id FROM call_transcripts WHERE (phoneNumber = :phoneNumber OR phoneNumber LIKE '%' || :phoneNumber OR :phoneNumber LIKE '%' || phoneNumber) AND timestamp >= :since ORDER BY timestamp DESC LIMIT 1)")
+    suspend fun updateRecentTranscript(phoneNumber: String, text: String, since: Long)
+
     @Query("SELECT COUNT(*) FROM call_transcripts")
     fun countAllCallsLifetime(): Flow<Int>
 

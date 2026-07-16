@@ -67,7 +67,7 @@ def send_fcm_with_token(token: str, keywords, transcript, scam_type,
             data={
                 "type":          "scam_alert",
                 "keywords":      ", ".join(keywords),
-                "transcript":    transcript[:200],
+                "transcript":    transcript[:1000],
                 "scam_type":     scam_type,
                 "caller_number": caller_number,
                 "confidence":    str(confidence),
@@ -86,7 +86,7 @@ from faster_whisper import WhisperModel
 
 MODEL_PATH_EN       = "/opt/vocaguard/model-en"
 SAMPLE_RATE         = 16000
-WHISPER_CHUNK_BYTES = 16000 * 2 * 4   # 4-second chunks at 16 kHz
+WHISPER_CHUNK_BYTES = 16000 * 2 * 6   # 6-second chunks at 16 kHz — more context = better accuracy
 WINDOW_SECONDS      = 90
 
 logging.basicConfig(
@@ -153,26 +153,20 @@ def main():
     resample_state = None
     whisper_buf    = bytearray()
     transcript_win  = deque()
+    # transcript_disp: combined Vosk+Whisper text for scam detection (max recall)
     transcript_disp = ""
+    # whisper_transcript: Whisper-only text for the user-facing history (accuracy)
+    whisper_transcript = ""
 
-    # Fire a scam alert 20 seconds after the call is bridged if no detection yet.
-    def _timeout_alert():
-        time.sleep(20)
-        nonlocal alerted
-        if not alerted:
-            log.warning("BG: 20s timeout — sending fallback scam alert")
-            send_fcm_with_token(
-                fcm_token, ["timeout"], transcript_disp.strip() or "[call in progress]",
-                "UNKNOWN", caller_number, 0.75
-            )
-            alerted = True
-
-    threading.Thread(target=_timeout_alert, daemon=True).start()
+    # No timeout alert — let the detector analyse the full call.
+    # A blanket 20s fallback caused false positives on every legitimate call.
 
     def add_text(text, label):
-        nonlocal transcript_disp
+        nonlocal transcript_disp, whisper_transcript
         transcript_win.append((time.monotonic(), text))
         transcript_disp += " " + text
+        if "ML" in label:
+            whisper_transcript += " " + text
         log.info(f"BG STT-{label}: {text}")
 
     def get_window_text():
@@ -214,7 +208,7 @@ def main():
                 )
                 segments, info = whisper_model.transcribe(
                     audio_np, beam_size=5, best_of=5,
-                    vad_filter=False, language="en",
+                    vad_filter=True, language="en",
                 )
                 text = " ".join(seg.text for seg in segments).strip()
                 if text:
@@ -307,7 +301,7 @@ def main():
                   .astype(np.float32) / 32768.0
             )
             segments, info = whisper_model.transcribe(
-                audio_np, language="en", beam_size=5, best_of=5, vad_filter=False,
+                audio_np, language="en", beam_size=5, best_of=5, vad_filter=True,
             )
             text = " ".join(seg.text for seg in segments).strip()
             if text:
@@ -316,7 +310,31 @@ def main():
             log.warning(f"BG Whisper final error: {e}")
 
     check_and_alert("final")
-    log.info(f"BG call ended. transcript={transcript_disp.strip()!r}")
+
+    # Send the Whisper-only transcript to the app for accurate history display.
+    # Vosk is kept for real-time scam detection but excluded from user-facing text.
+    final_transcript = whisper_transcript.strip() or transcript_disp.strip()
+    log.info(f"BG call ended. whisper={whisper_transcript.strip()!r}")
+    log.info(f"BG call ended. full={transcript_disp.strip()!r}")
+    if final_transcript and fcm_token:
+        try:
+            from firebase_admin import messaging as fcm_msg
+            # FCM data messages have a 4 KB limit — truncate if needed
+            trunc = final_transcript[:3500]
+            msg = fcm_msg.Message(
+                data={
+                    "type":          "call_transcript",
+                    "caller_number": caller_number,
+                    "transcript":    trunc,
+                },
+                android=fcm_msg.AndroidConfig(priority="high"),
+                token=fcm_token,
+            )
+            fcm_msg.send(msg)
+            log.info(f"BG transcript sent to app ({len(trunc)} chars)")
+        except Exception as e:
+            log.warning(f"BG transcript FCM error: {e}")
+
     try:
         os.unlink(audio_path)
     except Exception:

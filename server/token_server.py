@@ -217,7 +217,7 @@ def provision_pjsip_user(ext: str, password: str):
         f"context=vocaguard-user\n"
         f"auth=auth_{ext}\n"
         f"aors={ext}\n"
-        f"allow=!all,ulaw,alaw\n"
+        f"allow=!all,opus,ulaw,alaw\n"
         f"direct_media=no\n"
         f"force_rport=yes\n"
         f"rewrite_contact=yes\n"

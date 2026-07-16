@@ -151,6 +151,18 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                 )
                 return
             }
+            "call_transcript" -> {
+                val callerNumber = message.data["caller_number"] ?: ""
+                val transcript   = message.data["transcript"] ?: ""
+                if (callerNumber.isNotBlank() && transcript.isNotBlank()) {
+                    Log.i(TAG, "Server transcript received for $callerNumber (${transcript.length} chars)")
+                    CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+                        TranscriptRepository.getInstance(applicationContext)
+                            .updateRecentTranscript(callerNumber, transcript)
+                    }
+                }
+                return
+            }
             "scam_alert" -> { /* handled below */ }
             else -> return
         }

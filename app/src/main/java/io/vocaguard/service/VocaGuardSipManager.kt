@@ -60,6 +60,21 @@ object VocaGuardSipManager {
             c.isVideoCaptureEnabled = false
             c.isVideoDisplayEnabled = false
 
+            // Enable Opus codec for better audio quality (lower latency, better compression)
+            for (pt in c.audioPayloadTypes) {
+                when (pt.mimeType.lowercase()) {
+                    "opus" -> pt.enable(true)
+                    "pcmu", "pcma" -> pt.enable(true)    // keep G.711 as fallback
+                    else -> pt.enable(false)
+                }
+            }
+
+            // Increase jitter buffer to absorb network variance — reduces clicks/pops
+            c.audioJittcomp = 80   // ms (default 60)
+
+            // Enable adaptive rate control for smoother audio
+            c.isAdaptiveRateControlEnabled = true
+
             // Keep NAT pinhole open with UDP CRLF keep-alives
             c.isKeepAliveEnabled = true
 
@@ -81,7 +96,7 @@ object VocaGuardSipManager {
             serverAddr?.transport = TransportType.Udp
             params.serverAddress = serverAddr
             params.isRegisterEnabled = true
-            params.expires = 120  // re-register every 2min to keep NAT pinhole open
+            params.expires = 300  // re-register every 5min — sufficient for NAT keep-alive
 
             val account = c.createAccount(params)
             c.addAccount(account)
@@ -106,6 +121,7 @@ object VocaGuardSipManager {
                         Call.State.End, Call.State.Released, Call.State.Error -> {
                             _callState.value = CallState.ENDED
                             pendingAccept = false
+                            currentRecordFile = null
                         }
                         else -> {}
                     }
@@ -133,11 +149,15 @@ object VocaGuardSipManager {
             c.start()
             core = c
 
-            // Linphone requires periodic iterate() calls to process SIP messages
+            // Linphone requires periodic iterate() calls to process SIP messages.
+            // Use adaptive interval: 20ms during active calls for real-time audio,
+            // 100ms when idle to save battery (5× fewer CPU wake-ups).
             iterateJob = scope.launch(Dispatchers.Main) {
                 while (isActive) {
                     core?.iterate()
-                    delay(20)
+                    val interval = if (_callState.value == CallState.ACTIVE ||
+                                       _callState.value == CallState.INCOMING) 20L else 100L
+                    delay(interval)
                 }
             }
 
@@ -202,10 +222,24 @@ object VocaGuardSipManager {
         }
     }
 
+    /** Path of the current call's recording file (pre-set at answer time). */
+    private var currentRecordFile: String? = null
+
     private fun answerCall(core: Core, call: Call) {
         val callParams = core.createCallParams(call)
         callParams?.isAudioEnabled = true
         callParams?.isVideoEnabled = false
+        // Pre-set record file so startRecording() works mid-call
+        appContext?.let { ctx ->
+            val dir = java.io.File(ctx.getExternalFilesDir(null), "recordings")
+            dir.mkdirs()
+            val ts = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US)
+                .format(java.util.Date())
+            val file = java.io.File(dir, "call_$ts.wav")
+            callParams?.recordFile = file.absolutePath
+            currentRecordFile = file.absolutePath
+            Log.i(TAG, "Record file pre-set: ${file.absolutePath}")
+        }
         try {
             call.acceptWithParams(callParams)
             // Route audio to earpiece by default (user holds phone to ear)
@@ -229,6 +263,21 @@ object VocaGuardSipManager {
         val call = core?.currentCall ?: core?.calls?.firstOrNull()
         call?.terminate()
         _callState.value = CallState.IDLE
+    }
+
+    /** Start recording the current call. Record file is pre-set at answer time. */
+    fun startRecording(context: Context): String? {
+        val call = core?.currentCall ?: return null
+        val path = currentRecordFile ?: return null
+        call.startRecording()
+        Log.i(TAG, "Recording started: $path")
+        return path
+    }
+
+    /** Stop recording the current call. */
+    fun stopRecording() {
+        core?.currentCall?.stopRecording()
+        Log.i(TAG, "Recording stopped")
     }
 
     /** Toggle earpiece ↔ speaker during an active call. */

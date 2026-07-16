@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.ScamDatabaseManager
 import io.vocaguard.data.TranscriptRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -33,6 +34,7 @@ data class HomeStats(
     val blocklistSize: Int = 0,
     // Protection uptime
     val protectionDays: Int = 0,
+    val installTimestamp: Long = 0L,
     // Estimated money saved (FTC avg $1,480 per scam)
     val estimatedMoneySaved: Int = 0,
     // Protection score (0-100)
@@ -60,6 +62,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         emit(size)
     }
 
+    /** Emits every 60s so time-based values (protectionDays) stay fresh. */
+    private val minuteTicker = flow {
+        while (true) {
+            emit(System.currentTimeMillis())
+            delay(60_000L)
+        }
+    }
+
     val stats: StateFlow<HomeStats> = combine(
         repository.countScamCallsSince(monthAgo),
         repository.countAllCallsSince(monthAgo),
@@ -67,7 +77,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         repository.countAllCallsLifetime(),
         repository.countScamCallsLifetime(),
         repository.countCallsScreenedClean(),
-        blocklistFlow
+        blocklistFlow,
+        minuteTicker
     ) { values ->
         val scam = values[0] as Int
         val total = values[1] as Int
@@ -77,6 +88,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val lifetimeScam = values[4] as Int
         val screenedClean = values[5] as Int
         val blocklist = values[6] as Int
+        // values[7] is the ticker timestamp — used only to trigger recalculation
 
         val breakdown = typeJsons
             .flatMap { it.split(",") }
@@ -116,6 +128,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             messagesFlagged = settings.messagesFlaggedTotal,
             blocklistSize = blocklist,
             protectionDays = protectionDays,
+            installTimestamp = installTs,
             estimatedMoneySaved = estimatedSaved,
             protectionScore = score.coerceAtMost(100)
         )

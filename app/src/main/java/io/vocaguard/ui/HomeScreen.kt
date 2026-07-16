@@ -251,7 +251,7 @@ fun HomeTab(
         // Protection Score
         item {
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                ProtectionScoreCard(stats.protectionScore, stats.protectionDays)
+                ProtectionScoreCard(stats.protectionScore, stats.installTimestamp)
             }
         }
 
@@ -454,7 +454,7 @@ private fun StatItem(label: String, value: String) {
 }
 
 @Composable
-private fun ProtectionScoreCard(score: Int, days: Int) {
+private fun ProtectionScoreCard(score: Int, installTimestamp: Long) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -482,11 +482,28 @@ private fun ProtectionScoreCard(score: Int, days: Int) {
                     else -> MaterialTheme.colorScheme.error
                 }
             )
-            if (days > 0) {
+            if (installTimestamp > 0) {
                 Spacer(modifier = Modifier.height(4.dp))
-                val minutes = days.toLong() * 1440
+                // Live-updating elapsed time since install
+                var now by remember { mutableStateOf(System.currentTimeMillis()) }
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        now = System.currentTimeMillis()
+                        kotlinx.coroutines.delay(60_000L)
+                    }
+                }
+                val elapsedMs = now - installTimestamp
+                val totalMinutes = (elapsedMs / 60_000L).coerceAtLeast(1)
+                val days = (totalMinutes / 1440).toInt()
+                val hours = ((totalMinutes % 1440) / 60).toInt()
+                val mins = (totalMinutes % 60).toInt()
+                val timeText = when {
+                    days > 0 -> "Protected for $days day${if (days != 1) "s" else ""} \u00B7 $hours hr${if (hours != 1) "s" else ""} \u00B7 $mins min"
+                    hours > 0 -> "Protected for $hours hour${if (hours != 1) "s" else ""} \u00B7 $mins min"
+                    else -> "Protected for $mins minute${if (mins != 1) "s" else ""}"
+                }
                 Text(
-                    text = "Protected for $days day${if (days != 1) "s" else ""} \u00B7 %,d minutes".format(minutes),
+                    text = timeText,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

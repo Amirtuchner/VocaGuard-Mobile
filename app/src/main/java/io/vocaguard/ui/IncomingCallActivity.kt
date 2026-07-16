@@ -80,6 +80,8 @@ class IncomingCallActivity : ComponentActivity() {
     private var volumeLevel by mutableStateOf(0f)
     private var showVolumeMeter by mutableStateOf(false)
     private var volumeHideJob: Job? = null
+    private var isRecording by mutableStateOf(false)
+    private var recordingPath: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -130,10 +132,10 @@ class IncomingCallActivity : ComponentActivity() {
                         hangUpAndFinish()
                     }
                     sipState == VocaGuardSipManager.CallState.ACTIVE && callActive && !pendingCancel -> {
-                        // Bridge is established — some carriers deactivate *21* forwarding
-                        // when a call is answered. Re-enable it NOW while the call
-                        // is still active, so it's ready before the next call comes in.
-                        reEnableForwardingSilently()
+                        // Bridge is established. Do NOT re-enable *21* here — doing so
+                        // mid-call causes the carrier to re-forward the same call to
+                        // Asterisk, triggering a duplicate incoming-call notification.
+                        // Forwarding is re-enabled in onDestroy() after the call ends.
                     }
                     sipState == VocaGuardSipManager.CallState.ENDED && callActive -> {
                         getSystemService(NotificationManager::class.java)
@@ -150,6 +152,16 @@ class IncomingCallActivity : ComponentActivity() {
                     scamAlert = scamAlert,
                     volumeLevel = volumeLevel,
                     showVolumeMeter = showVolumeMeter,
+                    isRecording = isRecording,
+                    onToggleRecord = {
+                        if (isRecording) {
+                            VocaGuardSipManager.stopRecording()
+                            isRecording = false
+                        } else {
+                            recordingPath = VocaGuardSipManager.startRecording(this@IncomingCallActivity)
+                            isRecording = recordingPath != null
+                        }
+                    },
                     onEndCall = { hangUpAndFinish() },
                     onCancelConnecting = { pendingCancel = true }
                 )
@@ -195,6 +207,10 @@ class IncomingCallActivity : ComponentActivity() {
     }
 
     private fun hangUpAndFinish() {
+        if (isRecording) {
+            VocaGuardSipManager.stopRecording()
+            isRecording = false
+        }
         VocaGuardSipManager.hangupCurrentCall()
         VocaGuardFcmService.hangupCall(activeChannel)  // AMI hangup as fallback
         getSystemService(NotificationManager::class.java).cancel(ActiveCallReceiver.NOTIFICATION_ID)
@@ -353,6 +369,8 @@ private fun ActiveCallScreen(
     scamAlert: Pair<ScamType, Float>?,
     volumeLevel: Float,
     showVolumeMeter: Boolean,
+    isRecording: Boolean = false,
+    onToggleRecord: () -> Unit = {},
     onEndCall: () -> Unit,
     onCancelConnecting: () -> Unit
 ) {
@@ -438,25 +456,52 @@ private fun ActiveCallScreen(
                 Spacer(Modifier.height(16.dp))
             }
             if (connected) {
-                var speakerOn by remember { mutableStateOf(false) }
-                Button(
-                    onClick = {
-                        speakerOn = !speakerOn
-                        VocaGuardSipManager.setSpeaker(speakerOn)
-                    },
-                    modifier = Modifier.size(64.dp),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (speakerOn) Color(0xFF1565C0) else Color(0xFF444444)
-                    )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(32.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("\uD83D\uDD0A", fontSize = 22.sp)
+                    // Speaker button
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        var speakerOn by remember { mutableStateOf(false) }
+                        Button(
+                            onClick = {
+                                speakerOn = !speakerOn
+                                VocaGuardSipManager.setSpeaker(speakerOn)
+                            },
+                            modifier = Modifier.size(64.dp),
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (speakerOn) Color(0xFF1565C0) else Color(0xFF444444)
+                            )
+                        ) {
+                            Text("\uD83D\uDD0A", fontSize = 22.sp)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            if (speakerOn) "Speaker On" else "Speaker",
+                            color = Color.White, fontSize = 12.sp
+                        )
+                    }
+                    // Record button
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Button(
+                            onClick = onToggleRecord,
+                            modifier = Modifier.size(64.dp),
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isRecording) Color(0xFFD32F2F) else Color(0xFF444444)
+                            )
+                        ) {
+                            Text("\u23FA", fontSize = 22.sp)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            if (isRecording) "Recording" else "Record",
+                            color = if (isRecording) Color(0xFFEF5350) else Color.White,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    if (speakerOn) "Speaker On" else "Speaker",
-                    color = Color.White, fontSize = 12.sp
-                )
                 Spacer(Modifier.height(20.dp))
             }
             Button(

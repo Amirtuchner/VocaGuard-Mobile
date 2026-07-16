@@ -196,6 +196,14 @@ class CallMonitoringService : Service() {
         isVictimSideOnly = ServerDetectionManager.isRegistered() &&
             ServerDetectionManager.getActivationCode(this).isEmpty()
 
+        // Skip detection for known contacts — scammers are never in the contact list.
+        if (activePhoneNumber.isNotBlank() &&
+            ContactsHelper.isKnownContact(this, activePhoneNumber)) {
+            Log.i(TAG, "Known contact ($activePhoneNumber) — scam detection skipped entirely")
+            updateNotification("Call with known contact — monitoring inactive")
+            return
+        }
+
         // Reset all per-call accumulators
         rmsReadings.clear()
         totalRmsReadings = 0
@@ -243,14 +251,6 @@ class CallMonitoringService : Service() {
     }
 
     private fun startVoskRecognition() {
-        // Skip detection for known contacts — scammers are never in the victim's contact list.
-        if (activePhoneNumber.isNotBlank() &&
-            ContactsHelper.isKnownContact(this@CallMonitoringService, activePhoneNumber)) {
-            Log.i(TAG, "Known contact ($activePhoneNumber) — scam detection skipped")
-            updateNotification("Call with known contact — monitoring inactive")
-            return
-        }
-
         // Use Vosk directly — Android SpeechRecognizer interferes with call audio
         // (causes audible clicks and can't capture speech during calls)
         Log.i(TAG, "Starting Vosk speech recognition")
@@ -427,9 +427,9 @@ class CallMonitoringService : Service() {
                 val read = record.read(shortBuf, 0, shortBuf.size)
                 if (read <= 0) continue
 
-                // Log RMS every ~2 seconds to verify audio capture
+                // Log RMS every ~10 seconds to verify audio capture
                 loopCount++
-                if (loopCount % 30 == 0) {
+                if (loopCount % 150 == 0) {
                     var sum = 0L
                     for (i in 0 until read) sum += shortBuf[i].toLong() * shortBuf[i]
                     val rms = Math.sqrt(sum.toDouble() / read).toInt()
