@@ -53,11 +53,18 @@ class TranscriptRepository(private val dao: TranscriptDao) {
 
     suspend fun markAsFalsePositive(id: Long) = dao.markAsFalsePositive(id)
 
-    /** Update the transcript text for the most recent call from [phoneNumber] within the last [windowMs]. */
+    /** Update the transcript text for the most recent call from [phoneNumber] within the last [windowMs].
+     *  Falls back to the most recent transcript if no phone match is found. */
     suspend fun updateRecentTranscript(phoneNumber: String, text: String, windowMs: Long = 5 * 60_000L) {
         val since = System.currentTimeMillis() - windowMs
-        dao.updateRecentTranscript(phoneNumber, text, since)
-        Log.d(TAG, "Updated transcript for $phoneNumber (${text.length} chars)")
+        val updated = dao.updateRecentTranscriptByPhone(phoneNumber, text, since)
+        if (updated == 0) {
+            // Phone number format mismatch — update the most recent transcript instead
+            dao.updateMostRecentTranscript(text, since)
+            Log.d(TAG, "Updated most recent transcript (phone mismatch for $phoneNumber, ${text.length} chars)")
+        } else {
+            Log.d(TAG, "Updated transcript for $phoneNumber (${text.length} chars)")
+        }
     }
 
     /** One-shot count for the widget — no Flow needed. */

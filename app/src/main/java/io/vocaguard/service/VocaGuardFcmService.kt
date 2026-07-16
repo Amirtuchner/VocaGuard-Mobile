@@ -207,12 +207,19 @@ class VocaGuardFcmService : FirebaseMessagingService() {
     }
 
     private fun showIncomingCallNotification(callerNumber: String, asteriskChannel: String) {
-        // Ignore duplicate FCM "incoming_call" messages while a call is already active.
+        // Ignore duplicate FCM "incoming_call" messages while ANY call is already active
+        // (SIP bridge call, or regular PSTN call like an outgoing call to a contact).
         val sipState = VocaGuardSipManager.callState.value
+        val telecomInCall = try {
+            val tm = getSystemService(android.telecom.TelecomManager::class.java)
+            tm.isInCall
+        } catch (_: SecurityException) { false }
+
         if (io.vocaguard.ui.IncomingCallActivity.isShowing ||
             sipState == VocaGuardSipManager.CallState.ACTIVE ||
-            sipState == VocaGuardSipManager.CallState.INCOMING) {
-            Log.i(TAG, "Ignoring incoming_call FCM — call already in progress (state=$sipState, isShowing=${io.vocaguard.ui.IncomingCallActivity.isShowing})")
+            sipState == VocaGuardSipManager.CallState.INCOMING ||
+            telecomInCall) {
+            Log.i(TAG, "Ignoring incoming_call FCM — call already in progress (sip=$sipState, pstn=$telecomInCall, isShowing=${io.vocaguard.ui.IncomingCallActivity.isShowing})")
             return
         }
         // Reset stale ENDED state from previous call

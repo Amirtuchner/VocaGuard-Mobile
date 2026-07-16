@@ -108,14 +108,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         val estimatedSaved = lifetimeScam * 1480
 
-        // Protection score: 100 = fully configured
-        var score = 0
-        if (settings.onboardingComplete) score += 30
-        if (settings.callForwardingEnabled) score += 25
-        if (settings.messageScanEnabled) score += 15
-        if (settings.enableTts) score += 10
-        if (settings.enableSound) score += 10
-        if (settings.enableVibration) score += 10
+        // Protection score: starts at 100, deducts for disabled features
+        var score = 100
+        if (!settings.onboardingComplete) score -= 30
+        if (!settings.callForwardingEnabled) score -= 15
+        if (!settings.messageScanEnabled) score -= 10
 
         HomeStats(
             scamCallsThisMonth = scam,
