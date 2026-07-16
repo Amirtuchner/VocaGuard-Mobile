@@ -45,6 +45,7 @@ class ReEnableForwardingWorker(
         return Result.success()
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
     private suspend fun trySilentUssd(code: String): Boolean =
         suspendCancellableCoroutine { cont ->
             try {

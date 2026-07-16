@@ -336,6 +336,7 @@ class IncomingCallActivity : ComponentActivity() {
      * Try to silently re-enable *21* forwarding using the USSD/MMI API (no user interaction).
      * Falls back to a tap-to-call notification if the modem rejects the request.
      */
+    @android.annotation.SuppressLint("MissingPermission")
     private fun reEnableForwardingSilently() {
         ServerDetectionManager.init(this)
         val code = ServerDetectionManager.getActivationCode()

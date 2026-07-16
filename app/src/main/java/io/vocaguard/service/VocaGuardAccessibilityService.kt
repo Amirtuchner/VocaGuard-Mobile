@@ -74,6 +74,7 @@ class VocaGuardAccessibilityService : AccessibilityService() {
      * Start capturing audio via AudioRecord from the AccessibilityService context.
      * This is called by PhoneMonitorService when a call is detected.
      */
+    @android.annotation.SuppressLint("MissingPermission")
     fun startAudioCapture() {
         if (isCapturing) {
             Log.d(TAG, "Already capturing audio")
