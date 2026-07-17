@@ -105,55 +105,223 @@ SCAM_KEYWORDS_EN = [
 ]
 
 SCAM_KEYWORDS_HE = [
-    # ── High-signal (existing) ──
-    ("צו מעצר", 2), ("חשבון בטוח", 2), ("אל תספר", 2), ("בסוד", 2),
-    ("מחלקת הונאות", 2), ("כרטיס מתנה", 2), ("העברה בנקאית", 2),
-    ("ביטקוין", 2), ("קריפטו", 2), ("גישה מרחוק", 2), ("anydesk", 2), ("teamviewer", 2),
-    ("מספר תעודת זהות", 2),
-    # ── High-signal (new — Israeli-specific) ──
-    ("ביטוח לאומי", 2),          # National Insurance Institute — top scam vector in IL
-    ("המוסד לביטוח לאומי", 2),
-    ("קצבת נכות", 2),            # disability benefit (used in NII phishing calls)
-    ("שבס", 2),                   # Israel Prison Service (שב"ס) — arrest-warrant scams
-                                  # (STT transcribes without the gershayim mark)
+    # ══════════════════════════════════════════════════════════════════════════
+    # HIGH-SIGNAL (weight=2) — strongly correlated with scams
+    # ══════════════════════════════════════════════════════════════════════════
+
+    # ── Arrest / legal threats ──
+    ("צו מעצר", 2),              # arrest warrant
     ("צו עיכוב יציאה", 2),       # travel ban order
     ("תביעה משפטית", 2),         # lawsuit
-    ("ייפוי כוח", 2),            # power of attorney — financial fraud
+    ("שבס", 2),                   # Israel Prison Service (שב"ס)
+    ("צו בית משפט", 2),          # court order
+    ("כתב אישום", 2),            # indictment
+    ("הליך פלילי", 2),           # criminal proceedings
+
+    # ── Social engineering / secrecy ──
+    ("חשבון בטוח", 2),           # safe account
+    ("אל תספר", 2),              # don't tell
+    ("בסוד", 2),                  # in secret
+    ("מחלקת הונאות", 2),         # fraud department
+    ("אל תספר לאף אחד", 2),     # don't tell anyone
+    ("שמור על סודיות", 2),       # keep it confidential
+    ("אל תתקשר לבנק", 2),       # don't call the bank
+    ("אל תתקשר למשטרה", 2),     # don't call the police
+    ("חקירה חסויה", 2),          # confidential investigation
+    ("לא לספר לבן זוג", 2),     # don't tell your spouse
+
+    # ── Identity / OTP theft ──
+    ("מספר תעודת זהות", 2),      # ID number
     ("קוד חד פעמי", 2),          # one-time code / OTP
+    ("תן לי את הקוד", 2),       # give me the code
+    ("שלח לי את הקוד", 2),      # send me the code
+
+    # ── Remote access ──
+    ("גישה מרחוק", 2), ("anydesk", 2), ("teamviewer", 2),
+    ("הורד את האפליקציה", 2),    # install the app
+    ("תן לי שליטה", 2),          # give me control
+    ("שיתוף מסך", 2),            # screen sharing
+
+    # ── Payment / gift cards ──
+    ("כרטיס מתנה", 2),           # gift card
+    ("העברה בנקאית", 2),         # bank transfer
+    ("ביטקוין", 2), ("קריפטו", 2),
+    ("גיפט קארד", 2),            # gift card (transliterated)
+    ("קנה כרטיסי מתנה", 2),      # buy gift cards
+
+    # ── National Insurance Institute (ביטוח לאומי) ──
+    ("ביטוח לאומי", 2),
+    ("המוסד לביטוח לאומי", 2),
+    ("קצבת נכות", 2),            # disability benefit
+    ("קצבת ילדים", 2),           # child allowance
+    ("החזר כספי מביטוח לאומי", 2), # refund from NII
+    ("עדכון פרטי ביטוח לאומי", 2), # update NII details
+    ("זכאות לקצבה", 2),          # benefit eligibility
+
+    # ── Account freeze / block ──
     ("הקפאת חשבון", 2),          # account freeze
-    ("הורד את האפליקציה", 2),    # install the app — remote-access scam entry point
-    # ── Medium-signal (existing) ──
+    ("החשבון שלך נחסם", 2),      # your account was blocked
+    ("פעילות חשודה בחשבון", 2),  # suspicious account activity
+
+    # ── Power of attorney / financial fraud ──
+    ("ייפוי כוח", 2),            # power of attorney
+
+    # ── Investment / pig-butchering (weight=3 — single phrase clears threshold) ──
+    ("תשואה מובטחת", 3),         # guaranteed returns
+    ("רווחים מובטחים", 3),       # guaranteed profits
+    ("הכפלת כסף", 3),            # doubling money
+    ("השקעה ללא סיכון", 3),      # risk-free investment
+    ("ההון שלך מוגן", 3),        # your capital is protected
+    ("משיכת רווחים", 3),         # withdraw profits
+    ("הפקדה ראשונית", 3),        # initial deposit
+    ("ארביטראז' קריפטו", 3),     # crypto arbitrage
+    ("רובוט מסחר", 3),           # trading robot
+    ("קבוצת מסחר vip", 3),       # VIP trading group
+    ("מנהל חשבון אישי", 3),      # personal account manager
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # MEDIUM-SIGNAL (weight=1) — needs a partner keyword
+    # ══════════════════════════════════════════════════════════════════════════
+
+    # ── Urgency ──
     ("דחוף", 1), ("מיד", 1), ("עכשיו", 1), ("בדחיפות", 1),
+    ("הזדמנות אחרונה", 1),       # last chance
+    ("תוך 24 שעות", 1),          # within 24 hours
+    ("חלון הזדמנויות", 1),       # window of opportunity
+    ("לפני שיהיה מאוחר", 1),     # before it's too late
+    ("הזמן אוזל", 1),            # time is running out
+
+    # ── Account status ──
     ("חסום", 1), ("הוקפא", 1), ("מושעה", 1), ("חשבון מוקפא", 1),
+    ("חשבון מושעה", 1),           # suspended account
+    ("חשבון נחסם", 1),            # blocked account
+
+    # ── Authentication / phishing ──
     ("קוד אימות", 1), ("קוד otp", 1), ("אימות", 1),
-    ("העברת כסף", 1), ("ביט", 1), ("פייבוקס", 1), ("פרטי בנק", 1),
-    ("מס הכנסה", 1), ("רשות המסים", 1), ("חוב מס", 1), ("עיקול מס", 1),
-    ("תיק פלילי", 1), ("הוצאה לפועל", 1), ("עיקול", 1), ("חקירה", 1),
-    ("וירוס", 1), ("תמיכה טכנית", 1),
-    ("זכית", 1), ("הגרלה", 1), ("זכייה", 1), ("מזל טוב", 1),
-    ("לחץ אחת", 1), ("הודעה מוקלטת", 1), ("הודעה אוטומטית", 1),
-    ("חבילה", 1), ("אגרת מכס", 1),
-    ("הצעת עבודה", 1), ("עמלה", 1),
-    ("תרומה", 1), ("תעודת זהות", 1),
-    # ── Medium-signal (new — Israeli-specific) ──
-    ("משטרה", 1),                 # police (impersonation calls)
-    ("שוטר", 1),                  # officer
-    ("בנק הפועלים", 1),           # Israeli banks — callers claiming to be from the bank
-    ("בנק לאומי", 1),
-    ("דיסקונט", 1),
-    ("מזרחי טפחות", 1),
-    ("ישראכרט", 1),
-    ("כרטיס אשראי", 1),          # credit card
-    ("כאל", 1),                   # Israeli credit company (CAL)
-    ("מקס", 1),                   # Max credit
-    ("פפר פיי", 1),               # Pepper Pay
-    ("קישור", 1),                 # link — phishing SMS/calls
-    ("לינק", 1),
-    ("אפליקציה", 1),              # app (often "download an app" = remote access)
+    ("אימות דו שלבי", 1),        # two-factor auth
+    ("קישור", 1), ("לינק", 1),
+    ("אפליקציה", 1),
     ("מסרון", 1),                 # SMS
-    ("פרטים אישיים", 1),          # personal details
-    ("מנהל חשבון", 1),           # account manager (impersonation)
-    ("חתימה", 1),                 # signature
+    ("לחץ על הקישור", 1),        # click the link
+    ("עדכן פרטים", 1),           # update details
+    ("אמת את החשבון", 1),        # verify account
+
+    # ── Payment methods (Israeli) ──
+    ("העברת כסף", 1), ("ביט", 1), ("פייבוקס", 1), ("פרטי בנק", 1),
+    ("פפר פיי", 1),               # Pepper Pay
+    ("גוגל פיי", 1),             # Google Pay
+    ("אפל פיי", 1),              # Apple Pay
+    ("פייפאל", 1),                # PayPal
+    ("העברה מיידית", 1),         # instant transfer
+    ("מזומן", 1),                 # cash
+    ("כרטיס נטען", 1),           # prepaid card
+
+    # ── Israeli banks ──
+    ("בנק הפועלים", 1), ("בנק לאומי", 1), ("דיסקונט", 1),
+    ("מזרחי טפחות", 1), ("בנק הבינלאומי", 1), ("בנק ירושלים", 1),
+    ("בנק מרכנתיל", 1), ("הבנק הדיגיטלי", 1), ("וואן זירו", 1),
+
+    # ── Israeli credit companies ──
+    ("ישראכרט", 1), ("כרטיס אשראי", 1),
+    ("כאל", 1), ("מקס", 1),
+    ("לאומי קארד", 1),            # Leumi Card
+    ("פרימיום אקספרס", 1),       # Premium Express
+    ("אמריקן אקספרס", 1),        # American Express
+
+    # ── Tax authority (מס הכנסה) ──
+    ("מס הכנסה", 1), ("רשות המסים", 1), ("חוב מס", 1), ("עיקול מס", 1),
+    ("ביקורת מס", 1),             # tax audit
+    ("דוח שנתי", 1),              # annual report
+    ("החזר מס", 1),               # tax refund
+    ("קנס מס", 1),                # tax penalty
+
+    # ── Police / legal ──
+    ("משטרה", 1), ("שוטר", 1),
+    ("תיק פלילי", 1), ("הוצאה לפועל", 1), ("עיקול", 1), ("חקירה", 1),
+    ("בית משפט", 1),              # court
+    ("שופט", 1),                   # judge
+    ("עורך דין", 1),              # lawyer (impersonation)
+    ("פרקליטות", 1),              # prosecution
+    ("תלונה במשטרה", 1),         # police complaint
+    ("מעצר בית", 1),              # house arrest
+
+    # ── Tech support ──
+    ("וירוס", 1), ("תמיכה טכנית", 1),
+    ("המחשב שלך נפרץ", 1),       # your computer was hacked
+    ("זוהתה פריצה", 1),          # breach detected
+    ("חשבון נפרץ", 1),           # hacked account
+
+    # ── Lottery / prizes ──
+    ("זכית", 1), ("הגרלה", 1), ("זכייה", 1), ("מזל טוב", 1),
+    ("פרס", 1),                    # prize
+    ("זכית בהגרלה", 1),          # you won the lottery
+    ("מימוש זכייה", 1),           # redeem winnings
+    ("דמי שחרור פרס", 1),        # prize release fee
+
+    # ── Robocall ──
+    ("לחץ אחת", 1), ("הודעה מוקלטת", 1), ("הודעה אוטומטית", 1),
+    ("לחץ 1", 1),                 # press 1
+
+    # ── Delivery ──
+    ("חבילה", 1), ("אגרת מכס", 1),
+    ("חבילה עצורה", 1),           # package held
+    ("משלוח ממתין", 1),           # delivery pending
+    ("דמי שחרור", 1),             # release fee
+    ("דואר ישראל", 1),            # Israel Post (impersonation)
+    ("תשלום מכס", 1),             # customs payment
+
+    # ── Job scam ──
+    ("הצעת עבודה", 1), ("עמלה", 1),
+    ("עבודה מהבית", 1),           # work from home
+    ("הכנסה יומית מובטחת", 1),   # guaranteed daily income
+    ("לא נדרש ניסיון", 1),       # no experience needed
+    ("דמי הרשמה", 1),             # registration fee
+    ("עמלת עיבוד", 1),            # processing fee
+    ("שכר גבוה מיידי", 1),       # high immediate salary
+
+    # ── Romance ──
+    ("שלח לי כסף", 1),           # send me money
+    ("צריך כסף דחוף", 1),        # need money urgently
+    ("תקוע בחו\"ל", 1),          # stuck abroad
+
+    # ── Donation fraud ──
+    ("תרומה", 1), ("תעודת זהות", 1),
+    ("עמותה", 1),                  # nonprofit
+    ("לתרום עכשיו", 1),           # donate now
+    ("קרן סיוע", 1),              # relief fund
+
+    # ── Investment (medium-signal) ──
+    ("השקעה", 1), ("מסחר", 1), ("בורסה", 1), ("הפקדה", 1),
+    ("תשואה", 1), ("ברוקר", 1),
+    ("פורקס", 1),                  # forex
+    ("מנהל חשבון", 1),            # account manager
+    ("יועץ השקעות", 1),           # investment advisor
+    ("יועץ פיננסי", 1),           # financial advisor
+    ("פלטפורמת מסחר", 1),        # trading platform
+    ("הכנסה פסיבית", 1),          # passive income
+    ("חופש כלכלי", 1),            # financial freedom
+    ("תיק השקעות", 1),            # investment portfolio
+    ("קבוצת סיגנלים", 1),        # signals group
+    ("אות מסחר", 1),              # trading signal
+    ("בורסת ישראל", 1),           # Tel Aviv Stock Exchange
+    ("מניות", 1),                  # stocks
+    ("אופציות", 1),               # options
+    ("נדלן", 1),                   # real estate (scam investments)
+    ("תשואה חודשית", 1),         # monthly returns
+    ("הפקדה מינימלית", 1),       # minimum deposit
+    ("פתיחת חשבון מסחר", 1),     # open trading account
+    ("מטבעות דיגיטליים", 1),     # digital coins
+    ("ארנק קריפטו", 1),          # crypto wallet
+    ("NFT", 1), ("טוקן", 1),     # token
+    ("בלוקצ'יין", 1),            # blockchain
+
+    # ── Personal details (generic) ──
+    ("פרטים אישיים", 1),
+    ("חתימה", 1),
+    ("מספר כרטיס אשראי", 1),     # credit card number
+    ("תאריך תפוגה", 1),          # expiry date
+    ("שלוש ספרות בגב", 1),       # CVV
+    ("סיסמה", 1),                  # password
 ]
 
 SCAM_KEYWORDS_RU = [
@@ -197,14 +365,18 @@ ALL_KEYWORD_TABLES = [SCAM_KEYWORDS_EN, SCAM_KEYWORDS_HE, SCAM_KEYWORDS_RU, SCAM
 _TYPE_SIGNALS = [
     ("IRS_SCAM", [
         "irs", "tax", "arrest warrant", "federal investigation",
-        "מס הכנסה", "צו מעצר", "חקירה", "ביטוח לאומי", "המוסד לביטוח לאומי",
-        "тналоговая служба", "налоговый долг", "ордер на арест",
+        "מס הכנסה", "רשות המסים", "צו מעצר", "חקירה", "ביטוח לאומי", "המוסד לביטוח לאומי",
+        "חוב מס", "ביקורת מס", "החזר מס", "קנס מס", "קצבת נכות", "קצבת ילדים",
+        "זכאות לקצבה", "החזר כספי מביטוח לאומי", "עדכון פרטי ביטוח לאומי",
+        "налоговая служба", "налоговый долг", "ордер на арест",
         "مصلحة الضرائب", "دين ضريبي", "أمر اعتقال",
     ]),
     ("TECH_SUPPORT", [
         "virus", "microsoft", "tech support", "remote access", "anydesk", "teamviewer",
         "computer infected",
         "וירוס", "גישה מרחוק", "תמיכה טכנית", "הורד את האפליקציה", "אפליקציה",
+        "המחשב שלך נפרץ", "זוהתה פריצה", "חשבון נפרץ", "שיתוף מסך",
+        "תן לי שליטה",
         "вирус", "удаленный доступ", "техподдержка",
         "فيروس", "وصول عن بعد", "دعم فني",
     ]),
@@ -212,46 +384,59 @@ _TYPE_SIGNALS = [
         "bank transfer", "account frozen", "safe account", "suspicious activity",
         "העברה בנקאית", "חשבון מוקפא", "חשבון בטוח", "הקפאת חשבון",
         "בנק הפועלים", "בנק לאומי", "דיסקונט", "מזרחי טפחות",
+        "בנק הבינלאומי", "בנק ירושלים", "הבנק הדיגיטלי", "וואן זירו",
+        "ישראכרט", "כאל", "מקס", "לאומי קארד",
+        "פעילות חשודה בחשבון", "החשבון שלך נחסם", "מחלקת הונאות",
+        "כרטיס אשראי", "מספר כרטיס אשראי",
         "банковский перевод", "безопасный счет",
         "تحويل بنكي", "حساب آمن",
     ]),
     ("SOCIAL_SECURITY", [
         "social security", "ssn",
         "תעודת זהות", "מספר תעודת זהות", "ביטוח לאומי", "קצבת נכות",
+        "קצבת ילדים", "זכאות לקצבה",
         "снилс", "паспортные данные",
         "رقم الهوية", "بطاقة هوية",
     ]),
     ("LOTTERY_PRIZE", [
         "lottery", "prize", "won", "congratulations",
-        "הגרלה", "זכייה", "זכית",
+        "הגרלה", "זכייה", "זכית", "פרס", "זכית בהגרלה", "מימוש זכייה",
+        "דמי שחרור פרס",
         "лотерея", "выиграли", "приз",
         "يانصيب", "فزت", "جائزة",
     ]),
     ("ROBOCALL", [
         "press 1", "press one", "do not hang up",
-        "לחץ אחת", "הודעה מוקלטת", "הודעה אוטומטית",
+        "לחץ אחת", "לחץ 1", "הודעה מוקלטת", "הודעה אוטומטית",
     ]),
     ("PHISHING", [
         "password", "verify your account", "account compromised", "click the link",
         "קוד אימות", "אימות", "קוד חד פעמי", "קוד otp", "קישור", "לינק",
+        "לחץ על הקישור", "עדכן פרטים", "אמת את החשבון",
+        "תן לי את הקוד", "שלח לי את הקוד", "סיסמה",
+        "שלוש ספרות בגב", "תאריך תפוגה",
         "код подтверждения", "подтвердить",
         "رمز التحقق", "التحقق",
     ]),
     ("ARREST_SCAM", [
         "שבס", "צו עיכוב יציאה", "תביעה משפטית", "ייפוי כוח",
+        "צו מעצר", "צו בית משפט", "כתב אישום", "הליך פלילי",
+        "תיק פלילי", "מעצר בית", "פרקליטות",
         "arrest warrant", "federal investigation",
     ]),
     ("DELIVERY_SCAM", [
         "package", "customs fee", "fedex", "dhl", "ups",
-        "חבילה", "אגרת מכס",
+        "חבילה", "אגרת מכס", "חבילה עצורה", "משלוח ממתין",
+        "דמי שחרור", "דואר ישראל", "תשלום מכס",
     ]),
     ("JOB_SCAM", [
         "job offer", "work from home", "training fee", "money mule",
-        "הצעת עבודה", "עמלה",
+        "הצעת עבודה", "עמלה", "עבודה מהבית", "הכנסה יומית מובטחת",
+        "לא נדרש ניסיון", "דמי הרשמה", "עמלת עיבוד", "שכר גבוה מיידי",
     ]),
     ("DONATION_FRAUD", [
         "donation", "donate",
-        "תרומה",
+        "תרומה", "עמותה", "לתרום עכשיו", "קרן סיוע",
     ]),
     ("INVESTMENT_SCAM", [
         "invest", "investment", "trading", "stock market", "deposit",
@@ -260,10 +445,19 @@ _TYPE_SIGNALS = [
         "financial advisor", "portfolio", "roi", "returns",
         "eurotrade", "capital",
         "השקעה", "מסחר", "בורסה", "הפקדה", "תשואה", "ברוקר",
+        "תשואה מובטחת", "רווחים מובטחים", "הכפלת כסף", "פורקס",
+        "מנהל חשבון", "רובוט מסחר", "משיכת רווחים", "הפקדה ראשונית",
+        "ארביטראז' קריפטו", "קבוצת מסחר vip", "יועץ השקעות", "יועץ פיננסי",
+        "הכנסה פסיבית", "חופש כלכלי", "תיק השקעות", "פלטפורמת מסחר",
+        "קבוצת סיגנלים", "אות מסחר", "בורסת ישראל", "מניות", "אופציות",
+        "השקעה ללא סיכון", "ההון שלך מוגן", "מנהל חשבון אישי",
+        "תשואה חודשית", "הפקדה מינימלית", "פתיחת חשבון מסחר",
+        "מטבעות דיגיטליים", "ארנק קריפטו", "טוקן", "בלוקצ'יין",
     ]),
     ("ROMANCE_SCAM", [
         "send me money", "western union", "moneygram", "gift card",
         "i love you", "stranded", "need money",
+        "שלח לי כסף", "צריך כסף דחוף", "תקוע בחו\"ל",
     ]),
     ("INSURANCE", [
         "insurance claim", "insurance policy", "extended warranty",
@@ -271,6 +465,9 @@ _TYPE_SIGNALS = [
     ]),
     ("SOCIAL_ENGINEERING", [
         "transfer money", "wire transfer", "act now", "urgent matter",
+        "חשבון בטוח", "אל תספר לאף אחד", "שמור על סודיות",
+        "אל תתקשר לבנק", "אל תתקשר למשטרה", "חקירה חסויה",
+        "לא לספר לבן זוג", "העבר את הכסף", "אנחנו מגנים עליך",
     ]),
 ]
 
