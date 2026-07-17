@@ -363,7 +363,7 @@ fun SettingsTab(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Scans SMS, WhatsApp, Telegram, and Facebook Messenger notifications for " +
+                        text = "Scans SMS, WhatsApp, Telegram, Instagram, and Facebook Messenger notifications for " +
                             "scam patterns. When a scam is detected the notification is dismissed and " +
                             "you receive a VocaGuard warning instead. Requires Notification Access.",
                         style = MaterialTheme.typography.bodySmall,
@@ -372,7 +372,7 @@ fun SettingsTab(
                     Spacer(modifier = Modifier.height(8.dp))
                     AlertToggleRow(
                         label = "Scan messages",
-                        description = "SMS, WhatsApp, Telegram, Messenger",
+                        description = "SMS, WhatsApp, Telegram, Instagram, Messenger",
                         checked = messageScanEnabled,
                         onCheckedChange = { enabled ->
                             viewModel.setMessageScanEnabled(enabled)
