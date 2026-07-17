@@ -86,7 +86,7 @@ from faster_whisper import WhisperModel
 
 MODEL_PATH_EN       = "/opt/vocaguard/model-en"
 SAMPLE_RATE         = 16000
-WHISPER_CHUNK_BYTES = 16000 * 2 * 6   # 6-second chunks at 16 kHz — more context = better accuracy
+WHISPER_CHUNK_BYTES = 16000 * 2 * 10  # 10-second chunks at 16 kHz — more context = better accuracy
 WINDOW_SECONDS      = 90
 
 logging.basicConfig(
@@ -139,7 +139,7 @@ def main():
 
     whisper_model = None
     try:
-        whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+        whisper_model = WhisperModel("medium", device="cpu", compute_type="int8")
         log.info("BG: Whisper model loaded")
     except Exception as e:
         log.warning(f"BG: Whisper load error: {e}")
@@ -207,8 +207,8 @@ def main():
                       .astype(np.float32) / 32768.0
                 )
                 segments, info = whisper_model.transcribe(
-                    audio_np, beam_size=5, best_of=5,
-                    vad_filter=True, language="en",
+                    audio_np, beam_size=5, best_of=3,
+                    vad_filter=True, language=None,
                 )
                 text = " ".join(seg.text for seg in segments).strip()
                 if text:
@@ -301,7 +301,7 @@ def main():
                   .astype(np.float32) / 32768.0
             )
             segments, info = whisper_model.transcribe(
-                audio_np, language="en", beam_size=5, best_of=5, vad_filter=True,
+                audio_np, language=None, beam_size=5, best_of=3, vad_filter=True,
             )
             text = " ".join(seg.text for seg in segments).strip()
             if text:
