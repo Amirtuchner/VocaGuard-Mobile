@@ -156,12 +156,15 @@ class ScamDatabaseManager private constructor(context: Context) {
 
     // --- Whitelist ---
 
-    fun addToWhitelist(phoneNumber: String) {
+    suspend fun addToWhitelist(phoneNumber: String) {
         val cleanNumber = cleanPhoneNumber(phoneNumber)
         val current = whitelistPrefs.getStringSet(KEY_WHITELIST, emptySet()).orEmpty().toMutableSet()
         current.add(cleanNumber)
         whitelistPrefs.edit().putStringSet(KEY_WHITELIST, current).apply()
-        Log.i(TAG, "Added to whitelist: $cleanNumber")
+        // Remove from local scam database so the number is no longer flagged
+        scamDatabase.remove(cleanNumber)
+        scamNumberDao.deleteByNumber(cleanNumber)
+        Log.i(TAG, "Added to whitelist and removed from scam DB: $cleanNumber")
     }
 
     fun removeFromWhitelist(phoneNumber: String) {

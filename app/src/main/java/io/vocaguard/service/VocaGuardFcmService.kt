@@ -203,6 +203,11 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                     phoneNumber = callerNumber
                 )
             )
+            // Add to local scam DB and community blocklist
+            if (callerNumber.isNotEmpty()) {
+                val scamDb = io.vocaguard.data.ScamDatabaseManager.getInstance(applicationContext)
+                scamDb.reportScamNumber(callerNumber, scamType)
+            }
         }
     }
 

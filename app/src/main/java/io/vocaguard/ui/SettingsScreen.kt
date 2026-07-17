@@ -123,6 +123,7 @@ fun SettingsTab(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = "Settings",
                 style = MaterialTheme.typography.titleLarge,

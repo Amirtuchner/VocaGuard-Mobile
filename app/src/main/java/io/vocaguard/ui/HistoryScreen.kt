@@ -337,10 +337,9 @@ fun HistoryTab(viewModel: HistoryViewModel = viewModel()) {
                 onReport = { reportingTranscript = transcript },
                 onWhitelist = {
                     if (transcript.phoneNumber.isNotEmpty()) {
-                        viewModel.addToWhitelist(transcript.phoneNumber)
+                        viewModel.addToWhitelist(transcript.phoneNumber, transcript.id)
                     }
-                },
-                onMarkFalsePositive = { viewModel.markAsFalsePositive(transcript.id) }
+                }
             )
         }
 
@@ -369,11 +368,10 @@ fun TranscriptCard(
     transcript: CallTranscript,
     onDelete: () -> Unit,
     onReport: () -> Unit,
-    onWhitelist: () -> Unit,
-    onMarkFalsePositive: () -> Unit = {}
+    onWhitelist: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var markedFalsePositive by remember(transcript.id) { mutableStateOf(transcript.isFalsePositive) }
+    var markedFalsePositive by remember(transcript.id, transcript.isFalsePositive) { mutableStateOf(transcript.isFalsePositive) }
     val dateFormat = remember { SimpleDateFormat("MMM d, yyyy  h:mm a", Locale.ENGLISH) }
     val isScam = transcript.detectedScamTypes.isNotEmpty()
 
@@ -407,16 +405,17 @@ fun TranscriptCard(
                         )
                     }
                 }
-                if (transcript.phoneNumber.isNotEmpty()) {
+                if (isScam && !markedFalsePositive && transcript.phoneNumber.isNotEmpty()) {
                     var whitelisted by remember { mutableStateOf(false) }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         IconButton(onClick = {
                             onWhitelist()
                             whitelisted = true
+                            markedFalsePositive = true
                         }) {
                             Icon(
                                 imageVector = Icons.Default.Shield,
-                                contentDescription = "Whitelist number",
+                                contentDescription = "Mark as safe",
                                 tint = if (whitelisted) MaterialTheme.colorScheme.primary
                                        else MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -428,35 +427,19 @@ fun TranscriptCard(
                         )
                     }
                 }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    IconButton(onClick = onReport) {
-                        Icon(
-                            imageVector = Icons.Default.Flag,
-                            contentDescription = "Report scam",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Text(
-                        text = "Report",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                // "Not a scam" button — only shown for scam-flagged, not yet corrected entries
-                if (isScam && !markedFalsePositive) {
+                if (!isScam || markedFalsePositive) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         IconButton(onClick = {
-                            markedFalsePositive = true
-                            onMarkFalsePositive()
+                            onReport()
                         }) {
                             Icon(
-                                imageVector = Icons.Default.ThumbDown,
-                                contentDescription = "Mark as not a scam",
+                                imageVector = Icons.Default.Flag,
+                                contentDescription = "Report as scam",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Text(
-                            text = "Not scam",
+                            text = "Report as scam",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -481,7 +464,7 @@ fun TranscriptCard(
             if (isScam && markedFalsePositive) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Marked as not a scam",
+                    text = "Marked as safe",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -545,10 +528,10 @@ fun ReportScamDialog(
     onDismiss: () -> Unit
 ) {
     var phoneNumber by remember { mutableStateOf(initialPhoneNumber) }
-    var selectedScamType by remember { mutableStateOf(ScamType.IRS_SCAM) }
+    var selectedScamType by remember { mutableStateOf(ScamType.UNKNOWN) }
     var expanded by remember { mutableStateOf(false) }
 
-    val scamTypes = enumValues<ScamType>().filter { it != ScamType.UNKNOWN }
+    val scamTypes = enumValues<ScamType>().toList()
 
     AlertDialog(
         onDismissRequest = onDismiss,

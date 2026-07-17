@@ -11,6 +11,7 @@ Endpoints:
 """
 import ssl, json, re, socket, logging, sqlite3, secrets, subprocess
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 
 # ---------------------------------------------------------------------------
 # Paths / constants
@@ -601,6 +602,28 @@ class Handler(BaseHTTPRequestHandler):
                 log.error("report-scam error: %s", e)
                 self._send(500, {"error": str(e)})
 
+        elif self.path == "/remove-scam":
+            try:
+                data   = self._read_json()
+                number = data.get("number", "").strip()
+                reporter = data.get("reporter", "").strip()
+                if not number:
+                    self._send(400, {"error": "number required"})
+                    return
+                conn = sqlite3.connect(DB_PATH)
+                conn.execute(
+                    "DELETE FROM community_blocklist WHERE phone_number = ?",
+                    (number,)
+                )
+                conn.commit()
+                changes = conn.total_changes
+                conn.close()
+                log.info("Scam removed: %s by=%s", number, reporter)
+                self._send(200, {"status": "removed", "number": number})
+            except Exception as e:
+                log.error("remove-scam error: %s", e)
+                self._send(500, {"error": str(e)})
+
         elif self.path == "/blocklist":
             try:
                 conn = sqlite3.connect(DB_PATH)
@@ -661,7 +684,7 @@ class Handler(BaseHTTPRequestHandler):
         log.info("%s - - %s", self.address_string(), fmt % args)
 
 
-class ReuseHTTPServer(HTTPServer):
+class ReuseHTTPServer(ThreadingMixIn, HTTPServer):
     allow_reuse_address = True
 
 

@@ -528,13 +528,13 @@ private fun MoneySavedCard(amount: Int) {
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "$${"%,d".format(amount)}",
+                text = "${"%,d".format(amount)}$",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.tertiary
             )
             Text(
-                text = "Based on FTC average loss of $1,480 per scam call blocked",
+                text = "Based on FTC average loss of 1,480$ per scam call blocked",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

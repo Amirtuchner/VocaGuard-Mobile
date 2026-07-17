@@ -126,6 +126,8 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             try {
                 scamDb.reportScamNumber(phoneNumber, scamType)
+                // Remove from whitelist if previously marked safe
+                scamDb.removeFromWhitelist(phoneNumber)
                 // Flag the transcript as scam so card turns red and "Scams only" filter includes it
                 if (transcriptId != 0L) {
                     repository.markAsScam(transcriptId, scamType.name)
@@ -164,11 +166,37 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun addToWhitelist(phoneNumber: String) {
+    private fun uploadScamRemoval(phoneNumber: String) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val body = org.json.JSONObject().apply {
+                    put("number", phoneNumber)
+                    put("reporter", io.vocaguard.service.ServerDetectionManager.getPhoneNumber())
+                }.toString()
+                val request = okhttp3.Request.Builder()
+                    .url("https://${io.vocaguard.BuildConfig.TOKEN_SERVER_HOST}/remove-scam")
+                    .addHeader("Authorization", "Bearer ${io.vocaguard.BuildConfig.TOKEN_SERVER_SECRET}")
+                    .post(body.toRequestBody("application/json".toMediaType()))
+                    .build()
+                okhttp3.OkHttpClient().newCall(request).execute().use { response ->
+                    android.util.Log.i("HistoryViewModel", "Scam removal uploaded: ${response.code}")
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("HistoryViewModel", "Failed to upload scam removal: ${e.message}")
+            }
+        }
+    }
+
+    fun addToWhitelist(phoneNumber: String, transcriptId: Long = 0L) {
         viewModelScope.launch {
             try {
                 scamDb.addToWhitelist(phoneNumber)
+                if (transcriptId != 0L) {
+                    repository.markAsFalsePositive(transcriptId)
+                }
                 _snackbarEvent.emit(SnackbarEvent.Success("$phoneNumber added to safe list"))
+                // Remove from community blocklist on the server
+                uploadScamRemoval(phoneNumber)
             } catch (e: Exception) {
                 CrashReporter.recordException(e)
                 _snackbarEvent.emit(SnackbarEvent.Error("Failed to add to safe list: ${e.message}", e))
@@ -176,11 +204,12 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    @Suppress("unused") // kept for potential future use from other UI surfaces
     fun markAsFalsePositive(id: Long) {
         viewModelScope.launch {
             try {
                 repository.markAsFalsePositive(id)
-                _snackbarEvent.emit(SnackbarEvent.Success("Marked as not a scam"))
+                _snackbarEvent.emit(SnackbarEvent.Success("Marked as safe"))
             } catch (e: Exception) {
                 CrashReporter.recordException(e)
                 _snackbarEvent.emit(SnackbarEvent.Error("Failed to update: ${e.message}", e))
