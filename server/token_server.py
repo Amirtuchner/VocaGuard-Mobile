@@ -686,13 +686,45 @@ class Handler(BaseHTTPRequestHandler):
 
 class ReuseHTTPServer(ThreadingMixIn, HTTPServer):
     allow_reuse_address = True
+    daemon_threads = True          # so hung request threads don't block shutdown
+    request_queue_size = 64        # allow more pending connections
 
 
 if __name__ == "__main__":
+    import threading, time, urllib.request
+
     init_db()
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(CERT_FILE, KEY_FILE)
     server = ReuseHTTPServer(("0.0.0.0", 443), Handler)
     server.socket = context.wrap_socket(server.socket, server_side=True)
-    log.info("Token server started on port 443 (multi-tenant)")
+
+    # --- Watchdog: self-check every 90s, restart if unresponsive ---
+    def _watchdog():
+        """Periodically probe the server; if it doesn't respond, force exit.
+        systemd Restart=always will bring us back up."""
+        check_ctx = ssl.create_default_context()
+        check_ctx.check_hostname = False
+        check_ctx.verify_mode = ssl.CERT_NONE
+        failures = 0
+        while True:
+            time.sleep(90)
+            try:
+                req = urllib.request.Request("https://127.0.0.1:443/",
+                                            method="GET")
+                urllib.request.urlopen(req, timeout=10, context=check_ctx)
+                failures = 0  # 404 is fine — server responded
+            except urllib.error.HTTPError:
+                failures = 0  # 404 means server is alive
+            except Exception as e:
+                failures += 1
+                log.warning("Watchdog: health check failed (%d): %s", failures, e)
+                if failures >= 2:
+                    log.error("Watchdog: server unresponsive, forcing restart")
+                    os._exit(1)  # systemd will restart us
+
+    wd = threading.Thread(target=_watchdog, daemon=True)
+    wd.start()
+
+    log.info("Token server started on port 443 (multi-tenant, watchdog enabled)")
     server.serve_forever()
