@@ -980,7 +980,7 @@ private fun FamilyGuardCard(
                 )
                 Text(
                     text = if (isUS) "Used as the caller ID when alerting the caregiver (e.g. +12025551234)."
-                           else "Used as the caller ID when alerting the caregiver (e.g. +972528233354).",
+                           else "Used as the caller ID when alerting the caregiver (e.g. +972501234567).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
