@@ -9,7 +9,7 @@ Endpoints:
   POST /accept-call       — AMI bridge: {channel, caller, phone_number}
   POST /hangup            — AMI hangup: {channel, phone_number}
 """
-import ssl, json, re, socket, logging, sqlite3, secrets, subprocess
+import os, ssl, json, re, socket, logging, sqlite3, secrets, subprocess
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -689,6 +689,26 @@ class ReuseHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True          # so hung request threads don't block shutdown
     request_queue_size = 64        # allow more pending connections
 
+    def get_request(self):
+        # The listening socket is wrapped with do_handshake_on_connect=False,
+        # so accept() returns immediately without doing the TLS handshake.
+        # A stalled handshake previously froze the accept loop (main thread)
+        # forever — one port scanner could hang the whole server.
+        sock, addr = self.socket.accept()
+        sock.settimeout(20)        # bounds handshake AND request reads
+        return sock, addr
+
+    def finish_request(self, request, client_address):
+        # Runs in the per-connection worker thread (ThreadingMixIn):
+        # do the deferred TLS handshake here, where a stall only costs
+        # one daemon thread instead of the accept loop.
+        try:
+            request.do_handshake()
+        except Exception as e:
+            log.info("TLS handshake failed from %s: %s", client_address[0], e)
+            return
+        super().finish_request(request, client_address)
+
 
 if __name__ == "__main__":
     import threading, time, urllib.request
@@ -697,25 +717,28 @@ if __name__ == "__main__":
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(CERT_FILE, KEY_FILE)
     server = ReuseHTTPServer(("0.0.0.0", 443), Handler)
-    server.socket = context.wrap_socket(server.socket, server_side=True)
+    server.socket = context.wrap_socket(server.socket, server_side=True,
+                                        do_handshake_on_connect=False)
 
     # --- Watchdog: self-check every 90s, restart if unresponsive ---
     def _watchdog():
         """Periodically probe the server; if it doesn't respond, force exit.
-        systemd Restart=always will bring us back up."""
-        check_ctx = ssl.create_default_context()
-        check_ctx.check_hostname = False
-        check_ctx.verify_mode = ssl.CERT_NONE
+        systemd Restart=always will bring us back up.
+        Uses subprocess curl with hard timeout to avoid the watchdog itself
+        getting stuck on a hung TLS handshake."""
         failures = 0
         while True:
             time.sleep(90)
             try:
-                req = urllib.request.Request("https://127.0.0.1:443/",
-                                            method="GET")
-                urllib.request.urlopen(req, timeout=10, context=check_ctx)
-                failures = 0  # 404 is fine — server responded
-            except urllib.error.HTTPError:
-                failures = 0  # 404 means server is alive
+                result = subprocess.run(
+                    ["curl", "-sk", "--max-time", "10", "-o", "/dev/null",
+                     "-w", "%{http_code}", "https://127.0.0.1:443/"],
+                    capture_output=True, text=True, timeout=15
+                )
+                if result.stdout.strip() in ("404", "200", "403"):
+                    failures = 0
+                else:
+                    raise RuntimeError(f"curl exit={result.returncode}")
             except Exception as e:
                 failures += 1
                 log.warning("Watchdog: health check failed (%d): %s", failures, e)
