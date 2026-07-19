@@ -193,7 +193,9 @@ def main():
     # FIFO buffer fills up, MixMonitor's write() stalls, and Asterisk pauses
     # the audio pipeline — causing brief disconnections the user can hear.
     import queue as _queue
-    whisper_q = _queue.Queue(maxsize=1)  # drop chunks if Whisper can't keep up
+    # Buffer up to 8 chunks (~80s of audio, ~2.5 MB) so transcription that
+    # momentarily falls behind real-time catches up instead of losing text.
+    whisper_q = _queue.Queue(maxsize=8)
 
     def _whisper_worker():
         while True:
@@ -271,43 +273,27 @@ def main():
                         try:
                             whisper_q.put_nowait(bytes(whisper_buf))
                         except _queue.Full:
-                            log.debug("BG: Whisper busy, dropping chunk")
+                            log.warning("BG: Whisper queue full — dropping 10s chunk (transcript will have a gap)")
                     whisper_buf.clear()
 
     except Exception as e:
         log.info(f"BG audio closed: {e}")
-        if whisper_model:
-            try:
-                whisper_q.put_nowait(None)
-            except Exception:
-                pass
-
-    finally:
-        if whisper_model:
-            try:
-                whisper_q.put_nowait(None)  # signal worker to stop
-            except _queue.Full:
-                pass
 
     # Final flush
     final_en = json.loads(rec_en.FinalResult()).get("text", "").strip()
     if final_en:
         add_text(final_en, "EN-final")
 
-    if whisper_buf and whisper_model:
-        try:
-            audio_np = (
-                np.frombuffer(bytes(whisper_buf), dtype=np.int16)
-                  .astype(np.float32) / 32768.0
-            )
-            segments, info = whisper_model.transcribe(
-                audio_np, language=None, beam_size=5, best_of=3, vad_filter=True,
-            )
-            text = " ".join(seg.text for seg in segments).strip()
-            if text:
-                add_text(text, f"ML({info.language})-final")
-        except Exception as e:
-            log.warning(f"BG Whisper final error: {e}")
+    if whisper_model:
+        # Route the tail audio through the same worker queue so text stays in
+        # call order, then drain the queue completely before sending the
+        # transcript — otherwise in-flight chunks are silently lost.
+        if whisper_buf:
+            whisper_q.put(bytes(whisper_buf))
+        whisper_q.put(None)  # sentinel: worker exits after draining
+        _wt.join(timeout=300)
+        if _wt.is_alive():
+            log.warning("BG: Whisper worker still busy after 300s — transcript may be incomplete")
 
     check_and_alert("final")
 
