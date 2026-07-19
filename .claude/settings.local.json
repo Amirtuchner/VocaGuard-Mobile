@@ -232,7 +232,22 @@
       "WebFetch(domain:download.linphone.org)",
       "WebFetch(domain:gitlab.linphone.org)",
       "WebFetch(domain:doc.didww.com)",
-      "WebFetch(domain:api.didww.com)"
+      "WebFetch(domain:api.didww.com)",
+      "WebFetch(domain:alphacephei.com)",
+      "PowerShell(ssh root@178.105.164.91 \"find /opt /root /usr/local -name 'scam_detector_bg.py' 2>/dev/null; grep -rn 'scam_detector_bg' /etc/asterisk/extensions.conf 2>/dev/null | head -3; systemctl is-active vocaguard-token-server; uptime\")",
+      "PowerShell(scp *)",
+      "PowerShell(\\(Get-FileHash -Algorithm MD5 server/scam_detector_bg.py\\).Hash)",
+      "PowerShell(git *)",
+      "PowerShell(ssh root@178.105.164.91 \"systemctl show vocaguard-token-server -p ActiveEnterTimestamp -p NRestarts; journalctl -u vocaguard-token-server --since '12 hours ago' | grep -iE 'watchdog|restart|hang|fail|traceback' | tail -10; curl -s -o /dev/null -w 'blocklist HTTP %{http_code} in %{time_total}s\\\\n' https://127.0.0.1:443/blocklist -k\")",
+      "PowerShell(ssh root@178.105.164.91 \"free -m | head -2; cp /opt/vocaguard/scam_detector_bg.py /tmp/vg_test_bg.py; sed -i 's|/opt/vocaguard/fcm_token.txt|/dev/null|' /tmp/vg_test_bg.py; grep -n FCM_TOKEN_FILE /tmp/vg_test_bg.py | head -2\")",
+      "PowerShell(ssh root@178.105.164.91 \"tail -c +45 /tmp/vg_test.wav > /tmp/vg_test.raw; rm -f /tmp/vg_test_fifo; mkfifo /tmp/vg_test_fifo; printf '#!/bin/bash\\\\nnohup /opt/vocaguard-venv/bin/python3 /tmp/vg_test_bg.py /tmp/vg_test_fifo +10005550123 nonexistent >> /tmp/vg_test.out 2>&1 &\\\\ncat /tmp/vg_test.raw > /tmp/vg_test_fifo\\\\necho FEED_DONE >> /tmp/vg_test.out\\\\n' > /tmp/vg_run_test.sh; chmod +x /tmp/vg_run_test.sh; nohup /tmp/vg_run_test.sh > /dev/null 2>&1 & echo LAUNCHED; date -u\")",
+      "PowerShell(ssh root@178.105.164.91 \"for i in \\\\$\\(seq 1 90\\); do if grep -q 'BG call ended' <\\(sed -n '/16:49:1/,\\\\$p' /var/log/vocaguard_agi.log\\); then break; fi; sleep 5; done; echo '=== bg log since test start ==='; sed -n '/16:49:1/,\\\\$p' /var/log/vocaguard_agi.log | grep -E 'BG' | head -40; echo '=== stderr/out ==='; cat /tmp/vg_test.out\")",
+      "PowerShell(adb devices *)",
+      "PowerShell($adb = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; & $adb devices)",
+      "PowerShell($adb = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; & $adb -s RFCY609DLHW shell \"dumpsys deviceidle get screen; dumpsys window | grep -E 'mDreamingLockscreen|mCurrentFocus'\")",
+      "PowerShell($adb = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; $found=$false; foreach \\($i in 1..25\\) { $f = & $adb -s RFCY609DLHW shell \"dumpsys window | grep mCurrentFocus\"; if \\($f -match 'Incoming|vocaguard'\\) { $found=$true; break }; Start-Sleep -Seconds 2 }; \"focus: $f\"; if \\($found\\) { & $adb -s RFCY609DLHW exec-out uiautomator dump /dev/tty 2>$null | Out-String -Width 100000 | Select-String -Pattern 'Answer|Decline|Accept|content-desc=\"[^\"]+\"' -AllMatches | ForEach-Object { $_.Matches.Value } | Select-Object -First 20 })",
+      "PowerShell(Out-Null *)",
+      "PowerShell($adb = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; & $adb -s RFCY609DLHW exec-out screencap -p > \"C:\\\\Users\\\\userX\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-userX-AndroidStudioProjects-VocaGuard\\\\e0f4982b-58fa-46da-8d15-dffcb32dc819\\\\scratchpad\\\\incoming.png\"; \\(Get-Item \"C:\\\\Users\\\\userX\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-userX-AndroidStudioProjects-VocaGuard\\\\e0f4982b-58fa-46da-8d15-dffcb32dc819\\\\scratchpad\\\\incoming.png\"\\).Length)"
     ]
   }
 }
