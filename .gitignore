@@ -21,6 +21,7 @@ ml_training/__pycache__/
 ml_training/*.pyc
 
 # Sensitive files
+.claude/settings.local.json
 google-services.json
 *.keystore
 *.jks
