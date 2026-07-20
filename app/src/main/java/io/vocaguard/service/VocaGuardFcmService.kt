@@ -98,12 +98,10 @@ class VocaGuardFcmService : FirebaseMessagingService() {
         }
 
         // Signal Asterisk to bridge the waiting incoming call to the user's SIP phone.
-        // No retry — a duplicate request would trigger a second AMI Originate,
-        // sending a second SIP INVITE to Linphone and causing a second incoming-call ring.
         fun acceptCall(channel: String, callerNumber: String) {
             CoroutineScope(Dispatchers.IO).launch {
                 val client = OkHttpClient.Builder()
-                    .connectTimeout(4, java.util.concurrent.TimeUnit.SECONDS)
+                    .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
                     .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
                     .build()
                 val jsonBody = JSONObject().apply {
@@ -112,17 +110,34 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                     val phone = ServerDetectionManager.getPhoneNumber()
                     if (phone.isNotEmpty()) put("phone_number", phone)
                 }.toString()
-                try {
-                    val request = Request.Builder()
-                        .url("https://${BuildConfig.TOKEN_SERVER_HOST}/accept-call")
-                        .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
-                        .post(jsonBody.toRequestBody("application/json".toMediaType()))
-                        .build()
-                    client.newCall(request).execute().use { response ->
-                        Log.i(TAG, "Accept call signalled: ${response.code}")
+                val request = Request.Builder()
+                    .url("https://${BuildConfig.TOKEN_SERVER_HOST}/accept-call")
+                    .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                    .post(jsonBody.toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                // A ConnectException means the TCP/TLS connection itself never came up,
+                // so the request body was never sent — safe to retry once (a brief cellular
+                // handoff or weak signal can blow past even a generous connect timeout).
+                // Any other failure must NOT be retried: the server may already have
+                // received the request and started the AMI Originate, and a second attempt
+                // would send a duplicate SIP INVITE to Linphone, ringing the phone twice.
+                for (attempt in 1..2) {
+                    try {
+                        client.newCall(request).execute().use { response ->
+                            Log.i(TAG, "Accept call signalled: ${response.code}")
+                        }
+                        return@launch
+                    } catch (e: java.net.ConnectException) {
+                        if (attempt == 2) {
+                            Log.e(TAG, "Accept call failed to connect after retry", e)
+                        } else {
+                            Log.w(TAG, "Accept call connect failed, retrying once", e)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to signal accept call", e)
+                        return@launch
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to signal accept call", e)
                 }
             }
         }
