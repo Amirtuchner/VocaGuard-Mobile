@@ -82,6 +82,7 @@ class IncomingCallActivity : ComponentActivity() {
     private var volumeHideJob: Job? = null
     private var isRecording by mutableStateOf(false)
     private var recordingPath: String? = null
+    private var connectFailed by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -145,26 +146,55 @@ class IncomingCallActivity : ComponentActivity() {
                 }
             }
 
-            if (callActive) {
-                ActiveCallScreen(
-                    callerNumber = activeCallerNumber,
-                    connected = (sipState == VocaGuardSipManager.CallState.ACTIVE),
-                    scamAlert = scamAlert,
-                    volumeLevel = volumeLevel,
-                    showVolumeMeter = showVolumeMeter,
-                    isRecording = isRecording,
-                    onToggleRecord = {
-                        if (isRecording) {
-                            VocaGuardSipManager.stopRecording()
-                            isRecording = false
+            // Guard against the bridge attempt never producing any SIP event at all —
+            // e.g. the user's stale/dead registration makes the AMI Originate fail
+            // silently server-side. Without this, sipState never leaves its initial
+            // value and the "Connecting…" screen is stuck forever with no way out.
+            // 35s gives a margin over the server's own 30s AMI Originate timeout so we
+            // don't cut off calls that were still genuinely connecting.
+            LaunchedEffect(callActive) {
+                if (callActive) {
+                    delay(35_000)
+                    val state = VocaGuardSipManager.callState.value
+                    if (state != VocaGuardSipManager.CallState.ACTIVE &&
+                        state != VocaGuardSipManager.CallState.ENDED
+                    ) {
+                        if (pendingCancel) {
+                            hangUpAndFinish()
                         } else {
-                            recordingPath = VocaGuardSipManager.startRecording(this@IncomingCallActivity)
-                            isRecording = recordingPath != null
+                            connectFailed = true
                         }
-                    },
-                    onEndCall = { hangUpAndFinish() },
-                    onCancelConnecting = { pendingCancel = true }
-                )
+                    }
+                }
+            }
+
+            if (callActive) {
+                if (connectFailed) {
+                    ConnectFailedScreen(
+                        callerNumber = activeCallerNumber,
+                        onDismiss = { hangUpAndFinish() }
+                    )
+                } else {
+                    ActiveCallScreen(
+                        callerNumber = activeCallerNumber,
+                        connected = (sipState == VocaGuardSipManager.CallState.ACTIVE),
+                        scamAlert = scamAlert,
+                        volumeLevel = volumeLevel,
+                        showVolumeMeter = showVolumeMeter,
+                        isRecording = isRecording,
+                        onToggleRecord = {
+                            if (isRecording) {
+                                VocaGuardSipManager.stopRecording()
+                                isRecording = false
+                            } else {
+                                recordingPath = VocaGuardSipManager.startRecording(this@IncomingCallActivity)
+                                isRecording = recordingPath != null
+                            }
+                        },
+                        onEndCall = { hangUpAndFinish() },
+                        onCancelConnecting = { pendingCancel = true }
+                    )
+                }
             } else {
                 IncomingCallScreen(
                     callerNumber = callerNumber,
@@ -520,6 +550,51 @@ private fun ActiveCallScreen(
                 if (connected) "End Call" else "Cancel",
                 color = Color.White, fontSize = 12.sp
             )
+        }
+    }
+}
+
+@Composable
+private fun ConnectFailedScreen(
+    callerNumber: String,
+    onDismiss: () -> Unit
+) {
+    val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1A1A2E)),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(
+            modifier = Modifier.padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(48.dp))
+            Text("Couldn't Connect", color = Color(0xFFEF5350), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(16.dp))
+            Text(displayNumber, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "The call could not be bridged. The other side may still be waiting.",
+                color = Color(0xFFAAAAAA), fontSize = 14.sp, textAlign = TextAlign.Center
+            )
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(bottom = 64.dp)
+        ) {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.size(80.dp),
+                shape = CircleShape,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+            ) {
+                Text("OK", fontSize = 16.sp, color = Color.White)
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("Dismiss", color = Color.White, fontSize = 12.sp)
         }
     }
 }
