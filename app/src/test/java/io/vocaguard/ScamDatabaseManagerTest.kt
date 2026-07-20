@@ -114,7 +114,7 @@ class ScamDatabaseManagerTest {
     @Test
     fun `whitelisted number is not flagged even if in scam database`() {
         runBlocking { manager.reportScamNumber("5551112222", ScamType.IRS_SCAM) }
-        manager.addToWhitelist("5551112222")
+        runBlocking { manager.addToWhitelist("5551112222") }
 
         val result = manager.checkNumber("5551112222")
         assertFalse(result.isKnownScammer)
@@ -123,20 +123,20 @@ class ScamDatabaseManagerTest {
 
     @Test
     fun `isWhitelisted returns true after adding`() {
-        manager.addToWhitelist("5553334444")
+        runBlocking { manager.addToWhitelist("5553334444") }
         assertTrue(manager.isWhitelisted("5553334444"))
     }
 
     @Test
     fun `removeFromWhitelist works`() {
-        manager.addToWhitelist("5553334444")
+        runBlocking { manager.addToWhitelist("5553334444") }
         manager.removeFromWhitelist("5553334444")
         assertFalse(manager.isWhitelisted("5553334444"))
     }
 
     @Test
     fun `whitelist cleans phone number formatting`() {
-        manager.addToWhitelist("(555) 333-4444") // strips to "5553334444"
+        runBlocking { manager.addToWhitelist("(555) 333-4444") } // strips to "5553334444"
         assertTrue(manager.isWhitelisted("5553334444"))
     }
 

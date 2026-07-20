@@ -76,7 +76,7 @@ class ScamCallScreeningServiceTest {
     @Test
     fun `whitelisted known scammer is not blocked`() {
         runBlocking { manager.reportScamNumber("5551112222", ScamType.BANK_FRAUD) }
-        manager.addToWhitelist("5551112222")
+        runBlocking { manager.addToWhitelist("5551112222") }
         assertFalse(shouldBlock("5551112222"))
     }
 
