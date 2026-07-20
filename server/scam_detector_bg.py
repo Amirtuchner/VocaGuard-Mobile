@@ -55,6 +55,17 @@ def get_fcm_token_for_number(phone_number: str) -> str:
         return ""
 
 
+def _utf8_truncate(text: str, max_bytes: int) -> str:
+    """Truncate to at most max_bytes when UTF-8 encoded, without splitting
+    a multi-byte character. A char-count slice (text[:N]) is only safe for
+    ASCII — Hebrew (and other non-Latin) text takes 2-3 bytes/char, so the
+    same N can be 2-3x over an FCM data-payload byte limit."""
+    encoded = text.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return text
+    return encoded[:max_bytes].decode("utf-8", errors="ignore")
+
+
 def send_fcm_with_token(token: str, keywords, transcript, scam_type,
                         caller_number="", confidence=0.9):
     """Send scam_alert FCM to a specific device token (multi-tenant aware)."""
@@ -67,7 +78,7 @@ def send_fcm_with_token(token: str, keywords, transcript, scam_type,
             data={
                 "type":          "scam_alert",
                 "keywords":      ", ".join(keywords),
-                "transcript":    transcript[:1000],
+                "transcript":    _utf8_truncate(transcript, 2000),
                 "scam_type":     scam_type,
                 "caller_number": caller_number,
                 "confidence":    str(confidence),
@@ -305,8 +316,12 @@ def main():
     if final_transcript and fcm_token:
         try:
             from firebase_admin import messaging as fcm_msg
-            # FCM data messages have a 4 KB limit — truncate if needed
-            trunc = final_transcript[:3500]
+            # FCM data messages have a 4 KB limit on the whole data payload.
+            # Truncate by UTF-8 byte length (not char count) — Hebrew text
+            # runs 2-3 bytes/char, so a char-based cap silently blew past
+            # 4 KB on long Hebrew calls and Firebase rejected the send
+            # outright, leaving History with no transcript at all.
+            trunc = _utf8_truncate(final_transcript, 3000)
             msg = fcm_msg.Message(
                 data={
                     "type":          "call_transcript",
