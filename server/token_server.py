@@ -223,6 +223,11 @@ def provision_pjsip_user(ext: str, password: str):
     """Append a PJSIP endpoint/auth/aor block and reload res_pjsip."""
     # AOR name MUST match the extension username (To-header in REGISTER).
     # Asterisk PJSIP maps incoming REGISTER to AOR by matching the To username.
+    # qualify_frequency=60: without this, a dead/stale contact (app killed, network
+    # change) is only discovered when a real call tries to use it and the AMI
+    # Originate silently fails — the phone just stays stuck on the "Connecting"
+    # screen. OPTIONS pings every 60s let Asterisk mark the contact unavailable
+    # ahead of time instead of during a live call.
     block = (
         f"\n[{ext}]\n"
         f"type=endpoint\n"
@@ -242,6 +247,8 @@ def provision_pjsip_user(ext: str, password: str):
         f"type=aor\n"
         f"max_contacts=1\n"
         f"remove_existing=yes\n"
+        f"qualify_frequency=60\n"
+        f"qualify_timeout=3\n"
     )
     with open(PJSIP_USERS_FILE, "a") as f:
         f.write(block)
