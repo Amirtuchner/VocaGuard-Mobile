@@ -9,7 +9,7 @@ Endpoints:
   POST /accept-call       — AMI bridge: {channel, caller, phone_number}
   POST /hangup            — AMI hangup: {channel, phone_number}
 """
-import os, ssl, json, re, socket, logging, sqlite3, secrets, subprocess
+import os, ssl, json, re, socket, logging, sqlite3, secrets, subprocess, threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -414,6 +414,14 @@ def _ami_originate_safe(channel, caller, sip_ext, phone):
     except Exception as e:
         log.error("ami_originate error: %s", e)
 
+# Channels already accepted (AMI Originate started), so a duplicate /accept-call
+# for the same channel — e.g. a double-tap on Accept, or a client retry that
+# raced a slow-but-successful first request — is a no-op instead of ringing the
+# user's phone a second time. Cleared on /hangup; Asterisk channel names are
+# unique per call, so no time-based expiry is needed.
+_accepted_channels: set[str] = set()
+_accepted_channels_lock = threading.Lock()
+
 
 # ---------------------------------------------------------------------------
 # HTTP handler
@@ -502,16 +510,26 @@ class Handler(BaseHTTPRequestHandler):
                 user    = get_user_by_phone(phone) if phone else None
                 sip_ext = user["sip_extension"] if user else "vocaguard"  # single-user fallback
 
+                with _accepted_channels_lock:
+                    already_accepted = channel in _accepted_channels
+                    if not already_accepted:
+                        _accepted_channels.add(channel)
+
                 # Respond 200 immediately so the Android client doesn't time out and
                 # retry — a duplicate request would trigger a second AMI Originate and
-                # a second SIP INVITE (causing a double-ring on the user's phone).
+                # a second SIP INVITE (causing a double-ring on the user's phone). The
+                # _accepted_channels check above is the actual guard against that: it
+                # catches duplicates that reach here as fully legitimate, successful
+                # requests (e.g. a double-tap on Accept), not just client retries.
                 self._send(200)
-                import threading
-                threading.Thread(
-                    target=_ami_originate_safe,
-                    args=(channel, caller, sip_ext, phone),
-                    daemon=True
-                ).start()
+                if already_accepted:
+                    log.warning("accept-call: duplicate request for %s, ignoring", channel)
+                else:
+                    threading.Thread(
+                        target=_ami_originate_safe,
+                        args=(channel, caller, sip_ext, phone),
+                        daemon=True
+                    ).start()
             except Exception as e:
                 log.error("accept-call error: %s", e)
                 self._send(500)
@@ -528,6 +546,9 @@ class Handler(BaseHTTPRequestHandler):
 
                 user    = get_user_by_phone(phone) if phone else None
                 sip_ext = user["sip_extension"] if user else "vocaguard"
+
+                with _accepted_channels_lock:
+                    _accepted_channels.discard(channel)
 
                 ami_hangup(channel, sip_ext)
                 log.info("Hangup: %s (user=%s ext=%s)", channel, phone, sip_ext)
@@ -547,7 +568,6 @@ class Handler(BaseHTTPRequestHandler):
                 if not caregiver:
                     self._send(400, {"error": "caregiver_number required"})
                     return
-                import threading, os
                 caller_id = data.get("senior_number", "").strip() or TWILIO_NUMBER
                 log.info("call_caregiver: senior_number=%r caller_id=%s", data.get("senior_number"), caller_id)
                 def _do_call():
