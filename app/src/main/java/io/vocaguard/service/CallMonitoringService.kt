@@ -44,6 +44,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 
 class CallMonitoringService : Service() {
 
@@ -422,48 +424,55 @@ class CallMonitoringService : Service() {
             Log.i(TAG, "Vosk audio loop started (source=VOICE_COMMUNICATION)")
             updateNotification("Monitoring call for scam patterns...")
 
-            var loopCount = 0
-            while (isActive && isMonitoring) {
-                val read = record.read(shortBuf, 0, shortBuf.size)
-                if (read <= 0) continue
+            try {
+                var loopCount = 0
+                while (isActive && isMonitoring) {
+                    val read = record.read(shortBuf, 0, shortBuf.size)
+                    if (read <= 0) continue
 
-                // Log RMS every ~10 seconds to verify audio capture
-                loopCount++
-                if (loopCount % 150 == 0) {
-                    var sum = 0L
-                    for (i in 0 until read) sum += shortBuf[i].toLong() * shortBuf[i]
-                    val rms = Math.sqrt(sum.toDouble() / read).toInt()
-                    Log.d(TAG, "Audio RMS=$rms (read=$read samples) loop=$loopCount")
-                }
+                    // Log RMS every ~10 seconds to verify audio capture
+                    loopCount++
+                    if (loopCount % 150 == 0) {
+                        var sum = 0L
+                        for (i in 0 until read) sum += shortBuf[i].toLong() * shortBuf[i]
+                        val rms = Math.sqrt(sum.toDouble() / read).toInt()
+                        Log.d(TAG, "Audio RMS=$rms (read=$read samples) loop=$loopCount")
+                    }
 
-                updateRmsFromPcm(shortBuf, read)
+                    updateRmsFromPcm(shortBuf, read)
 
-                if (!dtmfDetected && detectDtmf(shortBuf.copyOf(read))) {
-                    dtmfDetected = true
-                    Log.d(TAG, "DTMF tone detected")
-                }
+                    if (!dtmfDetected && detectDtmf(shortBuf.copyOf(read))) {
+                        dtmfDetected = true
+                        Log.d(TAG, "DTMF tone detected")
+                    }
 
-                if (recognizer.acceptWaveForm(shortBuf, read)) {
-                    val text = JSONObject(recognizer.result).optString("text").trim()
-                    if (text.isNotEmpty()) {
-                        Log.d(TAG, "Vosk result: $text")
-                        processRecognizedText(text)
+                    if (recognizer.acceptWaveForm(shortBuf, read)) {
+                        val text = JSONObject(recognizer.result).optString("text").trim()
+                        if (text.isNotEmpty()) {
+                            Log.d(TAG, "Vosk result: $text")
+                            processRecognizedText(text)
+                        }
                     }
                 }
-            }
 
-            val finalText = JSONObject(recognizer.finalResult).optString("text").trim()
-            if (finalText.isNotEmpty()) {
-                transcriptBuilder.append(finalText).append(" ")
-                analyzeForScamPatterns(finalText)
+                val finalText = JSONObject(recognizer.finalResult).optString("text").trim()
+                if (finalText.isNotEmpty()) {
+                    transcriptBuilder.append(finalText).append(" ")
+                    analyzeForScamPatterns(finalText)
+                }
+            } finally {
+                // Cleanup must happen here, on the thread that actually owns the native
+                // AudioRecord/Recognizer objects. stopMonitoring() used to close them
+                // directly from the caller's thread while this loop could still be mid
+                // native call (acceptWaveForm/finalResult) — a use-after-free race that
+                // crashed the whole process with a native SIGSEGV/SIGABRT in libvosk.
+                record.stop()
+                record.release()
+                recognizer.close()
+                audioRecord = null
+                voskRecognizer = null
+                Log.i(TAG, "Vosk audio loop ended")
             }
-
-            record.stop()
-            record.release()
-            recognizer.close()
-            audioRecord = null
-            voskRecognizer = null
-            Log.i(TAG, "Vosk audio loop ended")
         }
     }
 
@@ -686,13 +695,23 @@ class CallMonitoringService : Service() {
             usingSpeechRecognizer = false
         }
 
-        audioLoopJob?.cancel()
+        // Don't touch audioRecord/voskRecognizer here — the Vosk audio-loop coroutine
+        // owns them and cleans them up itself (see startVoskFallback's finally block).
+        // Closing them from this thread while that coroutine could still be mid native
+        // call caused a use-after-free crash (SIGSEGV/SIGABRT in libvosk).
+        val job = audioLoopJob
         audioLoopJob = null
-        audioRecord?.stop()
-        audioRecord?.release()
-        audioRecord = null
-        voskRecognizer?.close()
-        voskRecognizer = null
+        job?.cancel()
+        if (job != null) {
+            // Wait for the loop to append its final Vosk result to transcriptBuilder
+            // and finish cleanup before we read/clear it in saveTranscript() below —
+            // otherwise the last chunk of the call's transcript races the save and
+            // can get silently dropped (or the StringBuilder mutated concurrently).
+            runBlocking {
+                withTimeoutOrNull(2000) { job.join() }
+                    ?: Log.w(TAG, "Timed out waiting for Vosk audio loop to finish")
+            }
+        }
 
         // Save transcript for review
         saveTranscript()
