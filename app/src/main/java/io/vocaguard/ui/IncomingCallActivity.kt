@@ -199,17 +199,24 @@ class IncomingCallActivity : ComponentActivity() {
                 IncomingCallScreen(
                     callerNumber = callerNumber,
                     onAccept = {
-                        ringtone?.stop()
-                        ringtone = null
-                        getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
-                        activeChannel = asteriskChannel
-                        activeCallerNumber = callerNumber
-                        callActive = true
-                        showActiveCallNotification(asteriskChannel, callerNumber)
-                        // Tell the embedded SIP SDK to auto-answer the incoming INVITE,
-                        // then trigger Asterisk to originate the call via AMI.
-                        VocaGuardSipManager.acceptCall()
-                        VocaGuardFcmService.acceptCall(asteriskChannel, callerNumber)
+                        // Guard against a double-tap on Accept: callActive flips to true
+                        // synchronously below, before recomposition removes this button,
+                        // so a near-simultaneous second tap lands here and must no-op —
+                        // otherwise it fires a second real AMI Originate on the same
+                        // channel, ringing the user again right after they just answered.
+                        if (!callActive) {
+                            ringtone?.stop()
+                            ringtone = null
+                            getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
+                            activeChannel = asteriskChannel
+                            activeCallerNumber = callerNumber
+                            callActive = true
+                            showActiveCallNotification(asteriskChannel, callerNumber)
+                            // Tell the embedded SIP SDK to auto-answer the incoming INVITE,
+                            // then trigger Asterisk to originate the call via AMI.
+                            VocaGuardSipManager.acceptCall()
+                            VocaGuardFcmService.acceptCall(asteriskChannel, callerNumber)
+                        }
                     },
                     onDecline = { dismiss() }
                 )
