@@ -150,7 +150,11 @@ def main():
 
     whisper_model = None
     try:
-        whisper_model = WhisperModel("medium", device="cpu", compute_type="int8")
+        # local_files_only: the model is already cached on disk — without this,
+        # faster_whisper/huggingface_hub hits the HF API to check for a newer
+        # revision on every single call, adding a network round-trip to the
+        # model-load latency each time.
+        whisper_model = WhisperModel("medium", device="cpu", compute_type="int8", local_files_only=True)
         log.info("BG: Whisper model loaded")
     except Exception as e:
         log.warning(f"BG: Whisper load error: {e}")
