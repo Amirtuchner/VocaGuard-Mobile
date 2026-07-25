@@ -5,17 +5,13 @@
    Reads ORIGINAL_CALLED (from REDIRECTING(from-num)) to identify which user
    the call was originally for, then looks up their FCM token from the DB.
 """
-import sys, os, json, socket, re, sqlite3, time
+import sys, os, json, subprocess, re, sqlite3, time
 import firebase_admin
 from firebase_admin import credentials, messaging
 
 SERVICE_ACCOUNT = "/opt/vocaguard/service-account.json"
 FCM_TOKEN_FILE  = "/opt/vocaguard/fcm_token.txt"   # single-user fallback
 DB_PATH         = "/opt/vocaguard/users.db"
-AMI_HOST        = "127.0.0.1"
-AMI_PORT        = 5038
-AMI_USER        = "vocaguard-bridge"
-AMI_SECRET_FILE = "/opt/vocaguard/ami_secret.txt"
 
 
 def agi_init():
@@ -64,68 +60,40 @@ def get_fcm_token_for_number(phone_number: str) -> str:
         return ""
 
 
-def _ami_recv(s: socket.socket) -> str:
-    buf = b""
-    while b"\r\n\r\n" not in buf:
-        chunk = s.recv(4096)
-        if not chunk:
-            break
-        buf += chunk
-    return buf.decode(errors="replace")
-
-
 def cleanup_stale_vocaguard_channels():
-    """Hang up any lingering PJSIP/vocaguard_*-* channels before bridging a new call."""
+    """Hang up any lingering PJSIP/vocaguard_*-* channels before bridging a new call.
+
+    Uses the Asterisk CLI (not AMI) — CoreShowChannels was silently returning
+    "Permission denied" for the vocaguard-bridge AMI user regardless of granted
+    read classes, so this safety net was never actually running. The AGI process
+    runs as the asterisk OS user, which owns asterisk.ctl, so `asterisk -rx` works.
+    """
     try:
-        ami_secret = open(AMI_SECRET_FILE).read().strip()
-        s = socket.create_connection((AMI_HOST, AMI_PORT), timeout=5)
-        s.recv(1024)
-
-        s.sendall(
-            f"Action: Login\r\nUsername: {AMI_USER}\r\nSecret: {ami_secret}\r\n\r\n"
-            .encode()
+        result = subprocess.run(
+            ["asterisk", "-rx", "core show channels concise"],
+            capture_output=True, text=True, timeout=5,
         )
-        _ami_recv(s)
-
-        s.sendall(b"Action: CoreShowChannels\r\nActionID: cleanup\r\n\r\n")
-
-        buf = b""
-        while True:
-            chunk = s.recv(4096)
-            if not chunk:
-                break
-            buf += chunk
-            if b"CoreShowChannelsComplete" in buf:
-                break
-
-        text = buf.decode(errors="replace")
 
         stale = []
-        for block in text.split("\r\n\r\n"):
-            lines = block.splitlines()
-            channel_line = next(
-                (l for l in lines if l.startswith("Channel: PJSIP/vocaguard")), None
-            )
-            if not channel_line:
+        for line in result.stdout.splitlines():
+            fields = line.split("!")
+            if len(fields) < 5:
+                continue
+            channel, state = fields[0], fields[4]
+            if not channel.startswith("PJSIP/vocaguard"):
                 continue
             # Never kill a channel that is Up (actively bridged)
-            state_line = next(
-                (l for l in lines if l.startswith("ChannelStateDesc: ")), None
-            )
-            if state_line and "Up" in state_line:
-                ch_name = channel_line.split(": ", 1)[1].strip()
-                sys.stdout.write(f'VERBOSE "Skipping active channel {ch_name}" 1\n')
+            if state == "Up":
+                sys.stdout.write(f'VERBOSE "Skipping active channel {channel}" 1\n')
                 sys.stdout.flush()
                 continue
-            ch = channel_line.split(": ", 1)[1].strip()
-            stale.append(ch)
+            stale.append(channel)
 
         for ch in stale:
-            s.sendall(f"Action: Hangup\r\nChannel: {ch}\r\n\r\n".encode())
-            _ami_recv(s)
-
-        s.sendall(b"Action: Logoff\r\n\r\n")
-        s.close()
+            subprocess.run(
+                ["asterisk", "-rx", f"channel request hangup {ch}"],
+                capture_output=True, timeout=5,
+            )
 
         if stale:
             sys.stdout.write(f'VERBOSE "Cleared {len(stale)} stale channel(s)" 1\n')
