@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CallMade
+import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Flag
@@ -28,6 +30,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.collect
+import io.vocaguard.data.CallDirection
 import io.vocaguard.data.CallTranscript
 import io.vocaguard.data.ScamType
 import java.io.File
@@ -392,11 +395,28 @@ fun TranscriptCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = dateFormat.format(Date(transcript.timestamp)),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = dateFormat.format(Date(transcript.timestamp)),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            imageVector = if (transcript.direction == CallDirection.OUTGOING)
+                                Icons.AutoMirrored.Filled.CallMade else Icons.AutoMirrored.Filled.CallReceived,
+                            contentDescription = if (transcript.direction == CallDirection.OUTGOING)
+                                "Outgoing call" else "Incoming call",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = if (transcript.direction == CallDirection.OUTGOING) "Outgoing" else "Incoming",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     if (transcript.phoneNumber.isNotEmpty()) {
                         Text(
                             text = transcript.phoneNumber,

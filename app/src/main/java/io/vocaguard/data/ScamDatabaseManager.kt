@@ -35,6 +35,14 @@ class ScamDatabaseManager private constructor(context: Context) {
     var activeCallPhoneNumber: String = ""
         private set
 
+    @Volatile
+    var activeCallDirection: CallDirection = CallDirection.INCOMING
+        private set
+
+    fun setActiveCallDirection(direction: CallDirection) {
+        activeCallDirection = direction
+    }
+
     companion object {
         private const val TAG = "ScamDatabaseManager"
         private const val PREFS_WHITELIST = "vocaguard_whitelist"
@@ -213,6 +221,7 @@ class ScamDatabaseManager private constructor(context: Context) {
         scamDatabase.clear()
         monitoringCalls.clear()
         activeCallPhoneNumber = ""
+        activeCallDirection = CallDirection.INCOMING
         whitelistPrefs.edit().clear().commit() // commit() for synchronous clear in tests
         scope.launch { scamNumberDao.clearAll() }
     }

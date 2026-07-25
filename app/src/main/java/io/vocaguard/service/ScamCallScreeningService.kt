@@ -7,6 +7,7 @@ import android.telephony.PhoneStateListener
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import android.util.Log
+import io.vocaguard.data.CallDirection
 import io.vocaguard.data.ScamDatabaseManager
 import io.vocaguard.ui.ScamOverlayManager
 
@@ -27,6 +28,8 @@ class ScamCallScreeningService : CallScreeningService() {
 
         val scamDatabaseManager = ScamDatabaseManager.getInstance(applicationContext)
         val scamInfo = scamDatabaseManager.checkNumber(phoneNumber)
+        // CallScreeningService is only ever invoked for incoming calls.
+        scamDatabaseManager.setActiveCallDirection(CallDirection.INCOMING)
 
         // Always allow the call to ring — we warn via overlay instead of silent blocking
         respondToCall(

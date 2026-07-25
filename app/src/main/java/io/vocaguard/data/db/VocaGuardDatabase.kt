@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [CallTranscriptEntity::class, ScamNumberEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class VocaGuardDatabase : RoomDatabase() {
@@ -65,6 +65,15 @@ abstract class VocaGuardDatabase : RoomDatabase() {
             }
         }
 
+        /** v5 → v6: add direction column (incoming/outgoing badge on call cards). */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE call_transcripts ADD COLUMN direction TEXT NOT NULL DEFAULT 'INCOMING'"
+                )
+            }
+        }
+
         fun getInstance(context: Context): VocaGuardDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -72,7 +81,7 @@ abstract class VocaGuardDatabase : RoomDatabase() {
                     VocaGuardDatabase::class.java,
                     "vocaguard.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }

@@ -27,6 +27,7 @@ import androidx.core.app.NotificationCompat
 import io.vocaguard.MainActivity
 import io.vocaguard.R
 import io.vocaguard.alert.ScamAlertManager
+import io.vocaguard.data.CallDirection
 import io.vocaguard.data.CallTranscript
 import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.ScamDatabaseManager
@@ -108,6 +109,7 @@ class CallMonitoringService : Service() {
     private val transcriptBuilder = StringBuilder()
     private val detectedScamTypes = mutableSetOf<String>()
     private var activePhoneNumber: String = ""
+    private var activeCallDirection: CallDirection = CallDirection.INCOMING
 
     // VAD state — tracks consecutive low-RMS readings to detect silence periods
     @Volatile private var consecutiveLowRmsCount = 0
@@ -195,6 +197,7 @@ class CallMonitoringService : Service() {
 
         isMonitoring = true
         activePhoneNumber = scamDatabaseManager.activeCallPhoneNumber
+        activeCallDirection = scamDatabaseManager.activeCallDirection
         isVictimSideOnly = ServerDetectionManager.isRegistered() &&
             ServerDetectionManager.getActivationCode(this).isEmpty()
 
@@ -729,6 +732,7 @@ class CallMonitoringService : Service() {
         val transcript = transcriptBuilder.toString()
         val scamTypes = detectedScamTypes.toList()
         val number = activePhoneNumber
+        val direction = activeCallDirection
         // Clear state immediately so the service can handle the next call right away
         transcriptBuilder.clear()
         detectedScamTypes.clear()
@@ -738,7 +742,7 @@ class CallMonitoringService : Service() {
         // Use a detached IO scope so the write completes even if the service is destroyed
         CoroutineScope(Dispatchers.IO).launch {
             transcriptRepository.save(
-                CallTranscript(text = transcript, detectedScamTypes = scamTypes, phoneNumber = number)
+                CallTranscript(text = transcript, detectedScamTypes = scamTypes, phoneNumber = number, direction = direction)
             )
         }
     }
