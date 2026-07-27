@@ -44,6 +44,34 @@ object ContactsHelper {
     }
 
     /**
+     * Returns the saved contact's display name for [phoneNumber], or null if it
+     * doesn't match any contact. Uses the same [ContactsContract.PhoneLookup]
+     * normalisation as [isKnownContact].
+     */
+    fun getContactName(context: Context, phoneNumber: String): String? {
+        if (phoneNumber.isBlank()) return null
+        return try {
+            val uri = ContactsContract.PhoneLookup.CONTENT_FILTER_URI
+                .buildUpon().appendPath(phoneNumber).build()
+            context.contentResolver.query(
+                uri,
+                arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME),
+                null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.PhoneLookup.DISPLAY_NAME))
+                } else null
+            }
+        } catch (e: SecurityException) {
+            Log.d(TAG, "READ_CONTACTS not granted — name lookup skipped")
+            null
+        } catch (e: Exception) {
+            Log.e(TAG, "Contact name lookup failed for $phoneNumber", e)
+            null
+        }
+    }
+
+    /**
      * Returns true if [displayName] exactly matches any contact's display name
      * (case-insensitive via COLLATE NOCASE).
      *

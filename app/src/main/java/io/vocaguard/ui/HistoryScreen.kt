@@ -29,9 +29,12 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.withContext
 import io.vocaguard.data.CallDirection
 import io.vocaguard.data.CallTranscript
+import io.vocaguard.data.ContactsHelper
 import io.vocaguard.data.ScamType
 import java.io.File
 import java.text.SimpleDateFormat
@@ -378,6 +381,16 @@ fun TranscriptCard(
     val dateFormat = remember { SimpleDateFormat("MMM d, yyyy  h:mm a", Locale.ENGLISH) }
     val isScam = transcript.detectedScamTypes.isNotEmpty()
 
+    val context = LocalContext.current
+    var contactName by remember(transcript.phoneNumber) { mutableStateOf<String?>(null) }
+    LaunchedEffect(transcript.phoneNumber) {
+        if (transcript.phoneNumber.isNotEmpty()) {
+            contactName = withContext(Dispatchers.IO) {
+                ContactsHelper.getContactName(context, transcript.phoneNumber)
+            }
+        }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -418,11 +431,24 @@ fun TranscriptCard(
                         )
                     }
                     if (transcript.phoneNumber.isNotEmpty()) {
-                        Text(
-                            text = transcript.phoneNumber,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        if (contactName != null) {
+                            Text(
+                                text = contactName!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = transcript.phoneNumber,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Text(
+                                text = transcript.phoneNumber,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
                 if (isScam && !markedFalsePositive && transcript.phoneNumber.isNotEmpty()) {

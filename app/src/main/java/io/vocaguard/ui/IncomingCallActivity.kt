@@ -19,6 +19,7 @@ import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -30,6 +31,7 @@ import io.vocaguard.service.VocaGuardSipManager
 import androidx.core.app.NotificationCompat
 import io.vocaguard.R
 import io.vocaguard.data.CallTranscript
+import io.vocaguard.data.ContactsHelper
 import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.ScamType
 import io.vocaguard.data.TranscriptRepository
@@ -83,6 +85,7 @@ class IncomingCallActivity : ComponentActivity() {
     private var isRecording by mutableStateOf(false)
     private var recordingPath: String? = null
     private var connectFailed by mutableStateOf(false)
+    private var contactName by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -109,6 +112,16 @@ class IncomingCallActivity : ComponentActivity() {
 
         val callerNumber    = intent.getStringExtra(EXTRA_CALLER_NUMBER) ?: ""
         val asteriskChannel = intent.getStringExtra(EXTRA_CHANNEL) ?: ""
+
+        // Resolve the caller's saved contact name, if any. Runs off the main thread
+        // since ContentResolver.query() against the contacts provider hits disk.
+        if (callerNumber.isNotBlank()) {
+            lifecycleScope.launch {
+                contactName = withContext(Dispatchers.IO) {
+                    ContactsHelper.getContactName(this@IncomingCallActivity, callerNumber)
+                }
+            }
+        }
 
         // Start looping ringtone
         val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
@@ -172,11 +185,13 @@ class IncomingCallActivity : ComponentActivity() {
                 if (connectFailed) {
                     ConnectFailedScreen(
                         callerNumber = activeCallerNumber,
+                        contactName = contactName,
                         onDismiss = { hangUpAndFinish() }
                     )
                 } else {
                     ActiveCallScreen(
                         callerNumber = activeCallerNumber,
+                        contactName = contactName,
                         connected = (sipState == VocaGuardSipManager.CallState.ACTIVE),
                         scamAlert = scamAlert,
                         volumeLevel = volumeLevel,
@@ -198,6 +213,7 @@ class IncomingCallActivity : ComponentActivity() {
             } else {
                 IncomingCallScreen(
                     callerNumber = callerNumber,
+                    contactName = contactName,
                     onAccept = {
                         // Guard against a double-tap on Accept: callActive flips to true
                         // synchronously below, before recomposition removes this button,
@@ -211,7 +227,7 @@ class IncomingCallActivity : ComponentActivity() {
                             activeChannel = asteriskChannel
                             activeCallerNumber = callerNumber
                             callActive = true
-                            showActiveCallNotification(asteriskChannel, callerNumber)
+                            showActiveCallNotification(asteriskChannel, callerNumber, contactName)
                             // Tell the embedded SIP SDK to auto-answer the incoming INVITE,
                             // then trigger Asterisk to originate the call via AMI.
                             VocaGuardSipManager.acceptCall()
@@ -254,7 +270,7 @@ class IncomingCallActivity : ComponentActivity() {
         finish()
     }
 
-    private fun showActiveCallNotification(channel: String, callerNumber: String) {
+    private fun showActiveCallNotification(channel: String, callerNumber: String, contactName: String? = null) {
         val channelId = "active_call_channel"
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(channelId) == null) {
@@ -279,9 +295,10 @@ class IncomingCallActivity : ComponentActivity() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
+        val displayCaller = if (contactName != null) "$contactName ($displayNumber)" else displayNumber
         val notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("VocaGuard: Monitoring Call")
-            .setContentText("Tap to open • From: $displayNumber")
+            .setContentText("Tap to open • From: $displayCaller")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .setContentIntent(openVocaGuardPi)
@@ -403,6 +420,7 @@ class IncomingCallActivity : ComponentActivity() {
 @Composable
 private fun ActiveCallScreen(
     callerNumber: String,
+    contactName: String? = null,
     connected: Boolean,
     scamAlert: Pair<ScamType, Float>?,
     volumeLevel: Float,
@@ -465,7 +483,13 @@ private fun ActiveCallScreen(
                 Text("Connecting…", color = Color(0xFFFFB300), fontSize = 16.sp)
             }
             Spacer(Modifier.height(16.dp))
-            Text(displayNumber, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            if (contactName != null) {
+                Text(contactName, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                Text(displayNumber, color = Color(0xFFAAAAAA), fontSize = 16.sp)
+            } else {
+                Text(displayNumber, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            }
             Spacer(Modifier.height(8.dp))
             Text("VocaGuard is monitoring this call", color = Color(0xFFAAAAAA), fontSize = 14.sp)
         }
@@ -564,6 +588,7 @@ private fun ActiveCallScreen(
 @Composable
 private fun ConnectFailedScreen(
     callerNumber: String,
+    contactName: String? = null,
     onDismiss: () -> Unit
 ) {
     val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
@@ -581,7 +606,13 @@ private fun ConnectFailedScreen(
             Spacer(Modifier.height(48.dp))
             Text("Couldn't Connect", color = Color(0xFFEF5350), fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(16.dp))
-            Text(displayNumber, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            if (contactName != null) {
+                Text(contactName, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                Text(displayNumber, color = Color(0xFFAAAAAA), fontSize = 16.sp)
+            } else {
+                Text(displayNumber, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            }
             Spacer(Modifier.height(8.dp))
             Text(
                 "The call could not be bridged. The other side may still be waiting.",
@@ -609,6 +640,7 @@ private fun ConnectFailedScreen(
 @Composable
 private fun IncomingCallScreen(
     callerNumber: String,
+    contactName: String? = null,
     onAccept: () -> Unit,
     onDecline: () -> Unit
 ) {
@@ -627,7 +659,13 @@ private fun IncomingCallScreen(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("Incoming Call", color = Color.White, fontSize = 16.sp)
             Spacer(Modifier.height(16.dp))
-            Text(displayNumber, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            if (contactName != null) {
+                Text(contactName, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                Text(displayNumber, color = Color(0xFFAAAAAA), fontSize = 16.sp)
+            } else {
+                Text(displayNumber, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            }
             Spacer(Modifier.height(8.dp))
             Text("VocaGuard is monitoring this call", color = Color(0xFFAAAAAA), fontSize = 14.sp)
         }
