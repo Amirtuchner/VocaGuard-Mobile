@@ -116,14 +116,29 @@ def run_detector(pcm_path: str, caller: str = "+972501234567") -> int:
         proc.wait(timeout=120)
         return proc.returncode
 
-def tail_log_for(keyword: str, timeout: float = 5.0) -> bool:
-    """Return True if keyword appears in the log within timeout seconds."""
+def log_size() -> int:
+    """Current byte size of the detector log (0 if missing)."""
+    try:
+        return os.path.getsize(LOG)
+    except OSError:
+        return 0
+
+
+def tail_log_for(keyword: str, timeout: float = 5.0, since: int = 0) -> bool:
+    """Return True if keyword appears in log content written after byte
+    offset [since] within timeout seconds.
+
+    An offset is used instead of `tail -N`: detection is logged mid-call, and
+    by the time the detector process exits, later STT/FCM/cleanup lines can
+    push the detection line beyond any fixed tail window — a tail -20 check
+    made this test fail even though SCAM DETECTED was right there in the log.
+    """
     start = time.time()
     while time.time() - start < timeout:
         try:
-            out = subprocess.check_output(
-                ["tail", "-20", LOG], stderr=subprocess.DEVNULL
-            ).decode(errors="replace")
+            with open(LOG, "rb") as f:
+                f.seek(since)
+                out = f.read().decode(errors="replace")
             if keyword in out:
                 return True
         except Exception:
@@ -152,11 +167,12 @@ def run_audio_test(label: str, text: str, lang: str, expect_scam: bool) -> bool:
         print(f"        {size_kb} KB  ({duration_s:.1f}s of audio)")
 
         print("  [2/3] Running scam_detector.py...")
+        log_start = log_size()
         run_detector(pcm)
 
         print("  [3/3] Checking log for result...")
-        detected = tail_log_for("SCAM DETECTED", timeout=3.0)
-        fcm_sent  = tail_log_for("FCM sent",     timeout=3.0)
+        detected = tail_log_for("SCAM DETECTED", timeout=3.0, since=log_start)
+        fcm_sent  = tail_log_for("FCM sent",     timeout=3.0, since=log_start)
 
     if expect_scam:
         if detected:
@@ -256,6 +272,15 @@ def main():
              True,  "3 high-signal EN keywords"),
             ("hello how are you today the weather is nice",
              False, "legit EN — no false positive"),
+            # Regression 2026-07-27: English-Vosk hallucination of a Hebrew job
+            # interview — "a manila bay and without him along a great guy at
+            # like one hundred thousand" — fired BANK_FRAUD at threshold=2
+            # because a bare money amount was weight-2. Amounts alone (or with
+            # only weight-1 partners) must never fire.
+            ("a manila bay and without him along a great guy at like one hundred thousand",
+             False, "STT garbage with money amount — no false positive"),
+            ("the salary is one hundred thousand shekels a year plus a deposit on the apartment",
+             False, "legit salary/price talk with amounts — no false positive"),
         ]))
 
         results.append(run_unit_test("Sliding window — expired text ignored", [

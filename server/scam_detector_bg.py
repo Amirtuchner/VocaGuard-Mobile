@@ -167,20 +167,31 @@ def main():
     alerted        = False
     resample_state = None
     whisper_buf    = bytearray()
-    transcript_win  = deque()
+    transcript_win  = deque()   # entries: (timestamp, text, source)  source: "vosk" | "whisper"
     # transcript_disp: combined Vosk+Whisper text for scam detection (max recall)
     transcript_disp = ""
     # whisper_transcript: Whisper-only text for the user-facing history (accuracy)
     whisper_transcript = ""
+
+    # Language gating: the Vosk model is English-only, so on a Hebrew/Russian/
+    # Arabic call it hallucinates fluent-looking English garbage — which then
+    # feeds the keyword detector (2026-07-27: a Hebrew job interview fired a
+    # "BANK_FRAUD" alert because Vosk invented "one hundred thousand").
+    # Whisper auto-detects the language per chunk; after two non-English chunks
+    # we conclude the call is non-English and exclude Vosk text from detection.
+    # Whisper's own (correctly-transcribed, language-aware) text still feeds it.
+    non_english_chunks = 0
+    call_is_non_english = False
 
     # No timeout alert — let the detector analyse the full call.
     # A blanket 20s fallback caused false positives on every legitimate call.
 
     def add_text(text, label):
         nonlocal transcript_disp, whisper_transcript
-        transcript_win.append((time.monotonic(), text))
+        source = "whisper" if "ML" in label else "vosk"
+        transcript_win.append((time.monotonic(), text, source))
         transcript_disp += " " + text
-        if "ML" in label:
+        if source == "whisper":
             whisper_transcript += " " + text
         log.info(f"BG STT-{label}: {text}")
 
@@ -188,7 +199,10 @@ def main():
         now = time.monotonic()
         while transcript_win and now - transcript_win[0][0] > WINDOW_SECONDS:
             transcript_win.popleft()
-        return " ".join(t for _, t in transcript_win)
+        return " ".join(
+            t for _, t, source in transcript_win
+            if not (call_is_non_english and source == "vosk")
+        )
 
     def check_and_alert(label):
         nonlocal alerted
@@ -213,6 +227,7 @@ def main():
     whisper_q = _queue.Queue(maxsize=8)
 
     def _whisper_worker():
+        nonlocal non_english_chunks, call_is_non_english
         while True:
             item = whisper_q.get()
             if item is None:
@@ -229,6 +244,12 @@ def main():
                 )
                 text = " ".join(seg.text for seg in segments).strip()
                 if text:
+                    if info.language and info.language != "en":
+                        non_english_chunks += 1
+                        if non_english_chunks >= 2 and not call_is_non_english:
+                            call_is_non_english = True
+                            log.info(f"BG: call language is '{info.language}' — "
+                                     "excluding English-Vosk garbage from detection")
                     add_text(text, f"ML({info.language})")
                     check_and_alert("whisper-ml")
             except Exception as e:
@@ -268,8 +289,11 @@ def main():
                         add_text(text, "EN")
                         check_and_alert("vosk-en")
                 else:
-                    # Check partial result mid-utterance — fires before silence
-                    partial = json.loads(rec_en.PartialResult()).get("partial", "").strip()
+                    # Check partial result mid-utterance — fires before silence.
+                    # Skipped on non-English calls: the partial is Vosk-EN output,
+                    # which is hallucinated garbage for Hebrew/Russian/Arabic audio.
+                    partial = "" if call_is_non_english else \
+                        json.loads(rec_en.PartialResult()).get("partial", "").strip()
                     if partial and len(partial.split()) >= 4:
                         is_scam, all_signals, total_score, mode = detect_scam_combined(
                             partial + " " + get_window_text()

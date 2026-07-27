@@ -37,7 +37,7 @@ SERVICE_ACCOUNT      = "/opt/vocaguard/service-account.json"
 FCM_TOKEN_FILE       = "/opt/vocaguard/fcm_token.txt"
 SAMPLE_RATE          = 16000
 WHISPER_CHUNK_BYTES  = 16000 * 2 * 2   # 2-second chunks (was 3 s)
-SCAM_SCORE_THRESHOLD = 2
+SCAM_SCORE_THRESHOLD = 3
 WINDOW_SECONDS       = 90              # sliding window: only last 90 s counts
 
 logging.basicConfig(
@@ -72,7 +72,12 @@ SCAM_KEYWORDS_EN = [
     ("virus", 1), ("microsoft", 1), ("computer infected", 1), ("tech support", 1),
     ("suspicious activity", 1), ("account frozen", 1), ("verify your account", 1),
     ("bank transfer", 1), ("account compromised", 1),
-    ("you have won", 2), ("you've won", 2), ("you are a winner", 2), ("you won a prize", 2), ("you've earned", 2), ("earned a prize", 2), ("you earned", 2), ("claim your prize", 2), ("claim the prize", 2), ("thousand euro", 2), ("million euro", 2), ("thousand euros", 2), ("million euros", 2), ("thousand dollars", 2), ("hundred thousand", 2),
+    ("you have won", 2), ("you've won", 2), ("you are a winner", 2), ("you won a prize", 2), ("you've earned", 2), ("earned a prize", 2), ("you earned", 2), ("claim your prize", 2), ("claim the prize", 2),
+    # Bare money amounts demoted to weight 1: they appear constantly in legitimate
+    # calls (salaries, prices, real-estate) — a 2026-07-27 false positive fired
+    # "BANK_FRAUD" on a job interview because STT garbage contained "one hundred
+    # thousand". Amounts only matter alongside a real scam-phrase partner.
+    ("thousand euro", 1), ("million euro", 1), ("thousand euros", 1), ("million euros", 1), ("thousand dollars", 1), ("hundred thousand", 1),
     ("won", 1), ("lottery", 1), ("prize", 1), ("congratulations", 1), ("claim", 1), ("euro", 1), ("euros", 1), ("dollars", 1), ("dollar", 1),
     ("ssn", 1), ("suspended", 1),
     ("press 1", 1), ("press one", 1), ("do not hang up", 1),

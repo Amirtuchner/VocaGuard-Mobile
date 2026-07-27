@@ -218,10 +218,18 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                     phoneNumber = callerNumber
                 )
             )
-            // Add to local scam DB and community blocklist
+            // Add to the local scam DB with a 7-day expiry. A non-zero expiresAt also
+            // means this is NOT submitted to the community blocklist — automated
+            // detections can be false positives (2026-07-27: a Hebrew job interview
+            // was flagged BANK_FRAUD off STT garbage, permanently blacklisting a
+            // legitimate number for every user). Only explicit user reports from the
+            // History tab go to the community list.
             if (callerNumber.isNotEmpty()) {
                 val scamDb = io.vocaguard.data.ScamDatabaseManager.getInstance(applicationContext)
-                scamDb.reportScamNumber(callerNumber, scamType)
+                scamDb.reportScamNumber(
+                    callerNumber, scamType,
+                    expiresAt = System.currentTimeMillis() + io.vocaguard.data.ScamDatabaseManager.NETWORK_TTL_MS
+                )
             }
         }
     }

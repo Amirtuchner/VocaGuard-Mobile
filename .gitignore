@@ -18,6 +18,7 @@ local.properties
 # ML training
 ml_training/venv312/
 ml_training/__pycache__/
+server/__pycache__/
 ml_training/*.pyc
 
 # Sensitive files
