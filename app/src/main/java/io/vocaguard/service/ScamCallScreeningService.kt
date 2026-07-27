@@ -24,11 +24,29 @@ class ScamCallScreeningService : CallScreeningService() {
 
     override fun onScreenCall(callDetails: Call.Details) {
         val phoneNumber = callDetails.handle?.schemeSpecificPart ?: ""
+
+        // Since Android 10 (API 29, our minSdk), onScreenCall is also invoked for
+        // outgoing calls, not just incoming ones. This service exists to screen
+        // incoming scam callers — a call the user is placing themselves needs no
+        // screening, and letting it fall through below used to force
+        // activeCallDirection to INCOMING and kick off a spurious monitoring cycle,
+        // producing a duplicate, wrongly-tagged "Incoming" history row alongside the
+        // real (correctly-tagged) outgoing call row.
+        if (callDetails.callDirection == Call.Details.DIRECTION_OUTGOING) {
+            // Still record the number — direction is resolved separately via
+            // PhoneStateMonitor/PhoneStateReceiver — so CallMonitoringService's
+            // transcript row has a phoneNumber to display and resolve a contact name from.
+            ScamDatabaseManager.getInstance(applicationContext).setActiveCallPhoneNumber(phoneNumber)
+            respondToCall(callDetails, CallResponse.Builder().build())
+            return
+        }
+
         Log.d(TAG, "Screening call from: $phoneNumber")
 
         val scamDatabaseManager = ScamDatabaseManager.getInstance(applicationContext)
         val scamInfo = scamDatabaseManager.checkNumber(phoneNumber)
-        // CallScreeningService is only ever invoked for incoming calls.
+        // CallScreeningService is only invoked for incoming calls at this point —
+        // outgoing calls are handled by the early-return above.
         scamDatabaseManager.setActiveCallDirection(CallDirection.INCOMING)
 
         // Always allow the call to ring — we warn via overlay instead of silent blocking

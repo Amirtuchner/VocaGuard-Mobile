@@ -206,6 +206,10 @@ class CallMonitoringService : Service() {
             ContactsHelper.isKnownContact(this, activePhoneNumber)) {
             Log.i(TAG, "Known contact ($activePhoneNumber) — scam detection skipped entirely")
             updateNotification("Call with known contact — monitoring inactive")
+            // Still record the call in history: a non-zero callStartTime makes
+            // saveTranscript() save a row (empty transcript, no scam analysis)
+            // when the call ends, so contact calls don't vanish from the list.
+            callStartTime = System.currentTimeMillis()
             return
         }
 

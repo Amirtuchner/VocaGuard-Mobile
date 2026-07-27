@@ -39,8 +39,34 @@ class ScamDatabaseManager private constructor(context: Context) {
     var activeCallDirection: CallDirection = CallDirection.INCOMING
         private set
 
+    // Only incoming calls ring before going off-hook, so this tells an answered
+    // incoming call apart from a dialed outgoing call at OFFHOOK time. Owned here
+    // (rather than in PhoneStateMonitor) because call state is delivered via two
+    // independent, racing paths — PhoneStateMonitor's own TelephonyCallback/
+    // PhoneStateListener, and PhoneStateReceiver's manifest broadcast fallback for
+    // Samsung devices that freeze the registered listener. Both must feed the same
+    // flag or whichever path loses the race leaves activeCallDirection stale from
+    // the previous call.
+    @Volatile
+    private var sawRingingForCurrentCall = false
+
     fun setActiveCallDirection(direction: CallDirection) {
         activeCallDirection = direction
+    }
+
+    /** Call when CALL_STATE_RINGING is observed, from any call-detection path. */
+    fun markCallRinging() {
+        sawRingingForCurrentCall = true
+    }
+
+    /** Call when CALL_STATE_OFFHOOK is observed, from any call-detection path. */
+    fun resolveActiveCallDirectionOnOffhook() {
+        activeCallDirection = if (sawRingingForCurrentCall) CallDirection.INCOMING else CallDirection.OUTGOING
+    }
+
+    /** Call when CALL_STATE_IDLE is observed, from any call-detection path. */
+    fun markCallIdle() {
+        sawRingingForCurrentCall = false
     }
 
     companion object {
@@ -198,6 +224,16 @@ class ScamDatabaseManager private constructor(context: Context) {
         activeCallPhoneNumber = cleanNumber
     }
 
+    /**
+     * Records the number for an outgoing call so CallMonitoringService's saved
+     * transcript has a phoneNumber to display/look up a contact name for.
+     * Skips the suspicious-number bookkeeping in [markCallForMonitoring], which
+     * only applies to incoming calls from potential scammers.
+     */
+    fun setActiveCallPhoneNumber(phoneNumber: String) {
+        activeCallPhoneNumber = cleanPhoneNumber(phoneNumber)
+    }
+
     fun stopMonitoringCall(phoneNumber: String) {
         val cleanNumber = cleanPhoneNumber(phoneNumber)
         monitoringCalls.remove(cleanNumber)
@@ -227,6 +263,20 @@ class ScamDatabaseManager private constructor(context: Context) {
     }
 
     /**
+     * Region used to interpret nationally-formatted numbers (no +country prefix).
+     * Was hardcoded to "US", which mangled local numbers everywhere else — e.g.
+     * Israeli "0559978201" became "10559978201" (US country code prepended, so it
+     * matched neither the contacts database nor the real number).
+     */
+    private val defaultRegion: String by lazy {
+        val tm = appContext.getSystemService(Context.TELEPHONY_SERVICE)
+            as? android.telephony.TelephonyManager
+        tm?.simCountryIso?.takeIf { it.isNotBlank() }?.uppercase()
+            ?: tm?.networkCountryIso?.takeIf { it.isNotBlank() }?.uppercase()
+            ?: java.util.Locale.getDefault().country.ifBlank { "US" }
+    }
+
+    /**
      * Normalises [phoneNumber] to a digit-only E.164 string (without the leading +) so that
      * "+1 (555) 123-4567", "15551234567", and "(555) 123-4567" all resolve to the same key.
      * Falls back to stripping non-digits if libphonenumber cannot parse the input.
@@ -234,7 +284,7 @@ class ScamDatabaseManager private constructor(context: Context) {
     private fun cleanPhoneNumber(phoneNumber: String): String {
         return try {
             val phoneUtil = PhoneNumberUtil.getInstance()
-            val parsed = phoneUtil.parse(phoneNumber, "US")
+            val parsed = phoneUtil.parse(phoneNumber, defaultRegion)
             phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164)
                 .removePrefix("+")
         } catch (_: NumberParseException) {

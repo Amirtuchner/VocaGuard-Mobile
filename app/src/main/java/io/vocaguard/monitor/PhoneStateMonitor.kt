@@ -9,7 +9,6 @@ import android.telephony.PhoneStateListener
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import android.util.Log
-import io.vocaguard.data.CallDirection
 import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.ScamDatabaseManager
 import io.vocaguard.service.CallMonitoringService
@@ -89,9 +88,6 @@ class PhoneStateMonitor(
     }
 
     private var lastReportedState = -1
-    // Set on RINGING, cleared on IDLE — lets OFFHOOK tell an answered incoming call
-    // apart from a dialed outgoing call, since only incoming calls ring first.
-    private var sawRingingForCurrentCall = false
 
     private fun handleCallStateChange(state: Int, phoneNumber: String? = null) {
         // Deduplicate — both PhoneStateListener and TelephonyCallback may fire
@@ -101,19 +97,17 @@ class PhoneStateMonitor(
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
                 Log.i(TAG, "Incoming call: ${phoneNumber ?: "unknown"}")
-                sawRingingForCurrentCall = true
+                scamDatabaseManager.markCallRinging()
                 onIncomingCall(phoneNumber)
             }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
                 Log.i(TAG, "Call answered or outgoing call")
-                scamDatabaseManager.setActiveCallDirection(
-                    if (sawRingingForCurrentCall) CallDirection.INCOMING else CallDirection.OUTGOING
-                )
+                scamDatabaseManager.resolveActiveCallDirectionOnOffhook()
                 onCallActive()
             }
             TelephonyManager.CALL_STATE_IDLE -> {
                 Log.i(TAG, "Call ended or idle")
-                sawRingingForCurrentCall = false
+                scamDatabaseManager.markCallIdle()
                 handleCallEnded()
             }
         }

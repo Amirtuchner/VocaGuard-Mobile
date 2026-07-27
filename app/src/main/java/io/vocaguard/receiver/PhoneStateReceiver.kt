@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.telephony.TelephonyManager
 import android.util.Log
+import io.vocaguard.data.ScamDatabaseManager
 import io.vocaguard.service.PhoneMonitorService
 
 /**
@@ -42,12 +43,19 @@ class PhoneStateReceiver : BroadcastReceiver() {
 
         // Forward the state change to PhoneMonitorService so it can act
         // even if its TelephonyCallback was frozen.
+        // Feed the same shared ringing/direction state that PhoneStateMonitor uses,
+        // so whichever path (this broadcast, or PhoneStateMonitor's own registered
+        // listener) delivers a given transition first, direction is computed the
+        // same way instead of one path leaving it stale from the previous call.
+        val scamDatabaseManager = ScamDatabaseManager.getInstance(context)
         when (state) {
             TelephonyManager.EXTRA_STATE_RINGING -> {
                 Log.i(TAG, "Incoming call detected via broadcast")
+                scamDatabaseManager.markCallRinging()
             }
             TelephonyManager.EXTRA_STATE_OFFHOOK -> {
                 Log.i(TAG, "Call answered — notifying PhoneMonitorService")
+                scamDatabaseManager.resolveActiveCallDirectionOnOffhook()
                 context.startService(
                     Intent(context, PhoneMonitorService::class.java).apply {
                         action = "io.vocaguard.ACTION_CALL_OFFHOOK"
@@ -56,6 +64,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
             }
             TelephonyManager.EXTRA_STATE_IDLE -> {
                 Log.i(TAG, "Call ended — notifying PhoneMonitorService")
+                scamDatabaseManager.markCallIdle()
                 context.startService(
                     Intent(context, PhoneMonitorService::class.java).apply {
                         action = "io.vocaguard.ACTION_CALL_IDLE"
