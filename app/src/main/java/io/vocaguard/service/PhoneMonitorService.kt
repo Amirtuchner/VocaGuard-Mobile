@@ -96,7 +96,7 @@ class PhoneMonitorService : Service() {
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
                 startForeground(NOTIFICATION_ID, notification, type)
             } catch (e: SecurityException) {
-                Log.w(TAG, "Cannot start with microphone type, using dataSync only: ${e.message}")
+                Log.w(TAG, "Cannot start with microphone type, using specialUse only: ${e.message}")
                 try {
                     startForeground(NOTIFICATION_ID, notification,
                         ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
