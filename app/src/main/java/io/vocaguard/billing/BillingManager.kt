@@ -8,6 +8,7 @@ import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.BillingResult
 import com.android.billingclient.api.PendingPurchasesParams
+import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
@@ -56,6 +57,11 @@ class BillingManager private constructor(private val context: Context) :
     private val _billingError = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val billingError: SharedFlow<String> = _billingError.asSharedFlow()
 
+    /** Localized pricing line for the paywall (e.g. "1 month free · then $4.99/month"),
+     *  built from Play's ProductDetails so it always matches Play Console config. */
+    private val _priceLine = MutableStateFlow<String?>(null)
+    val priceLine: StateFlow<String?> = _priceLine.asStateFlow()
+
     private val billingClient: BillingClient = BillingClient.newBuilder(context)
         .setListener(this)
         .enablePendingPurchases(
@@ -94,8 +100,9 @@ class BillingManager private constructor(private val context: Context) :
         } else {
             // Only block with paywall if the product actually exists in Play Console.
             // If it hasn't been created yet, stay Unknown so access isn't blocked.
-            val productExists = queryProductDetails() != null
-            _status.value = if (productExists) SubscriptionStatus.Expired else SubscriptionStatus.Unknown
+            val details = queryProductDetails()
+            details?.let { _priceLine.value = formatPriceLine(it) }
+            _status.value = if (details != null) SubscriptionStatus.Expired else SubscriptionStatus.Unknown
         }
 
         // Acknowledge any unacknowledged purchases so Play doesn't revoke them
@@ -138,6 +145,35 @@ class BillingManager private constructor(private val context: Context) :
             ).build()
         ).productDetailsList?.firstOrNull()
 
+    /** Prefer an offer with a free phase (free trial) when the user is eligible;
+     *  Play only returns offers the user qualifies for, so returning users
+     *  simply fall back to the base plan. */
+    private fun bestOffer(details: ProductDetails): ProductDetails.SubscriptionOfferDetails? {
+        val offers = details.subscriptionOfferDetails ?: return null
+        return offers.firstOrNull { offer ->
+            offer.pricingPhases.pricingPhaseList.any { it.priceAmountMicros == 0L }
+        } ?: offers.firstOrNull()
+    }
+
+    private fun formatPriceLine(details: ProductDetails): String? {
+        val phases = bestOffer(details)?.pricingPhases?.pricingPhaseList ?: return null
+        val paid = phases.lastOrNull { it.priceAmountMicros > 0 } ?: return null
+        val trial = phases.firstOrNull { it.priceAmountMicros == 0L }
+        val perMonth = "${paid.formattedPrice}/month"
+        return if (trial != null) {
+            val trialLength = when (trial.billingPeriod) {
+                "P1M" -> "1 month"
+                "P1W" -> "1 week"
+                "P3D" -> "3 days"
+                "P7D" -> "7 days"
+                else -> trial.billingPeriod.removePrefix("P").lowercase()
+            }
+            "$trialLength free · then $perMonth · cancel any time"
+        } else {
+            "$perMonth · cancel any time"
+        }
+    }
+
     fun startSubscriptionFlow(activity: Activity) {
         scope.launch(Dispatchers.Main) {
             val productDetails = queryProductDetails()
@@ -145,7 +181,7 @@ class BillingManager private constructor(private val context: Context) :
                 _billingError.tryEmit("Subscription product not available yet. Please try again later.")
                 return@launch
             }
-            val offerToken = productDetails.subscriptionOfferDetails?.firstOrNull()?.offerToken
+            val offerToken = bestOffer(productDetails)?.offerToken
             if (offerToken == null) {
                 _billingError.tryEmit("No subscription offer available. Please try again later.")
                 return@launch

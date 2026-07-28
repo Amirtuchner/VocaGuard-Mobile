@@ -128,9 +128,11 @@ class MainActivity : ComponentActivity() {
                             Snackbar(snackbarData = data)
                         }}
                     ) { _ ->
+                        val priceLine by billing.priceLine.collectAsState()
                         PaywallScreen(
                             onSubscribeClick = { billing.startSubscriptionFlow(this@MainActivity) },
-                            onRestoreClick   = { billing.refresh() }
+                            onRestoreClick   = { billing.refresh() },
+                            priceLine        = priceLine,
                         )
                     }
                     else -> MainScreen(

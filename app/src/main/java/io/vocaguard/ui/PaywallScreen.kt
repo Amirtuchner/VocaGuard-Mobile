@@ -36,6 +36,7 @@ private val features = listOf(
 fun PaywallScreen(
     onSubscribeClick: () -> Unit,
     onRestoreClick: () -> Unit,
+    priceLine: String? = null,
 ) {
     Column(
         modifier = Modifier
@@ -108,7 +109,7 @@ fun PaywallScreen(
         Spacer(Modifier.height(8.dp))
 
         Text(
-            text = "1 month free · then ₪15/month · cancel any time",
+            text = priceLine ?: "1 month free · then $4.99/month · cancel any time",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
