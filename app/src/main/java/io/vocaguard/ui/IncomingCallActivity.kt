@@ -181,6 +181,24 @@ class IncomingCallActivity : ComponentActivity() {
                 }
             }
 
+            // The accept-call HTTP signal exhausted all its retries — the server never
+            // heard the accept, so no bridge is coming. Fail fast instead of letting the
+            // user sit on "Connecting…" for the full 35s while the caller gives up.
+            LaunchedEffect(callActive) {
+                if (callActive) {
+                    VocaGuardFcmService.acceptFailedFlow.collect { failed ->
+                        if (failed && !connectFailed) {
+                            val state = VocaGuardSipManager.callState.value
+                            if (state != VocaGuardSipManager.CallState.ACTIVE &&
+                                state != VocaGuardSipManager.CallState.ENDED
+                            ) {
+                                connectFailed = true
+                            }
+                        }
+                    }
+                }
+            }
+
             if (callActive) {
                 if (connectFailed) {
                     ConnectFailedScreen(

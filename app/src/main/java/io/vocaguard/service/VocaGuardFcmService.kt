@@ -38,6 +38,11 @@ class VocaGuardFcmService : FirebaseMessagingService() {
         /** Emits the latest scam alert so IncomingCallActivity can show an in-screen banner. */
         val scamAlertFlow = MutableStateFlow<Pair<io.vocaguard.data.ScamType, Float>?>(null)
 
+        /** Set to true when every accept-call attempt failed — lets the in-call UI
+         *  show the "Couldn't Connect" screen immediately instead of after the 35s timeout.
+         *  Reset to false each time a new accept begins. */
+        val acceptFailedFlow = MutableStateFlow(false)
+
         // Upload current device token to the Asterisk server over HTTPS.
         // Includes phone_number for multi-tenant routing if the user has registered.
         fun uploadToken(token: String) {
@@ -116,27 +121,29 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                     .post(jsonBody.toRequestBody("application/json".toMediaType()))
                     .build()
 
-                // A ConnectException means the TCP/TLS connection itself never came up,
-                // so the request body was never sent — safe to retry once (a brief cellular
-                // handoff or weak signal can blow past even a generous connect timeout).
-                // Any other failure must NOT be retried: the server may already have
-                // received the request and started the AMI Originate, and a second attempt
-                // would send a duplicate SIP INVITE to Linphone, ringing the phone twice.
-                for (attempt in 1..2) {
+                // The server's /accept-call is idempotent (token_server.py keeps an
+                // _accepted_channels set — a duplicate request for an already-accepted
+                // channel no-ops instead of firing a second AMI Originate, verified live
+                // 2026-07-23). So retrying on ANY failure is safe and cannot double-ring.
+                // A lost accept leaves the user staring at "Connecting" until the caller
+                // gives up (happened 2026-07-28: accept never reached the server), so be
+                // persistent: 4 attempts with short backoff, then tell the UI we failed.
+                acceptFailedFlow.value = false
+                val maxAttempts = 4
+                for (attempt in 1..maxAttempts) {
                     try {
                         client.newCall(request).execute().use { response ->
-                            Log.i(TAG, "Accept call signalled: ${response.code}")
+                            Log.i(TAG, "Accept call signalled: ${response.code} (attempt $attempt)")
                         }
                         return@launch
-                    } catch (e: java.net.ConnectException) {
-                        if (attempt == 2) {
-                            Log.e(TAG, "Accept call failed to connect after retry", e)
-                        } else {
-                            Log.w(TAG, "Accept call connect failed, retrying once", e)
-                        }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Failed to signal accept call", e)
-                        return@launch
+                        if (attempt == maxAttempts) {
+                            Log.e(TAG, "Accept call failed after $maxAttempts attempts", e)
+                            acceptFailedFlow.value = true
+                        } else {
+                            Log.w(TAG, "Accept call attempt $attempt failed, retrying", e)
+                            kotlinx.coroutines.delay(attempt * 1000L)
+                        }
                     }
                 }
             }
