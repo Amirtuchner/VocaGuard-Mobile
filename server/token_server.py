@@ -20,6 +20,12 @@ SECRET_FILE      = "/opt/vocaguard/token_server_secret.txt"
 AMI_SECRET_FILE  = "/opt/vocaguard/ami_secret.txt"
 CERT_FILE        = "/opt/vocaguard/server.crt"
 KEY_FILE         = "/opt/vocaguard/server.key"
+# Domain cert (Let's Encrypt) served via SNI to clients that connect by
+# hostname; clients connecting by bare IP still get the self-signed cert
+# above, which old app builds pin. See __main__ TLS setup.
+API_DOMAIN       = "api.vocaguard.com"
+LE_CERT_FILE     = "/etc/letsencrypt/live/api.vocaguard.com/fullchain.pem"
+LE_KEY_FILE      = "/etc/letsencrypt/live/api.vocaguard.com/privkey.pem"
 TOKEN_FILE       = "/opt/vocaguard/fcm_token.txt"  # single-user fallback
 DB_PATH          = "/opt/vocaguard/users.db"
 PJSIP_USERS_FILE = "/etc/asterisk/pjsip_users.conf"
@@ -743,6 +749,25 @@ if __name__ == "__main__":
     init_db()
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(CERT_FILE, KEY_FILE)
+
+    # Serve the Let's Encrypt cert to clients that ask for API_DOMAIN via SNI
+    # (app builds >= 1.0.5 use the hostname and validate against system CAs).
+    # Clients with no matching SNI — old builds hitting the bare IP — fall
+    # through to the pinned self-signed cert, so they keep working unchanged.
+    # Guarded on file existence: before certbot has issued the cert, behavior
+    # is identical to the old single-cert setup.
+    if os.path.exists(LE_CERT_FILE) and os.path.exists(LE_KEY_FILE):
+        le_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        le_context.load_cert_chain(LE_CERT_FILE, LE_KEY_FILE)
+
+        def _sni_callback(sslobj, server_name, _ctx):
+            if server_name == API_DOMAIN:
+                sslobj.context = le_context
+            return None
+
+        context.sni_callback = _sni_callback
+        log.info("SNI enabled: %s -> Let's Encrypt cert, bare IP -> self-signed", API_DOMAIN)
+
     server = ReuseHTTPServer(("0.0.0.0", 443), Handler)
     server.socket = context.wrap_socket(server.socket, server_side=True,
                                         do_handshake_on_connect=False)

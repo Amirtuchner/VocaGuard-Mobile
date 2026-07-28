@@ -38,7 +38,7 @@ android {
 
         val tokenServerHost = localProperties.getProperty("token_server_host")
             ?: System.getenv("TOKEN_SERVER_HOST")
-            ?: "178.105.164.91"
+            ?: "api.vocaguard.com"
         buildConfigField("String", "TOKEN_SERVER_HOST", "\"$tokenServerHost\"")
     }
 
