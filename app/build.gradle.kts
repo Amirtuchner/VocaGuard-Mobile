@@ -21,8 +21,8 @@ android {
         applicationId = "io.vocaguard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.0.2"
+        versionCode = 9
+        versionName = "1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
