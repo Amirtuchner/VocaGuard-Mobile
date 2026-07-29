@@ -1,6 +1,5 @@
 <resources>
     <string name="app_name">VocaGuard</string>
-    <string name="accessibility_service_description">VocaGuard detects when a phone call is active so it can start real-time scam pattern analysis. This service observes phone call UI windows and does not read other app content.</string>
     <string name="widget_description">Shows VocaGuard protection status on your home screen.</string>
     <string name="widget_status_protected">Protected</string>
     <string name="widget_status_setup_required">Setup Required</string>
@@ -9,7 +8,7 @@
     <string name="onboarding_title_1">Real-time scam detection</string>
     <string name="onboarding_desc_1">VocaGuard listens for scam patterns during live calls and alerts you immediately — before you hand over any personal information.</string>
     <string name="onboarding_title_2">Permissions we need</string>
-    <string name="onboarding_desc_2">To screen calls and transcribe speech, VocaGuard needs the Phone, Microphone, and Accessibility permissions. Your audio is never sent off-device.</string>
+    <string name="onboarding_desc_2">To screen calls and transcribe speech, VocaGuard needs the Phone and Microphone permissions. Call audio is analyzed in real time solely to detect scam patterns.</string>
     <string name="onboarding_title_3">You\'re in control</string>
     <string name="onboarding_desc_3">Adjust detection sensitivity, whitelist trusted numbers, and review call transcripts whenever you like. VocaGuard works quietly in the background.</string>
     <string name="onboarding_title_4">Call Recording Notice</string>

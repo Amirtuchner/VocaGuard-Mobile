@@ -171,14 +171,6 @@ class CallMonitoringService : Service() {
                 stopMonitoring()
                 stopSelf()
             }
-            "io.vocaguard.A11Y_TEXT" -> {
-                // Text forwarded from AccessibilityService audio capture
-                val text = intent.getStringExtra("text") ?: ""
-                if (text.isNotEmpty() && isMonitoring) {
-                    Log.i(TAG, "A11y text received: $text")
-                    processRecognizedText(text)
-                }
-            }
         }
         return START_STICKY
     }
@@ -247,16 +239,8 @@ class CallMonitoringService : Service() {
             }
         }
 
-        // If AccessibilityService is available, let it handle audio capture —
-        // Samsung Android 15 blocks AudioRecord from regular FGS during calls,
-        // but AccessibilityService runs in a privileged context that may bypass this.
-        if (VocaGuardAccessibilityService.instance != null) {
-            Log.i(TAG, "AccessibilityService available — skipping FGS AudioRecord (Samsung blocks it)")
-            updateNotification("Monitoring call for scam patterns...")
-        } else {
-            // Fallback: start Vosk offline speech recognition via AudioRecord
-            startVoskRecognition()
-        }
+        // Start Vosk offline speech recognition via AudioRecord
+        startVoskRecognition()
     }
 
     private fun startVoskRecognition() {

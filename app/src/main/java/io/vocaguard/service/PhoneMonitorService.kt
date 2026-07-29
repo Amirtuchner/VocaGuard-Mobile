@@ -196,14 +196,6 @@ class PhoneMonitorService : Service() {
                 putExtra(CallMonitoringService.EXTRA_SKIP_FOREGROUND, true)
             }
         )
-
-        // Also start audio capture from AccessibilityService context —
-        // Samsung Android 15 blocks AudioRecord from regular FGS during calls,
-        // but AccessibilityService may have elevated privileges.
-        VocaGuardAccessibilityService.instance?.let {
-            Log.i(TAG, "Starting audio capture via AccessibilityService")
-            it.startAudioCapture()
-        } ?: Log.w(TAG, "AccessibilityService not running — a11y audio capture unavailable")
     }
 
     /** Called when the call ends — either by TelephonyCallback or broadcast receiver. */
@@ -211,8 +203,6 @@ class PhoneMonitorService : Service() {
         if (!isCallActive) return
         isCallActive = false
         stopCallStatePolling()
-        // Stop AccessibilityService audio capture
-        VocaGuardAccessibilityService.instance?.stopAudioCapture()
         startService(
             Intent(this, CallMonitoringService::class.java).apply {
                 action = CallMonitoringService.ACTION_STOP_MONITORING
