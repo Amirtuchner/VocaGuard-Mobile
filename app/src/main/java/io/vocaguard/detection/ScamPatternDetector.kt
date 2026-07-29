@@ -28,6 +28,7 @@ class ScamPatternDetector() {
                 // French
                 "service des impôts", "dette fiscale", "direction générale des finances publiques"
             ),
+
             ScamType.TECH_SUPPORT to listOf(
                 // English
                 "computer virus", "microsoft support", "windows support", "technical support",
