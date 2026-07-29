@@ -87,6 +87,13 @@ class BillingManager private constructor(private val context: Context) :
     }
 
     private suspend fun refreshStatus() {
+        // Debug builds can't purchase (Play only sells to Play-installed builds),
+        // so the paywall would permanently lock developers out — skip it.
+        if (io.vocaguard.BuildConfig.DEBUG) {
+            _status.value = SubscriptionStatus.Active
+            queryProductDetails()?.let { _priceLine.value = formatPriceLine(it) }
+            return
+        }
         val params = QueryPurchasesParams.newBuilder()
             .setProductType(BillingClient.ProductType.SUBS)
             .build()
