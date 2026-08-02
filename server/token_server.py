@@ -412,6 +412,39 @@ def ami_hangup(channel: str, sip_extension: str):
     finally:
         s.close()
 
+def ami_channel_exists(channel: str) -> bool:
+    """Check whether an Asterisk channel is still alive via AMI Status.
+
+    Guards /accept-call against bridging into a call whose caller already hung
+    up (e.g. user answers the still-ringing app screen minutes later). On any
+    AMI failure, err on the side of True so a transient AMI hiccup can't block
+    a legitimate accept.
+    """
+    try:
+        s = socket.create_connection((AMI_HOST, AMI_PORT), timeout=5)
+        try:
+            s.recv(1024)
+            s.sendall(
+                f"Action: Login\r\nUsername: {AMI_USER}\r\nSecret: {AMI_SECRET}\r\n\r\n"
+                .encode()
+            )
+            _ami_recv(s)
+            s.sendall(f"Action: Status\r\nChannel: {channel}\r\n\r\n".encode())
+            resp = _ami_recv(s)
+            s.sendall(b"Action: Logoff\r\n\r\n")
+        finally:
+            s.close()
+        # Only an explicit "No such channel" means the caller is gone. Any other
+        # error (e.g. "Permission denied" — this AMI user has had class quirks,
+        # see notify_incoming.py's CoreShowChannels note) must NOT block accepts.
+        if "Response: Error" in resp and "No such channel" in resp:
+            return False
+        return True
+    except Exception as e:
+        log.warning("ami_channel_exists(%s) check failed, assuming alive: %s", channel, e)
+        return True
+
+
 def _ami_originate_safe(channel, caller, sip_ext, phone):
     """Wrapper that logs errors from ami_originate without crashing the server."""
     try:
@@ -511,6 +544,15 @@ class Handler(BaseHTTPRequestHandler):
 
                 if not _CHANNEL_RE.match(channel):
                     self._send(400, {"error": "invalid channel"})
+                    return
+
+                # Caller may have hung up while the app was still ringing (the
+                # dialplan's 60s window expired, or they gave up). Answering a
+                # dead channel used to bridge the user into a 1-second phantom
+                # call (2026-08-02); tell the app the call is gone instead.
+                if not ami_channel_exists(channel):
+                    log.warning("accept-call: channel %s is gone (caller hung up)", channel)
+                    self._send(410, {"error": "call_gone"})
                     return
 
                 user    = get_user_by_phone(phone) if phone else None

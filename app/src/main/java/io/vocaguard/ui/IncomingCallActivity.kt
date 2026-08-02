@@ -72,6 +72,11 @@ class IncomingCallActivity : ComponentActivity() {
 
         /** True while an IncomingCallActivity instance is alive — used to block duplicate launches. */
         @Volatile var isShowing = false
+
+        /** Set when the user explicitly taps Decline, so the later server call_cancelled
+         *  push does NOT raise a "missed call" for a call they deliberately rejected.
+         *  Reset by VocaGuardFcmService when a fresh incoming_call arrives. */
+        @Volatile var userDeclined = false
     }
 
     private var ringtone: Ringtone? = null
@@ -176,6 +181,28 @@ class IncomingCallActivity : ComponentActivity() {
                             hangUpAndFinish()
                         } else {
                             connectFailed = true
+                        }
+                    }
+                }
+            }
+
+            // The caller hung up before (or just as) we accepted — server pushed
+            // call_cancelled, or /accept-call answered 410 call_gone. Stop ringing /
+            // abandon "Connecting…" immediately; channel names are unique per call,
+            // so a stale value from a previous call can never match this one.
+            LaunchedEffect(Unit) {
+                VocaGuardFcmService.callGoneFlow.collect { gone ->
+                    if (gone != null && (gone == asteriskChannel || gone == activeChannel)) {
+                        VocaGuardFcmService.callGoneFlow.value = null
+                        val state = VocaGuardSipManager.callState.value
+                        if (state != VocaGuardSipManager.CallState.ACTIVE) {
+                            ringtone?.stop()
+                            ringtone = null
+                            val nm = getSystemService(NotificationManager::class.java)
+                            nm.cancel(NOTIFICATION_ID)
+                            nm.cancel(ActiveCallReceiver.NOTIFICATION_ID)
+                            VocaGuardSipManager.hangupCurrentCall()
+                            finish()
                         }
                     }
                 }
@@ -326,6 +353,7 @@ class IncomingCallActivity : ComponentActivity() {
     }
 
     private fun dismiss() {
+        userDeclined = true
         ringtone?.stop()
         ringtone = null
         getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
@@ -374,36 +402,6 @@ class IncomingCallActivity : ComponentActivity() {
         }
     }
 
-    private fun showReEnableForwardingNotification() {
-        ServerDetectionManager.init(this)
-        val code = ServerDetectionManager.getActivationCode()
-        if (code.isEmpty()) return
-
-        val callIntent = Intent(Intent.ACTION_CALL, Uri.fromParts("tel", code, null))
-        val pi = PendingIntent.getActivity(
-            this, 9001, callIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        val nm = getSystemService(NotificationManager::class.java)
-        val channelId = "forwarding_reminder"
-        if (nm.getNotificationChannel(channelId) == null) {
-            nm.createNotificationChannel(
-                NotificationChannel(channelId, "Call Forwarding", NotificationManager.IMPORTANCE_HIGH)
-                    .apply { description = "Re-enable call forwarding after each call" }
-            )
-        }
-        nm.notify(3001, NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Re-enable Call Protection")
-            .setContentText("Call forwarding was disabled. Tap to re-enable.")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .setContentIntent(pi)
-            .addAction(R.drawable.ic_launcher_foreground, "Re-enable Now", pi)
-            .build()
-        )
-    }
-
     /**
      * Try to silently re-enable *21* forwarding using the USSD/MMI API (no user interaction).
      * Falls back to a tap-to-call notification if the modem rejects the request.
@@ -424,13 +422,13 @@ class IncomingCallActivity : ComponentActivity() {
                 override fun onReceiveUssdResponseFailed(
                     tm: android.telephony.TelephonyManager, request: String, failureCode: Int
                 ) {
-                    android.util.Log.w("VocaGuard", "Silent re-enable failed ($failureCode), showing notification")
-                    showReEnableForwardingNotification()
+                    // No user-facing notification: on persistent-CFU carriers the
+                    // re-enable "failure" is a false alarm. See ReEnableForwardingWorker.
+                    android.util.Log.w("VocaGuard", "Silent re-enable failed ($failureCode), suppressing notification")
                 }
             }, android.os.Handler(mainLooper))
         } catch (e: Exception) {
             android.util.Log.w("VocaGuard", "sendUssdRequest error: $e")
-            showReEnableForwardingNotification()
         }
     }
 }

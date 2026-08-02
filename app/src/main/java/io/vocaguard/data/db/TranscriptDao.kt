@@ -33,7 +33,7 @@ interface TranscriptDao {
     @Query("SELECT COUNT(*) FROM call_transcripts WHERE detectedScamTypesJson != '' AND timestamp >= :since")
     fun countScamCallsSince(since: Long): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM call_transcripts WHERE timestamp >= :since")
+    @Query("SELECT COUNT(*) FROM call_transcripts WHERE timestamp >= :since AND direction != 'MISSED'")
     fun countAllCallsSince(since: Long): Flow<Int>
 
     /** Returns all scam transcripts since [since] so the ViewModel can compute per-type counts. */
@@ -63,12 +63,12 @@ interface TranscriptDao {
     @Query("UPDATE call_transcripts SET text = :text WHERE id = (SELECT id FROM call_transcripts WHERE timestamp >= :since ORDER BY timestamp DESC LIMIT 1)")
     suspend fun updateMostRecentTranscript(text: String, since: Long): Int
 
-    @Query("SELECT COUNT(*) FROM call_transcripts")
+    @Query("SELECT COUNT(*) FROM call_transcripts WHERE direction != 'MISSED'")
     fun countAllCallsLifetime(): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM call_transcripts WHERE detectedScamTypesJson != '' AND isFalsePositive = 0")
     fun countScamCallsLifetime(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM call_transcripts WHERE detectedScamTypesJson = '' OR isFalsePositive = 1")
+    @Query("SELECT COUNT(*) FROM call_transcripts WHERE (detectedScamTypesJson = '' OR isFalsePositive = 1) AND direction != 'MISSED'")
     fun countCallsScreenedClean(): Flow<Int>
 }

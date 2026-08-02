@@ -1,19 +1,12 @@
 package io.vocaguard.service
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.telephony.TelephonyManager
 import android.util.Log
-import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import io.vocaguard.R
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 
@@ -25,8 +18,6 @@ class ReEnableForwardingWorker(
     companion object {
         private const val TAG = "ReEnableForwarding"
         const val WORK_NAME = "re_enable_call_forwarding"
-        private const val CHANNEL_ID = "forwarding_reminder"
-        private const val NOTIF_ID = 3001
     }
 
     override suspend fun doWork(): Result {
@@ -39,8 +30,12 @@ class ReEnableForwardingWorker(
 
         val ussdOk = trySilentUssd(code)
         if (!ussdOk) {
-            Log.w(TAG, "USSD failed — showing notification")
-            showNotification(code)
+            // Deliberately NO user-facing notification here. On carriers where CFU
+            // (*21*) is persistent it is never actually cleared by a call, so the
+            // silent re-enable "failing" is a false alarm — surfacing it just spams
+            // the user after every call. The silent attempt above stays as a safety
+            // net for carriers that DO clear CFU.
+            Log.w(TAG, "USSD re-enable failed ($code) — suppressing notification (persistent-CFU carrier)")
         }
         return Result.success()
     }
@@ -70,28 +65,4 @@ class ReEnableForwardingWorker(
             }
         }
 
-    private fun showNotification(code: String) {
-        val callIntent = Intent(Intent.ACTION_CALL, Uri.fromParts("tel", code, null))
-        val pi = PendingIntent.getActivity(
-            ctx, 0, callIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        val nm = ctx.getSystemService(NotificationManager::class.java)
-        if (nm.getNotificationChannel(CHANNEL_ID) == null) {
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Call Forwarding", NotificationManager.IMPORTANCE_HIGH)
-                    .apply { description = "Re-enable call forwarding after each call" }
-            )
-        }
-        nm.notify(NOTIF_ID, NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Re-enable Call Protection")
-            .setContentText("Call forwarding was disabled. Tap to re-enable.")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .setContentIntent(pi)
-            .addAction(R.drawable.ic_launcher_foreground, "Re-enable Now", pi)
-            .build()
-        )
-    }
 }

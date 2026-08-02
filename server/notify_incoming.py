@@ -130,36 +130,15 @@ def _is_duplicate(caller: str) -> bool:
     return False
 
 
-def main():
-    agi_vars = agi_init()
-    caller  = agi_vars.get("agi_callerid", "")
-    channel = agi_vars.get("agi_channel", "")
-
-    # Read original called number (set in extensions.conf from REDIRECTING(from-num))
-    diversion_number = agi_get_variable("ORIGINAL_CALLED")
-
-    # Deduplicate: if same caller was notified recently, skip FCM (DIDWW/Twilio retry)
-    if _is_duplicate(caller):
-        sys.stdout.write(f'VERBOSE "Duplicate FCM suppressed for {caller}" 1\n')
-        sys.stdout.flush()
-        return
-
-    cleanup_stale_vocaguard_channels()
-
+def send_fcm(diversion_number: str, data: dict):
     try:
         cred = credentials.Certificate(SERVICE_ACCOUNT)
         firebase_admin.initialize_app(cred)
 
         token = get_fcm_token_for_number(diversion_number)
         if token:
-            data = {
-                "type":             "incoming_call",
-                "caller_number":    caller,
-                "asterisk_channel": channel,
-            }
             if diversion_number:
                 data["diversion_number"] = diversion_number
-
             msg = messaging.Message(
                 data=data,
                 android=messaging.AndroidConfig(priority="high"),
@@ -169,6 +148,46 @@ def main():
     except Exception as e:
         sys.stdout.write(f'VERBOSE "FCM notify error: {e}" 1\n')
         sys.stdout.flush()
+
+
+def main():
+    agi_vars = agi_init()
+    caller  = agi_vars.get("agi_callerid", "")
+    channel = agi_vars.get("agi_channel", "")
+    # "cancel" mode: invoked from the h extension when the caller leg hung up
+    # before the user accepted — tells the app to stop ringing.
+    mode = (sys.argv[1] if len(sys.argv) > 1 else agi_vars.get("agi_arg_1", "")).strip()
+
+    # Read original called number (set in extensions.conf from REDIRECTING(from-num))
+    diversion_number = agi_get_variable("ORIGINAL_CALLED")
+
+    if mode == "cancel":
+        send_fcm(diversion_number, {
+            "type":             "call_cancelled",
+            "caller_number":    caller,
+            "asterisk_channel": channel,
+        })
+        # Clear the dedup marker so the same caller ringing back within
+        # DEDUP_TTL gets a fresh incoming_call FCM instead of silence.
+        try:
+            os.remove(_dedup_key(caller))
+        except OSError:
+            pass
+        return
+
+    # Deduplicate: if same caller was notified recently, skip FCM (DIDWW/Twilio retry)
+    if _is_duplicate(caller):
+        sys.stdout.write(f'VERBOSE "Duplicate FCM suppressed for {caller}" 1\n')
+        sys.stdout.flush()
+        return
+
+    cleanup_stale_vocaguard_channels()
+
+    send_fcm(diversion_number, {
+        "type":             "incoming_call",
+        "caller_number":    caller,
+        "asterisk_channel": channel,
+    })
 
 
 if __name__ == "__main__":

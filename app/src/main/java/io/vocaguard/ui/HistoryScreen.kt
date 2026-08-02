@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.automirrored.filled.CallReceived
+import androidx.compose.material.icons.filled.CallMissed
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Flag
@@ -23,6 +24,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -415,19 +417,29 @@ fun TranscriptCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(6.dp))
+                        val directionIcon = when (transcript.direction) {
+                            CallDirection.OUTGOING -> Icons.AutoMirrored.Filled.CallMade
+                            CallDirection.MISSED   -> Icons.Default.CallMissed
+                            else                   -> Icons.AutoMirrored.Filled.CallReceived
+                        }
+                        val directionLabel = when (transcript.direction) {
+                            CallDirection.OUTGOING -> "Outgoing"
+                            CallDirection.MISSED   -> "Missed"
+                            else                   -> "Incoming"
+                        }
+                        val directionTint = if (transcript.direction == CallDirection.MISSED)
+                            MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                         Icon(
-                            imageVector = if (transcript.direction == CallDirection.OUTGOING)
-                                Icons.AutoMirrored.Filled.CallMade else Icons.AutoMirrored.Filled.CallReceived,
-                            contentDescription = if (transcript.direction == CallDirection.OUTGOING)
-                                "Outgoing call" else "Incoming call",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            imageVector = directionIcon,
+                            contentDescription = "$directionLabel call",
+                            tint = directionTint,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(2.dp))
                         Text(
-                            text = if (transcript.direction == CallDirection.OUTGOING) "Outgoing" else "Incoming",
+                            text = directionLabel,
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = directionTint
                         )
                     }
                     if (transcript.phoneNumber.isNotEmpty()) {
@@ -537,10 +549,17 @@ fun TranscriptCard(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
+            val bodyText = when {
+                transcript.direction == CallDirection.MISSED && transcript.text.isEmpty() ->
+                    "Not answered"
+                expanded -> transcript.text
+                else -> transcript.text.take(120) + if (transcript.text.length > 120) "…" else ""
+            }
             Text(
-                text = if (expanded) transcript.text
-                       else transcript.text.take(120) + if (transcript.text.length > 120) "…" else "",
-                style = MaterialTheme.typography.bodySmall
+                text = bodyText,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (transcript.direction == CallDirection.MISSED && transcript.text.isEmpty())
+                    MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified
             )
 
             if (transcript.text.length > 120) {

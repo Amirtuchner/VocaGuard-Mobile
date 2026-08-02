@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 private val idCounter = AtomicLong(System.currentTimeMillis())
 
-enum class CallDirection { INCOMING, OUTGOING }
+enum class CallDirection { INCOMING, OUTGOING, MISSED }
 
 data class CallTranscript(
     val id: Long = idCounter.incrementAndGet(),

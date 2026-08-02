@@ -43,6 +43,12 @@ class VocaGuardFcmService : FirebaseMessagingService() {
          *  Reset to false each time a new accept begins. */
         val acceptFailedFlow = MutableStateFlow(false)
 
+        /** Emits the Asterisk channel of a call whose caller hung up before the user
+         *  accepted (server call_cancelled push), OR whose accept was answered with
+         *  410 call_gone. IncomingCallActivity collects this to stop ringing / bail
+         *  out of "Connecting" instead of bridging into a dead call. */
+        val callGoneFlow = MutableStateFlow<String?>(null)
+
         // Upload current device token to the Asterisk server over HTTPS.
         // Includes phone_number for multi-tenant routing if the user has registered.
         fun uploadToken(token: String) {
@@ -134,6 +140,11 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                     try {
                         client.newCall(request).execute().use { response ->
                             Log.i(TAG, "Accept call signalled: ${response.code} (attempt $attempt)")
+                            if (response.code == 410) {
+                                // Caller hung up while we were still ringing — no
+                                // bridge is coming, tell the UI the call is gone.
+                                callGoneFlow.value = channel
+                            }
                         }
                         return@launch
                     } catch (e: Exception) {
@@ -163,6 +174,41 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                 val callerNumber    = message.data["caller_number"] ?: ""
                 val asteriskChannel = message.data["asterisk_channel"] ?: ""
                 showIncomingCallNotification(callerNumber, asteriskChannel)
+                return
+            }
+            "call_cancelled" -> {
+                // Caller hung up before the user accepted (gave up ringing, or the
+                // dialplan's 60s window expired). Stop ringing NOW — without this the
+                // app rings into the void and a late Accept bridges to a dead channel.
+                val callerNumber    = message.data["caller_number"] ?: ""
+                val asteriskChannel = message.data["asterisk_channel"] ?: ""
+                Log.i(TAG, "Call cancelled by server: caller=$callerNumber channel=$asteriskChannel")
+                // Dismiss the full-screen/heads-up incoming notification either way
+                getSystemService(NotificationManager::class.java)
+                    .cancel(io.vocaguard.ui.IncomingCallActivity.NOTIFICATION_ID)
+                // Raise a "missed call" UNLESS the user deliberately declined — a
+                // decline isn't a missed call. (An accepted call can't reach here:
+                // the dialplan's h extension skips the cancel push when VG_ACCEPTED=1.)
+                Log.i(TAG, "call_cancelled: userDeclined=${io.vocaguard.ui.IncomingCallActivity.userDeclined}")
+                if (!io.vocaguard.ui.IncomingCallActivity.userDeclined) {
+                    try {
+                        showMissedCallNotification(callerNumber)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "showMissedCallNotification failed", e)
+                    }
+                    // Record the miss in call history so it appears in the History tab.
+                    CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+                        TranscriptRepository.getInstance(applicationContext).save(
+                            CallTranscript(
+                                text = "",
+                                detectedScamTypes = emptyList(),
+                                phoneNumber = callerNumber,
+                                direction = io.vocaguard.data.CallDirection.MISSED
+                            )
+                        )
+                    }
+                }
+                callGoneFlow.value = asteriskChannel
                 return
             }
             "error_report" -> {
@@ -264,6 +310,9 @@ class VocaGuardFcmService : FirebaseMessagingService() {
         // Set the flag here — before launching the activity — so any duplicate FCM that
         // arrives in the milliseconds before onCreate() fires is already blocked.
         io.vocaguard.ui.IncomingCallActivity.isShowing = true
+        // Fresh call — clear any decline flag left over from a previous call so a
+        // genuine miss on THIS call still raises a missed-call notification.
+        io.vocaguard.ui.IncomingCallActivity.userDeclined = false
         val channelId = "incoming_call_channel"
         val nm = getSystemService(NotificationManager::class.java)
 
@@ -306,6 +355,37 @@ class VocaGuardFcmService : FirebaseMessagingService() {
         // is already on top (full-screen intent + startActivity → one instance).
         startActivity(callIntent())
         Log.i(TAG, "Incoming call screen launched for $displayNumber channel=$asteriskChannel")
+    }
+
+    private fun showMissedCallNotification(callerNumber: String) {
+        Log.i(TAG, "showMissedCallNotification called for $callerNumber")
+        val channelId = "missed_call_channel_v2"
+        val nm = getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(channelId) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(channelId, "Missed Calls", NotificationManager.IMPORTANCE_HIGH)
+            )
+        }
+        val intent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
+        // NOTE: id must NOT collide with ActiveCallReceiver.NOTIFICATION_ID (2002),
+        // which the call-gone cleanup in IncomingCallActivity cancels — that was
+        // silently wiping this notification the instant it posted (2026-08-02).
+        nm.notify(2005, NotificationCompat.Builder(this, channelId)
+            .setContentTitle("Missed call")
+            .setContentText("From: $displayNumber")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_MISSED_CALL)
+            .setContentIntent(intent)
+            .setAutoCancel(true)
+            .build())
     }
 
     private fun showErrorReportNotification(phone: String, error: String, timestamp: String) {
