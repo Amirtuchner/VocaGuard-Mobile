@@ -9,7 +9,7 @@ Endpoints:
   POST /accept-call       — AMI bridge: {channel, caller, phone_number}
   POST /hangup            — AMI hangup: {channel, phone_number}
 """
-import os, ssl, json, re, socket, logging, sqlite3, secrets, subprocess, threading
+import os, ssl, json, re, socket, logging, sqlite3, secrets, subprocess, threading, time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -456,9 +456,19 @@ def _ami_originate_safe(channel, caller, sip_ext, phone):
 # Channels already accepted (AMI Originate started), so a duplicate /accept-call
 # for the same channel — e.g. a double-tap on Accept, or a client retry that
 # raced a slow-but-successful first request — is a no-op instead of ringing the
-# user's phone a second time. Cleared on /hangup; Asterisk channel names are
-# unique per call, so no time-based expiry is needed.
-_accepted_channels: set[str] = set()
+# user's phone a second time. Cleared on /hangup.
+#
+# IMPORTANT: entries carry a timestamp and expire after _ACCEPTED_TTL. Asterisk
+# channel names (PJSIP/didww-trunk-0000NNNN) are NOT globally unique — the counter
+# resets to 0 whenever Asterisk restarts (nightly unattended-upgrades), while this
+# process keeps running. Without a TTL, a channel ID reused the next day matched a
+# stale entry from a prior call, so the user's Accept was wrongly rejected as a
+# duplicate and the call never bridged (observed 2026-08-23, first morning calls
+# after the ~06:55 Asterisk restart). A genuine double-tap/retry happens within
+# seconds, so a short TTL still de-dupes real duplicates while letting a reused ID
+# a day later bridge normally.
+_ACCEPTED_TTL = 90.0  # seconds
+_accepted_channels: dict[str, float] = {}   # channel -> time.monotonic() when accepted
 _accepted_channels_lock = threading.Lock()
 
 
@@ -558,10 +568,17 @@ class Handler(BaseHTTPRequestHandler):
                 user    = get_user_by_phone(phone) if phone else None
                 sip_ext = user["sip_extension"] if user else "vocaguard"  # single-user fallback
 
+                now = time.monotonic()
                 with _accepted_channels_lock:
-                    already_accepted = channel in _accepted_channels
+                    # Drop expired entries so a channel ID reused after an Asterisk
+                    # restart is not mistaken for a still-active accept.
+                    for ch, ts in list(_accepted_channels.items()):
+                        if now - ts >= _ACCEPTED_TTL:
+                            del _accepted_channels[ch]
+                    prev = _accepted_channels.get(channel)
+                    already_accepted = prev is not None and (now - prev) < _ACCEPTED_TTL
                     if not already_accepted:
-                        _accepted_channels.add(channel)
+                        _accepted_channels[channel] = now
 
                 # Respond 200 immediately so the Android client doesn't time out and
                 # retry — a duplicate request would trigger a second AMI Originate and
@@ -596,7 +613,7 @@ class Handler(BaseHTTPRequestHandler):
                 sip_ext = user["sip_extension"] if user else "vocaguard"
 
                 with _accepted_channels_lock:
-                    _accepted_channels.discard(channel)
+                    _accepted_channels.pop(channel, None)
 
                 ami_hangup(channel, sip_ext)
                 log.info("Hangup: %s (user=%s ext=%s)", channel, phone, sip_ext)
