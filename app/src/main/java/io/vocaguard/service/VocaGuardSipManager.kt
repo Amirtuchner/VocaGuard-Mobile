@@ -288,6 +288,19 @@ object VocaGuardSipManager {
         } ?: c.outputAudioDevice
     }
 
+    /** Send a DTMF tone on the active call (for navigating IVR menus, entering
+     *  PINs, etc.). Linphone relays it as RFC 2833 / SIP INFO, and Asterisk
+     *  forwards it to the PSTN leg. Accepts 0-9, * and #. */
+    fun sendDtmf(digit: Char) {
+        val call = core?.currentCall ?: core?.calls?.firstOrNull() ?: return
+        try {
+            call.sendDtmf(digit)
+            Log.i(TAG, "Sent DTMF: $digit")
+        } catch (e: Exception) {
+            Log.w(TAG, "sendDtmf($digit) failed: ${e.message}")
+        }
+    }
+
     fun resetState() {
         _callState.value = CallState.IDLE
     }

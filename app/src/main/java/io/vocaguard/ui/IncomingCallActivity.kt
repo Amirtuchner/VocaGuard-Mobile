@@ -252,7 +252,8 @@ class IncomingCallActivity : ComponentActivity() {
                             }
                         },
                         onEndCall = { hangUpAndFinish() },
-                        onCancelConnecting = { pendingCancel = true }
+                        onCancelConnecting = { pendingCancel = true },
+                        onDtmf = { VocaGuardSipManager.sendDtmf(it) }
                     )
                 }
             } else {
@@ -444,9 +445,12 @@ private fun ActiveCallScreen(
     isRecording: Boolean = false,
     onToggleRecord: () -> Unit = {},
     onEndCall: () -> Unit,
-    onCancelConnecting: () -> Unit
+    onCancelConnecting: () -> Unit,
+    onDtmf: (Char) -> Unit = {}
 ) {
     val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
+    var showKeypad by remember { mutableStateOf(false) }
+    var dtmfDigits by remember { mutableStateOf("") }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -580,8 +584,34 @@ private fun ActiveCallScreen(
                             fontSize = 12.sp
                         )
                     }
+                    // Keypad toggle — lets the user send DTMF tones (IVR menus,
+                    // PINs, etc.) during a bridged call.
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Button(
+                            onClick = { showKeypad = !showKeypad },
+                            modifier = Modifier.size(64.dp),
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (showKeypad) Color(0xFF1565C0) else Color(0xFF444444)
+                            )
+                        ) {
+                            Text("⌗", fontSize = 24.sp, color = Color.White)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text("Keypad", color = Color.White, fontSize = 12.sp)
+                    }
                 }
                 Spacer(Modifier.height(20.dp))
+                if (showKeypad) {
+                    DtmfKeypad(
+                        entered = dtmfDigits,
+                        onKey = { c ->
+                            dtmfDigits += c
+                            onDtmf(c)
+                        }
+                    )
+                    Spacer(Modifier.height(20.dp))
+                }
             }
             Button(
                 onClick = if (connected) onEndCall else onCancelConnecting,
@@ -598,6 +628,40 @@ private fun ActiveCallScreen(
                 if (connected) "End Call" else "Cancel",
                 color = Color.White, fontSize = 12.sp
             )
+        }
+    }
+}
+
+@Composable
+private fun DtmfKeypad(entered: String, onKey: (Char) -> Unit) {
+    val rows = listOf(
+        listOf('1', '2', '3'),
+        listOf('4', '5', '6'),
+        listOf('7', '8', '9'),
+        listOf('*', '0', '#')
+    )
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+    ) {
+        if (entered.isNotEmpty()) {
+            Text(entered, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+        }
+        rows.forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                row.forEach { key ->
+                    Button(
+                        onClick = { onKey(key) },
+                        modifier = Modifier.size(64.dp),
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF333333))
+                    ) {
+                        Text(key.toString(), fontSize = 24.sp, color = Color.White)
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
         }
     }
 }
