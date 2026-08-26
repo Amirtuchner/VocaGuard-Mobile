@@ -450,7 +450,8 @@ private fun ActiveCallScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A1A2E)),
+            .background(Color(0xFF1A1A2E))
+            .systemBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
@@ -611,7 +612,8 @@ private fun ConnectFailedScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A1A2E)),
+            .background(Color(0xFF1A1A2E))
+            .systemBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
@@ -666,6 +668,7 @@ private fun IncomingCallScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1A2E))
+            .systemBarsPadding()
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween

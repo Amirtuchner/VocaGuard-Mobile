@@ -15,12 +15,12 @@ val localProperties = Properties().also { props ->
 
 android {
     namespace = "io.vocaguard"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "io.vocaguard"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 12
         versionName = "1.0.6"
 
