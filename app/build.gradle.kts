@@ -21,7 +21,7 @@ android {
         applicationId = "io.vocaguard"
         minSdk = 29
         targetSdk = 36
-        versionCode = 14
+        versionCode = 15
         versionName = "1.0.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -138,8 +138,11 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation(libs.billing.ktx)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("org.linphone:linphone-sdk-android:5.3.+")
-    implementation("com.alphacephei:vosk-android:0.3.47")
+    // Pinned to exact versions that ship 16 KB-page-aligned native libs
+    // (required for targetSdk 35+; 5.3.x / 0.3.47 were 4 KB-aligned and Play
+    // rejects them for production). See 16KB alignment check before bumping.
+    implementation("org.linphone:linphone-sdk-android:5.4.125")
+    implementation("com.alphacephei:vosk-android:0.3.75")
 
     testImplementation(libs.junit)
     testImplementation("org.robolectric:robolectric:4.11.1")
