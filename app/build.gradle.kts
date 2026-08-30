@@ -21,8 +21,16 @@ android {
         applicationId = "io.vocaguard"
         minSdk = 29
         targetSdk = 36
-        versionCode = 15
+        versionCode = 16
         versionName = "1.0.7"
+
+        // ARM-only. x86/x86_64 are emulator-only (no real phones), and LiteRT's
+        // x86_64 libtensorflowlite_jni.so is still 4KB-aligned, which fails Play's
+        // 16KB page-size requirement. Real 16KB devices are all arm64, so dropping
+        // x86/x86_64 clears the check and shrinks the app with no user impact.
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
