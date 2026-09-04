@@ -99,6 +99,14 @@ SCAM_KEYWORDS_EN = [
     ("monthly returns", 2), ("doubled their capital", 2), ("double your capital", 2),
     ("exclusive opportunity", 1), ("window closes", 1), ("crypto arbitrage", 3),
     ("guaranteed monthly", 2), ("your position before", 1),
+    # Natural-phrasing variants (2026-09-04): real callers use these; the list
+    # previously only had e.g. "double your capital"/"guaranteed returns", so a
+    # natural pitch ("cryptocurrency fund guarantees 40% return, double your
+    # money") scored under threshold and was missed.
+    ("cryptocurrency", 2), ("double your money", 2), ("guaranteed return", 3),
+    ("guaranteed monthly return", 3), ("return every month", 2),
+    ("returns every month", 2), ("risk-free", 2), ("risk free", 2),
+    ("high returns", 1), ("percent return", 1),
     # Social-media ad investment scam (first-call, calm trust-building)
     ("investment opportunity", 2), ("facebook page", 2), ("instagram", 2),
     ("facebook ad", 2), ("social media", 1), ("financial consultant", 2),

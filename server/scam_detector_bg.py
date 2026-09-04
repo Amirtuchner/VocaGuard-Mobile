@@ -97,7 +97,7 @@ from faster_whisper import WhisperModel
 
 MODEL_PATH_EN       = "/opt/vocaguard/model-en"
 SAMPLE_RATE         = 16000
-WHISPER_CHUNK_BYTES = 16000 * 2 * 10  # 10-second chunks at 16 kHz — more context = better accuracy
+WHISPER_CHUNK_BYTES = 16000 * 2 * 5   # 5-second chunks at 16 kHz — halves detection latency (2026-09-04); still enough context for accuracy
 WINDOW_SECONDS      = 90
 
 logging.basicConfig(
