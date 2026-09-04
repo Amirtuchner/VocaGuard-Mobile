@@ -150,13 +150,18 @@ object VocaGuardSipManager {
             core = c
 
             // Linphone requires periodic iterate() calls to process SIP messages.
-            // Use adaptive interval: 20ms during active calls for real-time audio,
-            // 100ms when idle to save battery (5× fewer CPU wake-ups).
+            // Adaptive interval: 20ms during active/incoming calls for real-time
+            // audio; 500ms when idle. The idle loop only needs to keep the
+            // registration alive and notice an inbound INVITE — 500ms instead of
+            // 100ms cuts idle CPU wake-ups 5× (2/sec vs 10/sec), letting the phone
+            // sleep more between them. Incoming calls are announced by the FCM
+            // "incoming_call" push first, and the state flips to INCOMING as soon
+            // as the INVITE is seen, so answer latency stays sub-second.
             iterateJob = scope.launch(Dispatchers.Main) {
                 while (isActive) {
                     core?.iterate()
                     val interval = if (_callState.value == CallState.ACTIVE ||
-                                       _callState.value == CallState.INCOMING) 20L else 100L
+                                       _callState.value == CallState.INCOMING) 20L else 500L
                     delay(interval)
                 }
             }
