@@ -29,7 +29,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-private const val TOTAL_STEPS = 6  // Terms · Welcome · Call Screening · Notification Access · Registration · Forwarding
+private const val TOTAL_STEPS = 7  // Terms · Welcome · Call Screening · Notification Access · Registration · Battery · Forwarding
+
+/** True if the app is exempt from battery optimization (won't be frozen in the background). */
+private fun isBatteryUnrestricted(context: android.content.Context): Boolean {
+    val pm = context.getSystemService(android.os.PowerManager::class.java)
+    return pm?.isIgnoringBatteryOptimizations(context.packageName) ?: false
+}
 
 /**
  * Full-screen setup wizard shown once after install.
@@ -49,11 +55,13 @@ fun OnboardingScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var callScreeningOk  by remember { mutableStateOf(permissionsManager.isCallScreeningEnabled()) }
     var notificationListenerOk by remember { mutableStateOf(permissionsManager.hasNotificationListenerAccess()) }
+    var batteryUnrestricted by remember { mutableStateOf(isBatteryUnrestricted(context)) }
     DisposableEffect(lifecycleOwner) {
         val obs = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 callScreeningOk = permissionsManager.isCallScreeningEnabled()
                 notificationListenerOk = permissionsManager.hasNotificationListenerAccess()
+                batteryUnrestricted = isBatteryUnrestricted(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(obs)
@@ -139,7 +147,23 @@ fun OnboardingScreen(
                     isRegistered    = serverRegistered,
                     status          = serverRegStatus
                 )
-                5 -> {
+                5 -> BatteryOptimizationStep(
+                    isDone = batteryUnrestricted,
+                    onEnable = {
+                        try {
+                            context.startActivity(
+                                Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                                    .setData(Uri.parse("package:" + context.packageName))
+                            )
+                        } catch (e: Exception) {
+                            // Fallback: open the battery-optimization list if the direct dialog is unavailable
+                            context.startActivity(
+                                Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                            )
+                        }
+                    }
+                )
+                6 -> {
                     val fallbackDid = if (simCountry == "us" || simCountry == "ca")
                         "+13373828491" else "+97233741493"
                     val fallbackCode = if (isVerizon) "*72$fallbackDid"
@@ -174,7 +198,7 @@ fun OnboardingScreen(
                 Spacer(Modifier.width(64.dp))
             }
 
-            val lastStep = TOTAL_STEPS - 1  // step 5
+            val lastStep = TOTAL_STEPS - 1  // step 6 (Call Forwarding)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // No Skip on the Terms step — acceptance is required
                 if (step in 1 until lastStep) {
@@ -296,7 +320,7 @@ private fun WelcomeStep() {
     StepLayout(
         icon        = Icons.Default.Shield,
         title       = "Welcome to VocaGuard",
-        description = "Let's get you set up in 4 quick steps so VocaGuard can protect you from scam calls."
+        description = "Let's get you set up in a few quick steps so VocaGuard can protect you from scam calls."
     )
 }
 
@@ -320,6 +344,18 @@ private fun NotificationListenerStep(isDone: Boolean, onEnable: () -> Unit) {
         description = "Allow VocaGuard to read notifications from messaging apps so it can detect scam messages from unknown senders in real time.",
         isDone      = isDone,
         actionLabel = "Enable",
+        onAction    = onEnable
+    )
+}
+
+@Composable
+private fun BatteryOptimizationStep(isDone: Boolean, onEnable: () -> Unit) {
+    StepLayout(
+        icon        = Icons.Default.BatteryChargingFull,
+        title       = "Allow Background Running",
+        description = "Android may put VocaGuard to sleep to save battery, which stops it from screening your calls. Tap Allow so VocaGuard can keep protecting you at all times.",
+        isDone      = isDone,
+        actionLabel = "Allow",
         onAction    = onEnable
     )
 }

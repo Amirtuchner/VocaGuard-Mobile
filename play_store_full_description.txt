@@ -1,0 +1,26 @@
+VocaGuard protects you and your loved ones from phone scams by analyzing your calls in real time and warning you the moment it detects a scam — before any money or personal details are handed over. It is built especially for seniors and the family members who help protect them.
+
+HOW IT WORKS
+When a call arrives, VocaGuard screens the conversation and checks it against known scam patterns — fake bank and government calls, tech-support fraud, prize and lottery scams, investment and cryptocurrency scams, and more. If it detects a scam, it shows a clear on-screen warning during the call so you can hang up in time. Every call is saved to your history so you can review it later.
+
+FAMILY GUARD MODE
+Worried about an elderly parent? Turn on Family Guard. When a scam is detected on their phone, VocaGuard automatically sends an SMS alert to a family caregiver you choose — so help is never far away.
+
+KEY FEATURES
+- Real-time scam detection during live calls
+- Clear on-screen scam warnings
+- Caregiver SMS alerts (Family Guard mode)
+- Call history with transcripts
+- Contact-aware: skips screening for people you already know
+- In-call keypad for navigating phone menus
+
+WHY VOCAGUARD NEEDS EACH PERMISSION
+- Microphone and foreground service: to analyze call audio live during a call and keep call monitoring active while you are on the phone. A persistent notification is shown whenever monitoring is running.
+- Phone and call permissions (phone state, answer calls, call phone): to detect, screen, and handle incoming calls — the core purpose of the app.
+- SMS: only in Family Guard mode, to send a scam-alert text to the caregiver you designate when a scam is detected on the user's phone.
+- Contacts: to skip scam screening for numbers already saved in your contacts.
+
+VocaGuard runs quietly in the background and never records or shares your calls for any purpose other than detecting scams to protect you.
+
+SUBSCRIPTION
+VocaGuard is a subscription service: 4.99 USD per month, with the first month free. Cancel anytime.

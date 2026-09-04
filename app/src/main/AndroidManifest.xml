@@ -32,6 +32,11 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Ask the OS to stop freezing the app in the background. Without this the
+         SIP registration is killed and forwarded calls are never answered
+         (the phone rings into a frozen app). Justified: real-time call
+         screening requires a persistent connection. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Telephony hardware is optional — app runs on tablets/ChromeOS without a SIM -->
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
