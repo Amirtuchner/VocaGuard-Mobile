@@ -1,7 +1,6 @@
 package io.vocaguard.alert
 
 import android.content.Context
-import android.telephony.SmsManager
 import android.util.Log
 import io.vocaguard.BuildConfig
 import io.vocaguard.data.FamilyContact
@@ -28,9 +27,11 @@ import javax.net.ssl.X509TrustManager
 /**
  * Notifies family members / caregivers when a scam call is detected on the senior's device.
  *
- * Sends an SMS alert to every contact in [FamilyGuardSettings.contacts].
- * Requires the `SEND_SMS` permission and Family Guard Mode to be enabled.
- * Failures are logged but never crash the caller.
+ * Sends an SMS alert to every contact in [FamilyGuardSettings.contacts] — dispatched
+ * via the VocaGuard server's Twilio number (POST /alert_caregiver), NOT the device's
+ * own SEND_SMS. On-device SMS was removed to comply with Google Play's SMS policy
+ * (SMS was an optional feature, not the app's core function). Failures are logged
+ * but never crash the caller.
  */
 class FamilyAlertSender(private val context: Context) {
 
@@ -61,42 +62,42 @@ class FamilyAlertSender(private val context: Context) {
         val confidencePct = (confidence * 100).toInt()
         val scamLabel = scamType.displayName()
 
+        val message = if (customMessage.isNotBlank()) {
+            "[VocaGuard] $customMessage"
+        } else {
+            "[VocaGuard] SCAM ALERT\n$senderName's phone detected a $scamLabel at $timeStr ($confidencePct% confidence)."
+        }
+
         contacts.forEach { contact ->
-            sendSms(contact, senderName, scamLabel, confidencePct, timeStr, customMessage)
+            sendServerSms(contact, message)
         }
     }
 
-    // ── SMS ───────────────────────────────────────────────────────────────────
+    // ── SMS via server (Twilio) — no on-device SEND_SMS permission ──────────────
 
-    private suspend fun sendSms(
+    private suspend fun sendServerSms(
         contact: FamilyContact,
-        senderName: String,
-        scamLabel: String,
-        confidencePct: Int,
-        timeStr: String,
-        customMessage: String = ""
+        message: String
     ) = withContext(Dispatchers.IO) {
         try {
-            val message = if (customMessage.isNotBlank()) {
-                "[VocaGuard] $customMessage"
-            } else {
-                "[VocaGuard] SCAM ALERT\n$senderName's phone detected a $scamLabel at $timeStr ($confidencePct% confidence)."
+            val payload = JSONObject().apply {
+                put("caregiver_number", contact.phoneNumber)
+                put("message", message)
+            }.toString()
+            val request = Request.Builder()
+                .url("https://${BuildConfig.TOKEN_SERVER_HOST}/alert_caregiver")
+                .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                .post(payload.toRequestBody("application/json".toMediaType()))
+                .build()
+            buildTrustAllHttpClient().newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    Log.i(TAG, "Server SMS alert queued for ${contact.name} (${contact.phoneNumber})")
+                } else {
+                    Log.e(TAG, "Server SMS alert failed: HTTP ${response.code}")
+                }
             }
-
-            @Suppress("DEPRECATION")
-            val smsManager = context.getSystemService(SmsManager::class.java)
-                ?: SmsManager.getDefault()
-
-            // Use sendMultipartTextMessage to handle messages longer than 160 chars
-            val parts = smsManager.divideMessage(message)
-            smsManager.sendMultipartTextMessage(
-                contact.phoneNumber, null, parts, null, null
-            )
-            Log.i(TAG, "SMS alert sent to ${contact.name} (${contact.phoneNumber})")
-        } catch (e: SecurityException) {
-            Log.e(TAG, "SEND_SMS permission denied — grant it in Settings", e)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to send SMS to ${contact.name}", e)
+            Log.e(TAG, "Failed to request server SMS alert to ${contact.name}", e)
         }
     }
 

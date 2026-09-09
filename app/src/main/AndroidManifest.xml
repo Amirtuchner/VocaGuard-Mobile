@@ -24,8 +24,9 @@
     <!-- Optional: shows an on-screen warning overlay during detected scam calls -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-    <!-- Family Guard Mode: sends SMS alerts to caregivers when a scam is detected -->
-    <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- Family Guard caregiver SMS alerts are sent server-side via Twilio
+         (POST /alert_caregiver), so no on-device SEND_SMS permission is needed.
+         SEND_SMS was removed to comply with Google Play's SMS policy. -->
     <!-- Family Guard Mode: makes an outgoing call to the primary caregiver after a scam call ends -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <!-- Read device contacts to skip scam analysis for known callers/senders -->

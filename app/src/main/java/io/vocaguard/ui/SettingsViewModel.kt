@@ -358,8 +358,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     _testAlertMessage.emit("Enable Family Guard first")
                 familySettings.contacts.isEmpty() ->
                     _testAlertMessage.emit("Add at least one contact first")
-                !permManager.hasSendSms() ->
-                    _testAlertMessage.emit("SMS permission not granted — grant it in App Settings > Permissions")
                 else -> {
                     val sender = io.vocaguard.alert.FamilyAlertSender(context)
                     sender.sendAlert(

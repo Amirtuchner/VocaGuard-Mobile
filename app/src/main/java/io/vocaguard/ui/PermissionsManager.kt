@@ -19,7 +19,6 @@ class PermissionsManager(private val context: Context) {
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.POST_NOTIFICATIONS,
             Manifest.permission.READ_CONTACTS,
-            Manifest.permission.SEND_SMS,
             Manifest.permission.CALL_PHONE
         )
     }
@@ -38,9 +37,6 @@ class PermissionsManager(private val context: Context) {
 
         return permissions
     }
-
-    /** Whether SEND_SMS is granted — required for Family Guard SMS alerts. */
-    fun hasSendSms(): Boolean = hasPermission(Manifest.permission.SEND_SMS)
 
     /** Whether CALL_PHONE is granted — required for Family Guard phone-call alerts. */
     fun hasCallPhone(): Boolean = hasPermission(Manifest.permission.CALL_PHONE)

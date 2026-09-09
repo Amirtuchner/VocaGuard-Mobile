@@ -668,6 +668,37 @@ class Handler(BaseHTTPRequestHandler):
                 log.error("call_caregiver error: %s", e)
                 self._send(500, {"error": str(e)})
 
+        elif self.path == "/alert_caregiver":
+            # Send a scam-alert SMS to the caregiver via Twilio. Replaces the
+            # app's on-device SEND_SMS (removed to comply with Play's SMS policy —
+            # SMS was an optional feature, not core functionality). The app POSTs
+            # the caregiver number and the message text; we relay it from the
+            # server's Twilio number.
+            try:
+                data      = self._read_json()
+                caregiver = data.get("caregiver_number", "").strip()
+                message   = data.get("message", "").strip()
+                if not caregiver or not message:
+                    self._send(400, {"error": "caregiver_number and message required"})
+                    return
+                def _do_sms():
+                    try:
+                        from twilio.rest import Client
+                        to_number = _normalize_phone(caregiver)
+                        if not to_number.startswith("+"):
+                            to_number = "+" + to_number
+                        sms = Client(TWILIO_SID, TWILIO_TOKEN).messages.create(
+                            to=to_number, from_=TWILIO_NUMBER, body=message[:480]
+                        )
+                        log.info("Twilio SMS SID %s to %s", sms.sid, to_number)
+                    except Exception as ex:
+                        log.error("alert_caregiver twilio error: %s", ex)
+                threading.Thread(target=_do_sms, daemon=True).start()
+                self._send(200, {"status": "sms_queued"})
+            except Exception as e:
+                log.error("alert_caregiver error: %s", e)
+                self._send(500, {"error": str(e)})
+
         elif self.path == "/report-scam":
             try:
                 data   = self._read_json()

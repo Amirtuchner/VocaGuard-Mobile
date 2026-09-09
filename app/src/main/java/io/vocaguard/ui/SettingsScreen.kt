@@ -199,7 +199,8 @@ fun SettingsTab(
                 },
                 onRemoveContact  = { viewModel.removeFamilyContact(it) },
                 onTestAlert      = { viewModel.sendTestAlert() },
-                hasSmsPermission = permissionsManager.hasSendSms(),
+                // SMS alerts are sent server-side (Twilio) — no on-device SMS permission needed.
+                hasSmsPermission = true,
                 hasCallPermission = permissionsManager.hasCallPhone(),
                 onGrantPermissions = { permissionsManager.openAppSettings() }
             )
