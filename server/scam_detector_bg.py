@@ -97,7 +97,8 @@ from faster_whisper import WhisperModel
 
 MODEL_PATH_EN       = "/opt/vocaguard/model-en"
 SAMPLE_RATE         = 16000
-WHISPER_CHUNK_BYTES = 16000 * 2 * 5   # 5-second chunks at 16 kHz — halves detection latency (2026-09-04); still enough context for accuracy
+WHISPER_CHUNK_BYTES   = 16000 * 2 * 8   # 8-second chunks at 16 kHz — more context = better accuracy; ~8-10s detection latency
+WHISPER_OVERLAP_BYTES = 16000           # 0.5s carried into the next chunk so a word on the boundary isn't lost
 WINDOW_SECONDS      = 90
 
 logging.basicConfig(
@@ -182,6 +183,10 @@ def main():
     # Whisper's own (correctly-transcribed, language-aware) text still feeds it.
     non_english_chunks = 0
     call_is_non_english = False
+    # Once Whisper confidently detects the call's language we lock it and pass it
+    # to every subsequent chunk — per-chunk auto-detect on short 8kHz telephony
+    # audio mis-fires (it has guessed Swedish on Hebrew/English calls), garbling output.
+    locked_language = None
 
     # No timeout alert — let the detector analyse the full call.
     # A blanket 20s fallback caused false positives on every legitimate call.
@@ -227,7 +232,7 @@ def main():
     whisper_q = _queue.Queue(maxsize=8)
 
     def _whisper_worker():
-        nonlocal non_english_chunks, call_is_non_english
+        nonlocal non_english_chunks, call_is_non_english, locked_language
         while True:
             item = whisper_q.get()
             if item is None:
@@ -238,19 +243,28 @@ def main():
                     np.frombuffer(buf_bytes, dtype=np.int16)
                       .astype(np.float32) / 32768.0
                 )
+                # language=locked_language once locked (else auto-detect). Gentler
+                # VAD padding (speech_pad_ms) so word edges aren't clipped.
                 segments, info = whisper_model.transcribe(
                     audio_np, beam_size=5, best_of=3,
-                    vad_filter=True, language=None,
+                    vad_filter=True,
+                    vad_parameters=dict(min_silence_duration_ms=1000, speech_pad_ms=400),
+                    language=locked_language,
                 )
+                if locked_language is None and info.language and \
+                        getattr(info, "language_probability", 0.0) >= 0.7:
+                    locked_language = info.language
+                    log.info(f"BG: locked transcription language = {locked_language}")
+                lang = locked_language or info.language
                 text = " ".join(seg.text for seg in segments).strip()
                 if text:
-                    if info.language and info.language != "en":
+                    if lang and lang != "en":
                         non_english_chunks += 1
                         if non_english_chunks >= 2 and not call_is_non_english:
                             call_is_non_english = True
-                            log.info(f"BG: call language is '{info.language}' — "
+                            log.info(f"BG: call language is '{lang}' — "
                                      "excluding English-Vosk garbage from detection")
-                    add_text(text, f"ML({info.language})")
+                    add_text(text, f"ML({lang})")
                     check_and_alert("whisper-ml")
             except Exception as e:
                 log.warning(f"BG Whisper thread error: {e}")
@@ -312,8 +326,10 @@ def main():
                         try:
                             whisper_q.put_nowait(bytes(whisper_buf))
                         except _queue.Full:
-                            log.warning("BG: Whisper queue full — dropping 10s chunk (transcript will have a gap)")
-                    whisper_buf.clear()
+                            log.warning("BG: Whisper queue full — dropping chunk (transcript will have a gap)")
+                    # Keep the last 0.5s as overlap into the next chunk so a word
+                    # straddling the boundary isn't dropped (e.g. "safe account").
+                    del whisper_buf[:-WHISPER_OVERLAP_BYTES]
 
     except Exception as e:
         log.info(f"BG audio closed: {e}")
