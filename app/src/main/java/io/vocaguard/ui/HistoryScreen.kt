@@ -441,7 +441,9 @@ fun TranscriptCard(
                         Text(
                             text = directionLabel,
                             style = MaterialTheme.typography.labelMedium,
-                            color = directionTint
+                            color = directionTint,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                     if (transcript.phoneNumber.isNotEmpty()) {
@@ -465,6 +467,10 @@ fun TranscriptCard(
                         }
                     }
                 }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                 if (isScam && !markedFalsePositive && transcript.phoneNumber.isNotEmpty()) {
                     var whitelisted by remember { mutableStateOf(false) }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -499,7 +505,7 @@ fun TranscriptCard(
                             )
                         }
                         Text(
-                            text = "Report as scam",
+                            text = "Report",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -546,6 +552,7 @@ fun TranscriptCard(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
                 }
             }
 
