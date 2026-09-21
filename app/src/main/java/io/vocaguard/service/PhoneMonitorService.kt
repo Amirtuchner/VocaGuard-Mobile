@@ -5,7 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Handler
@@ -13,7 +12,6 @@ import android.os.IBinder
 import android.os.Looper
 import android.telephony.TelephonyManager
 import android.util.Log
-import androidx.core.content.ContextCompat
 import io.vocaguard.R
 import io.vocaguard.monitor.PhoneStateMonitor
 import io.vocaguard.service.CallMonitoringService
@@ -63,7 +61,9 @@ class PhoneMonitorService : Service() {
                 startForeground(NOTIFICATION_ID, buildNotification(),
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
                 Log.i(TAG, "FGS upgraded to include microphone type")
-            } catch (e: SecurityException) {
+            } catch (e: Exception) {
+                // SecurityException or ForegroundServiceStartNotAllowedException — degrade
+                // to specialUse-only monitoring rather than crashing.
                 Log.w(TAG, "Cannot upgrade FGS for microphone: ${e.message}")
             }
         }
@@ -85,26 +85,22 @@ class PhoneMonitorService : Service() {
         }
 
         val notification = buildNotification()
-        val hasAudio = ContextCompat.checkSelfPermission(
-            this, android.Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Always start the persistent monitor as specialUse only. The microphone
+            // FGS type is added later via upgradeFgsForMicrophone() when a call is
+            // actually answered — that is the only time the mic is needed. Requesting
+            // the microphone type at startup crashes when the service is launched from
+            // the BOOT_COMPLETED receiver: Android 14+ disallows starting a mic-type
+            // FGS from the background and throws ForegroundServiceStartNotAllowedException
+            // (an IllegalStateException, not a SecurityException). See Play "limited
+            // types of foreground services" warning.
             try {
-                val type = if (hasAudio)
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                else
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-                startForeground(NOTIFICATION_ID, notification, type)
-            } catch (e: SecurityException) {
-                Log.w(TAG, "Cannot start with microphone type, using specialUse only: ${e.message}")
-                try {
-                    startForeground(NOTIFICATION_ID, notification,
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-                } catch (e2: Exception) {
-                    Log.e(TAG, "Cannot start foreground at all: ${e2.message}")
-                    stopSelf()
-                    return START_NOT_STICKY
-                }
+                startForeground(NOTIFICATION_ID, notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } catch (e: Exception) {
+                Log.e(TAG, "Cannot start foreground service: ${e.message}")
+                stopSelf()
+                return START_NOT_STICKY
             }
         } else {
             startForeground(NOTIFICATION_ID, notification)
