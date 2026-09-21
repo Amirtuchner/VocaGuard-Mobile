@@ -111,6 +111,12 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
+    // Force a modern androidx.fragment. play-services-basement drags in the
+    // deprecated fragment 1.1.0 transitively, which Play flags as an outdated SDK.
+    // This app has no fragments (100% Compose) — the explicit version just
+    // overrides the stale transitive so the dependency resolves to a supported one.
+    implementation("androidx.fragment:fragment:1.8.6")
+
     // Material Icons Extended
     implementation("androidx.compose.material:material-icons-extended:1.6.0")
 
