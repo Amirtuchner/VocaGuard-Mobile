@@ -72,8 +72,24 @@ with open("/opt/vocaguard/twilio_number.txt") as f:
 # SQLite user database
 # ---------------------------------------------------------------------------
 
+def db_connect():
+    """Open a SQLite connection tuned for the threaded server.
+
+    The HTTP server is a ThreadingMixIn, so each request runs on its own thread
+    with its own connection. Plain sqlite3.connect() has a 0-length busy timeout,
+    so any concurrent write returns "database is locked" (HTTP 500) immediately —
+    which broke /register. A busy_timeout makes writers wait for the lock instead
+    of failing, and WAL mode (set once in init_db, persisted in the DB header)
+    lets readers run concurrently with a writer.
+    """
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.execute("PRAGMA busy_timeout=30000")
+    return conn
+
+
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = db_connect()
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -101,7 +117,8 @@ def init_db():
 
 
 def get_user_by_phone(phone: str) -> dict | None:
-    conn = sqlite3.connect(DB_PATH)
+    phone = _normalize_phone(phone)
+    conn = db_connect()
     row = conn.execute(
         "SELECT phone_number, fcm_token, sip_extension, sip_password "
         "FROM users WHERE phone_number=?", (phone,)
@@ -119,7 +136,12 @@ def get_user_by_phone(phone: str) -> dict | None:
 
 def register_user(phone: str, fcm_token: str) -> dict:
     """Create user or update their FCM token. Returns SIP credentials."""
-    conn = sqlite3.connect(DB_PATH)
+    # Store the canonical (normalized) phone so /delete, /register-token and the
+    # incoming-call lookups all match. _normalize_phone strips the leading "+"
+    # (PJSIP dials digits only); it is idempotent, so re-registration matches the
+    # stored row and reuses the same extension instead of allocating a new one.
+    phone = _normalize_phone(phone)
+    conn = db_connect()
     existing = conn.execute(
         "SELECT sip_extension, sip_password FROM users WHERE phone_number=?",
         (phone,)
@@ -139,12 +161,18 @@ def register_user(phone: str, fcm_token: str) -> dict:
             "did_number":    DID_NUMBER,
         }
 
-    # New user: assign next extension number
+    # New user: assign next extension number. "vocaguard_" is 10 chars, so the
+    # numeric suffix starts at position 11 (SQLite SUBSTR is 1-indexed). The old
+    # code used position 12, which dropped the first digit of every extension and
+    # produced tiny, colliding numbers — e.g. vocaguard_1001/1002 parsed as 1/2,
+    # so the "next" extension was vocaguard_3, which already existed → UNIQUE
+    # constraint failure on register. max(..., 1000)+1 keeps allocation monotonic
+    # and always above both the true max and any stray small-numbered rows.
     row = conn.execute(
-        "SELECT MAX(CAST(SUBSTR(sip_extension, 12) AS INTEGER)) FROM users "
-        "WHERE sip_extension LIKE 'vocaguard__%'"
+        "SELECT MAX(CAST(SUBSTR(sip_extension, 11) AS INTEGER)) FROM users "
+        "WHERE sip_extension LIKE 'vocaguard_%'"
     ).fetchone()
-    next_num  = (row[0] or 1000) + 1
+    next_num  = max(row[0] or 0, 1000) + 1
     sip_ext   = f"vocaguard_{next_num}"
     sip_pass  = secrets.token_urlsafe(16)
 
@@ -168,7 +196,8 @@ def register_user(phone: str, fcm_token: str) -> dict:
 
 def update_fcm_token(phone: str, fcm_token: str) -> bool:
     """Update FCM token for an existing user. Returns False if user not found."""
-    conn = sqlite3.connect(DB_PATH)
+    phone = _normalize_phone(phone)
+    conn = db_connect()
     cur = conn.execute(
         "UPDATE users SET fcm_token=? WHERE phone_number=?",
         (fcm_token, phone)
@@ -183,7 +212,8 @@ def update_fcm_token(phone: str, fcm_token: str) -> bool:
 
 def delete_user(phone: str) -> bool:
     """Remove a user from the DB and from pjsip_users.conf, then reload PJSIP."""
-    conn = sqlite3.connect(DB_PATH)
+    phone = _normalize_phone(phone)
+    conn = db_connect()
     try:
         row = conn.execute(
             "SELECT sip_extension FROM users WHERE phone_number=?", (phone,)
@@ -708,7 +738,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not number:
                     self._send(400, {"error": "number required"})
                     return
-                conn = sqlite3.connect(DB_PATH)
+                conn = db_connect()
                 conn.execute(
                     "INSERT INTO community_blocklist (phone_number, scam_type, reported_by) "
                     "VALUES (?, ?, ?) "
@@ -733,7 +763,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not number:
                     self._send(400, {"error": "number required"})
                     return
-                conn = sqlite3.connect(DB_PATH)
+                conn = db_connect()
                 conn.execute(
                     "DELETE FROM community_blocklist WHERE phone_number = ?",
                     (number,)
@@ -749,7 +779,7 @@ class Handler(BaseHTTPRequestHandler):
 
         elif self.path == "/blocklist":
             try:
-                conn = sqlite3.connect(DB_PATH)
+                conn = db_connect()
                 rows = conn.execute(
                     "SELECT phone_number, scam_type FROM community_blocklist"
                 ).fetchall()
@@ -766,7 +796,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/blocklist":
             try:
-                conn = sqlite3.connect(DB_PATH)
+                conn = db_connect()
                 rows = conn.execute(
                     "SELECT phone_number, scam_type FROM community_blocklist"
                 ).fetchall()

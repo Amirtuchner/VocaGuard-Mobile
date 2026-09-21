@@ -42,7 +42,7 @@ def get_fcm_token_for_number(phone_number: str) -> str:
     """
     if phone_number:
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(DB_PATH, timeout=30)
             row = conn.execute(
                 "SELECT fcm_token FROM users WHERE phone_number LIKE ?",
                 (f"%{phone_number}",)
