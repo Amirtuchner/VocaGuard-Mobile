@@ -467,10 +467,16 @@ fun TranscriptCard(
                         }
                     }
                 }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
+            }
+            // Action buttons live on their own full-width row below the call
+            // details so they never compete for horizontal space with the date /
+            // direction line (3 buttons on missed calls used to clip "Missed" and
+            // push Delete off-screen).
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End)
+            ) {
                 if (isScam && !markedFalsePositive && transcript.phoneNumber.isNotEmpty()) {
                     var whitelisted by remember { mutableStateOf(false) }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -552,7 +558,6 @@ fun TranscriptCard(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
                 }
             }
 
