@@ -77,10 +77,13 @@ def db_connect():
 
     The HTTP server is a ThreadingMixIn, so each request runs on its own thread
     with its own connection. Plain sqlite3.connect() has a 0-length busy timeout,
-    so any concurrent write returns "database is locked" (HTTP 500) immediately —
+    so any concurrent write returned "database is locked" (HTTP 500) immediately —
     which broke /register. A busy_timeout makes writers wait for the lock instead
-    of failing, and WAL mode (set once in init_db, persisted in the DB header)
-    lets readers run concurrently with a writer.
+    of failing. NOTE: do NOT enable WAL here — the AGI helpers (notify_incoming.py,
+    scam_detector_bg.py) run as the 'asterisk' user with read-only access to the
+    root-owned users.db, and WAL requires write access to the -shm/-wal files even
+    for readers, which breaks their token lookups. Rollback-journal mode lets those
+    read-only SELECTs work; busy_timeout alone prevents the lock errors.
     """
     conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.execute("PRAGMA busy_timeout=30000")
@@ -89,7 +92,6 @@ def db_connect():
 
 def init_db():
     conn = db_connect()
-    conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id             INTEGER PRIMARY KEY AUTOINCREMENT,

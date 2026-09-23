@@ -12,6 +12,15 @@ from firebase_admin import credentials, messaging
 SERVICE_ACCOUNT = "/opt/vocaguard/service-account.json"
 FCM_TOKEN_FILE  = "/opt/vocaguard/fcm_token.txt"   # single-user fallback
 DB_PATH         = "/opt/vocaguard/users.db"
+NOTIFY_LOG      = "/var/log/vocaguard_notify.log"
+
+
+def _log(msg: str):
+    try:
+        with open(NOTIFY_LOG, "a") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}\n")
+    except Exception:
+        pass
 
 
 def agi_init():
@@ -49,14 +58,22 @@ def get_fcm_token_for_number(phone_number: str) -> str:
             ).fetchone()
             conn.close()
             if row and row[0]:
+                _log(f"token source=DB for '{phone_number}' tail={row[0][-10:]}")
                 return row[0]
+            _log(f"token source=DB MISS for '{phone_number}' -> using fallback file")
         except Exception as e:
             sys.stdout.write(f'VERBOSE "DB lookup warning: {e}" 1\n')
             sys.stdout.flush()
+            _log(f"token DB error: {e} -> using fallback file")
+    else:
+        _log("token: EMPTY diversion_number -> using fallback file")
     # Fallback: single-user token file
     try:
-        return open(FCM_TOKEN_FILE).read().strip()
+        t = open(FCM_TOKEN_FILE).read().strip()
+        _log(f"token source=FALLBACK_FILE tail={t[-10:]}")
+        return t
     except Exception:
+        _log("token: no fallback file, returning EMPTY")
         return ""
 
 
@@ -144,10 +161,14 @@ def send_fcm(diversion_number: str, data: dict):
                 android=messaging.AndroidConfig(priority="high"),
                 token=token,
             )
-            messaging.send(msg)
+            r = messaging.send(msg)
+            _log(f"FCM sent type={data.get('type')} tail={token[-10:]} id={r}")
+        else:
+            _log("FCM NOT sent: no token")
     except Exception as e:
         sys.stdout.write(f'VERBOSE "FCM notify error: {e}" 1\n')
         sys.stdout.flush()
+        _log(f"FCM send error: {e}")
 
 
 def main():
@@ -160,6 +181,7 @@ def main():
 
     # Read original called number (set in extensions.conf from REDIRECTING(from-num))
     diversion_number = agi_get_variable("ORIGINAL_CALLED")
+    _log(f"CALL mode='{mode}' caller='{caller}' channel='{channel}' ORIGINAL_CALLED='{diversion_number}'")
 
     if mode == "cancel":
         send_fcm(diversion_number, {
