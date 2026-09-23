@@ -21,8 +21,8 @@ android {
         applicationId = "io.vocaguard"
         minSdk = 29
         targetSdk = 36
-        versionCode = 18
-        versionName = "1.0.9"
+        versionCode = 19
+        versionName = "1.0.10"
 
         // ARM-only. x86/x86_64 are emulator-only (no real phones), and LiteRT's
         // x86_64 libtensorflowlite_jni.so is still 4KB-aligned, which fails Play's
