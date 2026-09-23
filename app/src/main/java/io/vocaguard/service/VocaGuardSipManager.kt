@@ -81,6 +81,13 @@ object VocaGuardSipManager {
             // build, so turn it on explicitly. (Reported 2026-09-23: "heard himself".)
             c.isEchoCancellationEnabled = true
 
+            // Speakerphone has a longer, louder echo path than the earpiece, so the
+            // default AEC filter tail is too short to model it and echo leaks back.
+            // A longer tail (128 ms) lets the canceller cover the speakerphone delay.
+            // Full-duplex is preserved (unlike the echo limiter, which we leave off
+            // to avoid clipping speech). Set before the core starts so it takes effect.
+            c.config?.setInt("sound", "ec_tail_len", 128)
+
             // Keep NAT pinhole open with UDP CRLF keep-alives
             c.isKeepAliveEnabled = true
 
