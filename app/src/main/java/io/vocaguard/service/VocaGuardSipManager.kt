@@ -75,6 +75,12 @@ object VocaGuardSipManager {
             // Enable adaptive rate control for smoother audio
             c.isAdaptiveRateControlEnabled = true
 
+            // Acoustic echo cancellation — without this the caller hears themselves:
+            // the caller's voice plays out the user's speaker, the mic picks it up,
+            // and it's sent back down the bridge. Not enabled by default in this SDK
+            // build, so turn it on explicitly. (Reported 2026-09-23: "heard himself".)
+            c.isEchoCancellationEnabled = true
+
             // Keep NAT pinhole open with UDP CRLF keep-alives
             c.isKeepAliveEnabled = true
 
