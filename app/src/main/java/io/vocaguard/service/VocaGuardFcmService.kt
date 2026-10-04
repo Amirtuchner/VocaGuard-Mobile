@@ -171,6 +171,12 @@ class VocaGuardFcmService : FirebaseMessagingService() {
 
         when (message.data["type"]) {
             "incoming_call" -> {
+                // Reopen the SIP NAT pinhole right now, before the user accepts. On
+                // cellular CGNAT the UDP binding Asterisk has for our contact goes
+                // stale between re-registrations, so the accept-bridge INVITE can't
+                // reach the app and the call hangs on "Connecting". Forcing a REGISTER
+                // on the push pushes a fresh contact/port seconds ahead of accept.
+                VocaGuardSipManager.refreshRegistrationNow()
                 val callerNumber    = message.data["caller_number"] ?: ""
                 val asteriskChannel = message.data["asterisk_channel"] ?: ""
                 showIncomingCallNotification(callerNumber, asteriskChannel)

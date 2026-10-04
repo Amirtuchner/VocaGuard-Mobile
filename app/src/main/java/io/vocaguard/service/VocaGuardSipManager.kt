@@ -83,10 +83,15 @@ object VocaGuardSipManager {
 
             // Speakerphone has a longer, louder echo path than the earpiece, so the
             // default AEC filter tail is too short to model it and echo leaks back.
-            // A longer tail (128 ms) lets the canceller cover the speakerphone delay.
-            // Full-duplex is preserved (unlike the echo limiter, which we leave off
-            // to avoid clipping speech). Set before the core starts so it takes effect.
-            c.config?.setInt("sound", "ec_tail_len", 128)
+            // A longer tail (200 ms) lets the canceller cover the speakerphone delay.
+            c.config?.setInt("sound", "ec_tail_len", 200)
+
+            // Echo limiter — AEC alone still left residual echo on speakerphone
+            // (reported 2026-09-23). The limiter attenuates the mic while the remote
+            // party is speaking, which suppresses hands-free echo the AEC misses.
+            // Trade-off: slightly less smooth full-duplex (mild ducking), accepted
+            // here to keep the caller from hearing themselves on speaker.
+            c.config?.setInt("sound", "echolimiter", 1)
 
             // Keep NAT pinhole open with UDP CRLF keep-alives
             c.isKeepAliveEnabled = true
@@ -106,7 +111,14 @@ object VocaGuardSipManager {
             val params = c.createAccountParams()
             params.identityAddress = factory.createAddress("sip:$sipUser@$serverIp")
             val serverAddr = factory.createAddress("sip:$serverIp")
-            serverAddr?.transport = TransportType.Udp
+            // TCP, not UDP. On cellular CGNAT the accept-bridge INVITE (~1459 bytes,
+            // bloated by the FCM push-param contact + SDP) exceeded the path MTU, was
+            // fragmented, and the carrier dropped the fragments — so the app never got
+            // the INVITE and the call stuck on "Connecting" (diagnosed 2026-10-04:
+            // REGISTER/OPTIONS <1400B worked, only the 1459B INVITE failed). TCP
+            // segments properly (no fragmentation) and keeps the NAT connection open,
+            // which also removes the pinhole-expiry problem. Server listens on tcp:5060.
+            serverAddr?.transport = TransportType.Tcp
             params.serverAddress = serverAddr
             params.isRegisterEnabled = true
             params.expires = 300  // re-register every 5min — sufficient for NAT keep-alive
@@ -225,6 +237,23 @@ object VocaGuardSipManager {
         val account = core?.defaultAccount ?: return
         if (_registrationState.value != RegistrationState.Ok) {
             Log.i(TAG, "ensureRegistered: state=${_registrationState.value}, refreshing")
+            account.refreshRegister()
+        }
+    }
+
+    /**
+     * Force an UNCONDITIONAL REGISTER refresh to reopen the NAT pinhole, even when
+     * the registration state is already Ok. Call the instant the incoming_call push
+     * arrives: on cellular CGNAT the UDP binding Asterisk holds for our contact goes
+     * stale between the 5-minute re-registrations, so the accept-bridge INVITE never
+     * reaches us and the call sticks on "Connecting" (diagnosed 2026-10-04 — the
+     * server retransmitted the INVITE 6× with no response, app never saw the call).
+     * Re-registering here pushes a fresh contact/port seconds before the user accepts.
+     */
+    fun refreshRegistrationNow() {
+        scope.launch(Dispatchers.Main) {
+            val account = core?.defaultAccount ?: return@launch
+            Log.i(TAG, "refreshRegistrationNow: forcing REGISTER to reopen NAT pinhole")
             account.refreshRegister()
         }
     }
