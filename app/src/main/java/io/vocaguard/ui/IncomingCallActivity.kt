@@ -16,6 +16,7 @@ import android.os.Looper
 import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -96,6 +97,12 @@ class IncomingCallActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Opt in to edge-to-edge explicitly (Android 15 / targetSdk 35+ forces it
+        // anyway). Our call screens already apply systemBarsPadding(), so content
+        // stays clear of the status/nav bars; this call satisfies Play's
+        // edge-to-edge check for this activity too (MainActivity already does it).
+        enableEdgeToEdge()
 
         // Volume buttons control the call audio, not ringtone/media
         volumeControlStream = AudioManager.STREAM_VOICE_CALL
