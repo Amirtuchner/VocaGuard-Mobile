@@ -37,7 +37,12 @@ SERVICE_ACCOUNT      = "/opt/vocaguard/service-account.json"
 FCM_TOKEN_FILE       = "/opt/vocaguard/fcm_token.txt"
 SAMPLE_RATE          = 16000
 WHISPER_CHUNK_BYTES  = 16000 * 2 * 2   # 2-second chunks (was 3 s)
-SCAM_SCORE_THRESHOLD = 3
+# Raised 3 -> 5 and detect_scam now also requires >=2 DISTINCT keyword matches
+# (see below). Rationale: a single mis-transcribed word used to clear the old
+# threshold of 3 (one weight-3 keyword), which caused live false positives on
+# imperfect speech-to-text (reported 2026-10-05: legit call flagged mid-call).
+# Requiring corroborating signals makes a stray STT word unable to fire alone.
+SCAM_SCORE_THRESHOLD = 5
 WINDOW_SECONDS       = 90              # sliding window: only last 90 s counts
 
 logging.basicConfig(
@@ -512,9 +517,12 @@ def detect_scam(window_text: str):
     Scan window_text against all keyword tables.
     Returns (is_scam, matched_keywords, score).
 
-    Both conditions must hold to fire:
-      1. Total weighted score >= SCAM_SCORE_THRESHOLD (3)
+    All three conditions must hold to fire (tightened 2026-10-05 to eliminate
+    live false positives from imperfect speech-to-text):
+      1. Total weighted score >= SCAM_SCORE_THRESHOLD (5)
       2. At least one HIGH-SIGNAL keyword (weight >= 2) present
+      3. At least TWO DISTINCT keywords matched — a single stray STT word can no
+         longer trigger an alert on its own.
 
     Matching is whole-word: punctuation/gershayim are normalised to spaces so
     that e.g. "ביט" (payment app) does not match inside "ביטוח לאומי".
@@ -542,7 +550,7 @@ def detect_scam(window_text: str):
                 matched.append(kw)
                 if weight >= 2:
                     has_high_signal = True
-    if score >= SCAM_SCORE_THRESHOLD and has_high_signal:
+    if score >= SCAM_SCORE_THRESHOLD and has_high_signal and len(matched) >= 2:
         return True, matched[:5], score
     return False, [], 0
 
@@ -554,9 +562,12 @@ def detect_scam(window_text: str):
 # Each category is counted ONCE even if multiple phrases match.
 # ---------------------------------------------------------------------------
 
-SE_SCORE_THRESHOLD = 4   # SE-only fire threshold
-SE_COMBO_KW        = 2   # keyword score required for combo mode
-SE_COMBO_SE        = 2   # SE score required for combo mode
+# Tightened 2026-10-05 (user wants no false positives). SE-only now needs 3
+# distinct strong manipulation categories (6) instead of 2 (4); combo needs a
+# genuine keyword hit (>=3) alongside solid SE signal (>=4) rather than one each.
+SE_SCORE_THRESHOLD = 6   # SE-only fire threshold
+SE_COMBO_KW        = 3   # keyword score required for combo mode
+SE_COMBO_SE        = 4   # SE score required for combo mode
 
 SE_PATTERNS = {
     # weight=2: strong manipulation
