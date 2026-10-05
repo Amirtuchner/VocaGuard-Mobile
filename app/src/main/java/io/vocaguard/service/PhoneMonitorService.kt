@@ -54,21 +54,6 @@ class PhoneMonitorService : Service() {
         )
     }
 
-    /** Try to upgrade the running FGS to include microphone type (needed for AudioRecord/SpeechRecognizer). */
-    private fun upgradeFgsForMicrophone() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            try {
-                startForeground(NOTIFICATION_ID, buildNotification(),
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-                Log.i(TAG, "FGS upgraded to include microphone type")
-            } catch (e: Exception) {
-                // SecurityException or ForegroundServiceStartNotAllowedException — degrade
-                // to specialUse-only monitoring rather than crashing.
-                Log.w(TAG, "Cannot upgrade FGS for microphone: ${e.message}")
-            }
-        }
-    }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Handle broadcast-forwarded call state actions (from PhoneStateReceiver)
         when (intent?.action) {
@@ -86,14 +71,11 @@ class PhoneMonitorService : Service() {
 
         val notification = buildNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Always start the persistent monitor as specialUse only. The microphone
-            // FGS type is added later via upgradeFgsForMicrophone() when a call is
-            // actually answered — that is the only time the mic is needed. Requesting
-            // the microphone type at startup crashes when the service is launched from
-            // the BOOT_COMPLETED receiver: Android 14+ disallows starting a mic-type
-            // FGS from the background and throws ForegroundServiceStartNotAllowedException
-            // (an IllegalStateException, not a SecurityException). See Play "limited
-            // types of foreground services" warning.
+            // This service is specialUse ONLY (declared that way in the manifest) so
+            // it is legal to start from the BOOT_COMPLETED receiver — Android 15
+            // forbids launching a microphone-type FGS from boot. When local (non-SIP)
+            // monitoring needs the mic, handleCallAnswered() starts the separate
+            // CallMonitoringService (microphone FGS), which is never boot-reachable.
             try {
                 startForeground(NOTIFICATION_ID, notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -184,12 +166,16 @@ class PhoneMonitorService : Service() {
         // Start polling only during active calls — catches Samsung IDLE misses
         startActiveCallPolling()
 
-        upgradeFgsForMicrophone()
-        Log.i(TAG, "Starting CallMonitoringService (embedded in PhoneMonitorService FGS)")
-        startService(
+        // Local (non-SIP) monitoring needs the mic. PhoneMonitorService is now
+        // specialUse-only (so it's legal to start from BOOT_COMPLETED), so it can
+        // no longer host the microphone FGS itself. Start CallMonitoringService as
+        // its OWN microphone foreground service instead — it's launched here at
+        // call-answer time (never from boot), so it doesn't trip the Android 15
+        // boot-FGS restriction.
+        Log.i(TAG, "Starting CallMonitoringService (own microphone FGS)")
+        startForegroundService(
             Intent(this, CallMonitoringService::class.java).apply {
                 action = CallMonitoringService.ACTION_START_MONITORING
-                putExtra(CallMonitoringService.EXTRA_SKIP_FOREGROUND, true)
             }
         )
     }

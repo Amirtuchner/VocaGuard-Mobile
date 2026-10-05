@@ -232,7 +232,10 @@ class CallMonitoringService : Service() {
                 } else {
                     startForeground(NOTIFICATION_ID, notification)
                 }
-            } catch (e: SecurityException) {
+            } catch (e: Exception) {
+                // SecurityException or ForegroundServiceStartNotAllowedException —
+                // e.g. a mic FGS can't be started from the background on Android 14+.
+                // Degrade gracefully (no local monitoring) instead of crashing.
                 Log.e(TAG, "Cannot start foreground: ${e.message}")
                 stopSelf()
                 return

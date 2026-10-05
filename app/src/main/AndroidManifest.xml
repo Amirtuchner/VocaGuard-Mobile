@@ -109,9 +109,15 @@
 
         <!-- Persistent foreground service: TelephonyCallback-based call detection
              (fallback for Samsung devices where CallScreeningService is not invoked) -->
+        <!-- specialUse ONLY. This service is started from BOOT_COMPLETED, and
+             Android 15 forbids launching a microphone-type FGS from a boot
+             receiver (Play flags it as a crash risk even with a runtime guard,
+             because it keys on the declared type). The microphone FGS lives in
+             CallMonitoringService, which is started only when a call is answered,
+             never from boot. -->
         <service
             android:name=".service.PhoneMonitorService"
-            android:foregroundServiceType="specialUse|microphone"
+            android:foregroundServiceType="specialUse"
             android:enabled="true"
             android:exported="false">
             <property
