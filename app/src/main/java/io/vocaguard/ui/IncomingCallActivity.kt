@@ -48,7 +48,9 @@ import kotlinx.coroutines.SupervisorJob
 import java.util.concurrent.TimeUnit
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
@@ -455,9 +457,14 @@ private fun ActiveCallScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1A2E))
-            .systemBarsPadding(),
+            .systemBarsPadding()
+            // Scrollable so every control (Speaker / Record / Keypad / Hang up)
+            // stays reachable even when the scam banner is shown and even in
+            // landscape (e.g. phone mounted in a car dock), where the fixed
+            // SpaceBetween layout used to push the controls off the bottom.
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Scam alert banner — shown prominently at the top when server detects a scam
         if (scamAlert != null) {
@@ -516,7 +523,7 @@ private fun ActiveCallScreen(
         }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(bottom = 64.dp)
+            modifier = Modifier.padding(bottom = 24.dp)
         ) {
             if (connected && showVolumeMeter) {
                 Column(
