@@ -133,6 +133,7 @@ class MainActivity : ComponentActivity() {
                             onSubscribeClick = { billing.startSubscriptionFlow(this@MainActivity) },
                             onRestoreClick   = { billing.refresh() },
                             priceLine        = priceLine,
+                            onRedeemCode     = { code -> billing.redeemReviewerCode(code) },
                         )
                     }
                     else -> MainScreen(

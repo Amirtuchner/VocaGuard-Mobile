@@ -41,6 +41,11 @@ class BillingManager private constructor(private val context: Context) :
 
     companion object {
         const val PRODUCT_ID = "vocaguard_monthly"
+        /** Code that unlocks premium for app review / testing (provided to Google in
+         *  Play Console → App access). Entered via the hidden tap on the paywall
+         *  title. Not secret-grade — it only grants the trial feature set so a
+         *  reviewer can evaluate the paid functionality without a live subscription. */
+        const val REVIEWER_CODE = "vocaguard-review-2026"
 
         @Volatile private var instance: BillingManager? = null
         fun getInstance(context: Context): BillingManager =
@@ -53,6 +58,21 @@ class BillingManager private constructor(private val context: Context) :
 
     private val _status = MutableStateFlow<SubscriptionStatus>(SubscriptionStatus.Unknown)
     val status: StateFlow<SubscriptionStatus> = _status.asStateFlow()
+
+    private val prefs = context.getSharedPreferences("vocaguard_billing", Context.MODE_PRIVATE)
+
+    private fun isReviewerUnlocked(): Boolean = prefs.getBoolean("reviewer_unlocked", false)
+
+    /** Redeem the reviewer/testing code. Returns true if it matched and premium was
+     *  granted (persisted), so Google reviewers can evaluate paid features. */
+    fun redeemReviewerCode(code: String): Boolean {
+        if (code.trim().equals(REVIEWER_CODE, ignoreCase = true)) {
+            prefs.edit().putBoolean("reviewer_unlocked", true).apply()
+            _status.value = SubscriptionStatus.Active
+            return true
+        }
+        return false
+    }
 
     private val _billingError = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val billingError: SharedFlow<String> = _billingError.asSharedFlow()
@@ -87,6 +107,13 @@ class BillingManager private constructor(private val context: Context) :
     }
 
     private suspend fun refreshStatus() {
+        // Reviewer/testing unlock (Play "App access"): grants premium so a Google
+        // reviewer can evaluate the paid features without a live subscription.
+        if (isReviewerUnlocked()) {
+            _status.value = SubscriptionStatus.Active
+            queryProductDetails()?.let { _priceLine.value = formatPriceLine(it) }
+            return
+        }
         // Debug builds can't purchase (Play only sells to Play-installed builds),
         // so the paywall would permanently lock developers out — skip it.
         if (io.vocaguard.BuildConfig.DEBUG) {

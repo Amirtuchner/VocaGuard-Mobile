@@ -131,6 +131,35 @@ fun SettingsTab(
             )
         }
 
+        // ── Demo / review: preview a monitored call with a sample scam alert ────
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Try it: demo scam call",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "See how VocaGuard protects you: this opens a sample monitored call with a scam warning. No real call is made.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(onClick = {
+                        context.startActivity(
+                            android.content.Intent(context, IncomingCallActivity::class.java).apply {
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                putExtra(IncomingCallActivity.EXTRA_DEMO, true)
+                                putExtra(IncomingCallActivity.EXTRA_CALLER_NUMBER, "+1 555-0100")
+                            }
+                        )
+                    }) { Text("Simulate scam call") }
+                }
+            }
+        }
+
         // ── Server Detection card ──────────────────────────────────────────────
         item {
             ServerDetectionCard(

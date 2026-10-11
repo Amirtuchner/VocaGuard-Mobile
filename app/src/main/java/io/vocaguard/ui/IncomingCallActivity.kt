@@ -71,6 +71,10 @@ class IncomingCallActivity : ComponentActivity() {
     companion object {
         const val EXTRA_CALLER_NUMBER = "caller_number"
         const val EXTRA_CHANNEL       = "asterisk_channel"
+        // Reviewer/testing demo: opens the active-call screen with a sample scam
+        // warning and the foreground-service notification, with no real SIP call —
+        // so an app reviewer can see the core feature + FGS on any device.
+        const val EXTRA_DEMO          = "demo_mode"
         const val NOTIFICATION_ID     = 2001
 
         /** True while an IncomingCallActivity instance is alive — used to block duplicate launches. */
@@ -126,6 +130,7 @@ class IncomingCallActivity : ComponentActivity() {
 
         val callerNumber    = intent.getStringExtra(EXTRA_CALLER_NUMBER) ?: ""
         val asteriskChannel = intent.getStringExtra(EXTRA_CHANNEL) ?: ""
+        val demoMode        = intent.getBooleanExtra(EXTRA_DEMO, false)
 
         // Resolve the caller's saved contact name, if any. Runs off the main thread
         // since ContentResolver.query() against the contacts provider hits disk.
@@ -137,11 +142,28 @@ class IncomingCallActivity : ComponentActivity() {
             }
         }
 
-        // Start looping ringtone
-        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-        ringtone = RingtoneManager.getRingtone(this, uri)?.also {
-            it.isLooping = true
-            it.play()
+        // Start looping ringtone (not in demo — demo jumps straight to the active call)
+        if (!demoMode) {
+            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            ringtone = RingtoneManager.getRingtone(this, uri)?.also {
+                it.isLooping = true
+                it.play()
+            }
+        }
+
+        // Reviewer/testing demo: jump straight to the active-call screen (no SIP) and
+        // raise a sample scam warning after a moment, so the foreground-service
+        // notification + on-screen scam alert are visible on any device.
+        if (demoMode) {
+            activeChannel = "DEMO"
+            activeCallerNumber = callerNumber.ifBlank { "+1 555-0100" }
+            callActive = true
+            showActiveCallNotification(activeChannel, activeCallerNumber, contactName)
+            lifecycleScope.launch {
+                delay(2500)
+                VocaGuardFcmService.scamAlertFlow.value =
+                    Pair(io.vocaguard.data.ScamType.INVESTMENT_SCAM, 0.92f)
+            }
         }
 
         setContent {
@@ -180,7 +202,7 @@ class IncomingCallActivity : ComponentActivity() {
             // 35s gives a margin over the server's own 30s AMI Originate timeout so we
             // don't cut off calls that were still genuinely connecting.
             LaunchedEffect(callActive) {
-                if (callActive) {
+                if (callActive && !demoMode) {
                     delay(35_000)
                     val state = VocaGuardSipManager.callState.value
                     if (state != VocaGuardSipManager.CallState.ACTIVE &&
@@ -246,13 +268,15 @@ class IncomingCallActivity : ComponentActivity() {
                     ActiveCallScreen(
                         callerNumber = activeCallerNumber,
                         contactName = contactName,
-                        connected = (sipState == VocaGuardSipManager.CallState.ACTIVE),
+                        connected = demoMode || (sipState == VocaGuardSipManager.CallState.ACTIVE),
                         scamAlert = scamAlert,
                         volumeLevel = volumeLevel,
                         showVolumeMeter = showVolumeMeter,
                         isRecording = isRecording,
                         onToggleRecord = {
-                            if (isRecording) {
+                            if (demoMode) {
+                                isRecording = !isRecording   // visual only in demo
+                            } else if (isRecording) {
                                 VocaGuardSipManager.stopRecording()
                                 isRecording = false
                             } else {
@@ -260,9 +284,16 @@ class IncomingCallActivity : ComponentActivity() {
                                 isRecording = recordingPath != null
                             }
                         },
-                        onEndCall = { hangUpAndFinish() },
+                        onEndCall = {
+                            if (demoMode) {
+                                VocaGuardFcmService.scamAlertFlow.value = null
+                                getSystemService(NotificationManager::class.java)
+                                    .cancel(ActiveCallReceiver.NOTIFICATION_ID)
+                                finish()
+                            } else hangUpAndFinish()
+                        },
                         onCancelConnecting = { pendingCancel = true },
-                        onDtmf = { VocaGuardSipManager.sendDtmf(it) }
+                        onDtmf = { if (!demoMode) VocaGuardSipManager.sendDtmf(it) }
                     )
                 }
             } else {

@@ -1,5 +1,6 @@
 package io.vocaguard.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,12 +13,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -37,7 +44,49 @@ fun PaywallScreen(
     onSubscribeClick: () -> Unit,
     onRestoreClick: () -> Unit,
     priceLine: String? = null,
+    // Returns true if the reviewer/testing code was accepted (premium granted).
+    onRedeemCode: (String) -> Boolean = { false },
 ) {
+    // Hidden reviewer access: tap the title 7× to open a code entry (for Google
+    // app review — the code is supplied in Play Console → App access).
+    var titleTaps by remember { mutableStateOf(0) }
+    var showCodeDialog by remember { mutableStateOf(false) }
+    var codeText by remember { mutableStateOf("") }
+    var codeError by remember { mutableStateOf(false) }
+
+    if (showCodeDialog) {
+        AlertDialog(
+            onDismissRequest = { showCodeDialog = false; codeError = false },
+            title = { Text("Enter access code") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = codeText,
+                        onValueChange = { codeText = it; codeError = false },
+                        singleLine = true,
+                        isError = codeError,
+                        label = { Text("Code") },
+                    )
+                    if (codeError) {
+                        Text(
+                            "Invalid code",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (onRedeemCode(codeText)) showCodeDialog = false else codeError = true
+                }) { Text("Unlock") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCodeDialog = false; codeError = false }) { Text("Cancel") }
+            },
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -58,6 +107,10 @@ fun PaywallScreen(
             text = "VocaGuard",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
+            modifier = Modifier.clickable {
+                titleTaps++
+                if (titleTaps >= 7) { titleTaps = 0; showCodeDialog = true }
+            },
         )
 
         Spacer(Modifier.height(4.dp))
