@@ -55,6 +55,9 @@ class CallMonitoringService : Service() {
         const val ACTION_START_MONITORING = "io.vocaguard.START_MONITORING"
         const val ACTION_STOP_MONITORING = "io.vocaguard.STOP_MONITORING"
         const val EXTRA_SKIP_FOREGROUND = "skip_foreground"
+        /** Demo/review: start the real microphone FGS (visible notification) but do
+         *  no audio capture, so a reviewer can see the user-facing foreground service. */
+        const val EXTRA_DEMO = "demo_mode"
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "call_monitoring_channel"
         // VAD (Voice Activity Detection) constants
@@ -162,7 +165,9 @@ class CallMonitoringService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START_MONITORING -> {
-                if (!isMonitoring) {
+                if (intent.getBooleanExtra(EXTRA_DEMO, false)) {
+                    startDemoForeground()
+                } else if (!isMonitoring) {
                     val skipForeground = intent.getBooleanExtra(EXTRA_SKIP_FOREGROUND, false)
                     startMonitoring(skipForeground)
                 }
@@ -173,6 +178,29 @@ class CallMonitoringService : Service() {
             }
         }
         return START_STICKY
+    }
+
+    /** Demo/review only: show the real microphone foreground-service notification
+     *  during a simulated call, with NO audio capture or detection. Lets an app
+     *  reviewer see the user-visible foreground service the permission is declared
+     *  for (Settings → "Simulate scam call"). Stopped via ACTION_STOP_MONITORING. */
+    private fun startDemoForeground() {
+        if (isMonitoring) return
+        isMonitoring = true
+        val notification = createNotification("Monitoring this call for scams…")
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            Log.i(TAG, "Demo foreground service started (microphone type, no capture)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Demo FGS start failed: ${e.message}")
+            isMonitoring = false
+            stopSelf()
+        }
     }
 
     private fun startMonitoring(skipForeground: Boolean = false) {
