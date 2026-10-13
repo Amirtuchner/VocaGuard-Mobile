@@ -28,7 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
-import io.vocaguard.service.CallMonitoringService
+import io.vocaguard.service.PhoneMonitorService
 import io.vocaguard.service.VocaGuardSipManager
 import androidx.core.app.NotificationCompat
 import io.vocaguard.R
@@ -160,15 +160,10 @@ class IncomingCallActivity : ComponentActivity() {
             activeCallerNumber = callerNumber.ifBlank { "+1 555-0100" }
             callActive = true
             showActiveCallNotification(activeChannel, activeCallerNumber, contactName)
-            // Start the real microphone foreground service (no audio capture) so its
-            // user-visible notification appears during the demo — this is the
-            // foreground service the reviewer needs to see.
-            startForegroundService(
-                Intent(this, CallMonitoringService::class.java).apply {
-                    action = CallMonitoringService.ACTION_START_MONITORING
-                    putExtra(CallMonitoringService.EXTRA_DEMO, true)
-                }
-            )
+            // Ensure the persistent specialUse foreground service is running so its
+            // user-visible notification ("VocaGuard — Scam protection active") appears
+            // during the demo — this is the foreground service the reviewer needs to see.
+            startForegroundService(Intent(this, PhoneMonitorService::class.java))
             lifecycleScope.launch {
                 delay(2500)
                 VocaGuardFcmService.scamAlertFlow.value =
@@ -297,10 +292,6 @@ class IncomingCallActivity : ComponentActivity() {
                         onEndCall = {
                             if (demoMode) {
                                 VocaGuardFcmService.scamAlertFlow.value = null
-                                startService(
-                                    Intent(this@IncomingCallActivity, CallMonitoringService::class.java)
-                                        .apply { action = CallMonitoringService.ACTION_STOP_MONITORING }
-                                )
                                 getSystemService(NotificationManager::class.java)
                                     .cancel(ActiveCallReceiver.NOTIFICATION_ID)
                                 finish()

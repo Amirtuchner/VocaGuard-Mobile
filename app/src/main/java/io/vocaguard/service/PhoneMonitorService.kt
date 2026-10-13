@@ -14,7 +14,6 @@ import android.telephony.TelephonyManager
 import android.util.Log
 import io.vocaguard.R
 import io.vocaguard.monitor.PhoneStateMonitor
-import io.vocaguard.service.CallMonitoringService
 
 /**
  * Persistent foreground service that keeps [PhoneStateMonitor] alive so incoming
@@ -33,7 +32,10 @@ class PhoneMonitorService : Service() {
     companion object {
         private const val TAG = "PhoneMonitorService"
         private const val NOTIFICATION_ID = 1003
-        private const val CHANNEL_ID = "phone_monitor_channel"
+        // v2 channel at IMPORTANCE_LOW so the specialUse foreground-service
+        // notification is actually visible in the shade (the old MIN channel hid it,
+        // and channel importance can't be raised after creation — hence a new id).
+        private const val CHANNEL_ID = "call_protection_channel_v2"
         const val ACTION_CALL_OFFHOOK = "io.vocaguard.ACTION_CALL_OFFHOOK"
         const val ACTION_CALL_IDLE = "io.vocaguard.ACTION_CALL_IDLE"
         /** Poll interval during an active call — only runs while call is in progress. */
@@ -73,9 +75,8 @@ class PhoneMonitorService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // This service is specialUse ONLY (declared that way in the manifest) so
             // it is legal to start from the BOOT_COMPLETED receiver — Android 15
-            // forbids launching a microphone-type FGS from boot. When local (non-SIP)
-            // monitoring needs the mic, handleCallAnswered() starts the separate
-            // CallMonitoringService (microphone FGS), which is never boot-reachable.
+            // forbids launching a microphone-type FGS from boot. The app no longer
+            // uses an on-device microphone FGS at all (detection is server-side).
             try {
                 startForeground(NOTIFICATION_ID, notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -152,32 +153,10 @@ class PhoneMonitorService : Service() {
             return
         }
 
-        // When the SIP bridge is active, the server handles scam detection via
-        // scam_detector_bg.py. Starting local AudioRecord/Vosk would compete with
-        // Linphone for the mic, causing periodic audio clicks/pops.
-        val sipState = VocaGuardSipManager.callState.value
-        if (sipState == VocaGuardSipManager.CallState.ACTIVE ||
-            sipState == VocaGuardSipManager.CallState.INCOMING) {
-            Log.i(TAG, "SIP bridge active (state=$sipState) — skipping local audio monitoring")
-            isCallActive = false
-            return
-        }
-
-        // Start polling only during active calls — catches Samsung IDLE misses
+        // Start polling only during active calls — catches Samsung IDLE misses.
+        // Scam detection itself runs server-side via the SIP bridge
+        // (scam_detector_bg.py); there is no on-device microphone monitoring.
         startActiveCallPolling()
-
-        // Local (non-SIP) monitoring needs the mic. PhoneMonitorService is now
-        // specialUse-only (so it's legal to start from BOOT_COMPLETED), so it can
-        // no longer host the microphone FGS itself. Start CallMonitoringService as
-        // its OWN microphone foreground service instead — it's launched here at
-        // call-answer time (never from boot), so it doesn't trip the Android 15
-        // boot-FGS restriction.
-        Log.i(TAG, "Starting CallMonitoringService (own microphone FGS)")
-        startForegroundService(
-            Intent(this, CallMonitoringService::class.java).apply {
-                action = CallMonitoringService.ACTION_START_MONITORING
-            }
-        )
     }
 
     /** Called when the call ends — either by TelephonyCallback or broadcast receiver. */
@@ -185,11 +164,6 @@ class PhoneMonitorService : Service() {
         if (!isCallActive) return
         isCallActive = false
         stopCallStatePolling()
-        startService(
-            Intent(this, CallMonitoringService::class.java).apply {
-                action = CallMonitoringService.ACTION_STOP_MONITORING
-            }
-        )
     }
 
     override fun onDestroy() {
@@ -208,13 +182,13 @@ class PhoneMonitorService : Service() {
                 NotificationChannel(
                     CHANNEL_ID,
                     "Call Protection",
-                    NotificationManager.IMPORTANCE_MIN
+                    NotificationManager.IMPORTANCE_LOW
                 ).apply { setShowBadge(false) }
             )
         }
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("VocaGuard")
-            .setContentText("Monitoring for scam calls")
+            .setContentTitle("VocaGuard — Scam protection active")
+            .setContentText("Monitoring your calls for scams")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .build()

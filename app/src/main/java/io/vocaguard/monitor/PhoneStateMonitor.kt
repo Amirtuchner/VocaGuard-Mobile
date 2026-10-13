@@ -11,7 +11,6 @@ import android.telephony.TelephonyManager
 import android.util.Log
 import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.ScamDatabaseManager
-import io.vocaguard.service.CallMonitoringService
 
 @Suppress("DEPRECATION") // PhoneStateListener used only on API < 31; TelephonyCallback used on 31+
 class PhoneStateMonitor(
@@ -123,18 +122,10 @@ class PhoneStateMonitor(
             Log.i(TAG, "Call answered but call forwarding not enabled — skipping")
             return
         }
-        Log.i(TAG, "Call answered — starting audio monitoring")
-        if (onCallStarted != null) {
-            // Use callback to run monitoring within the existing FGS (avoids background FGS restriction)
-            onCallStarted.invoke()
-        } else {
-            // Legacy path: start separate FGS
-            context.startForegroundService(
-                Intent(context, CallMonitoringService::class.java).apply {
-                    action = CallMonitoringService.ACTION_START_MONITORING
-                }
-            )
-        }
+        Log.i(TAG, "Call answered")
+        // Scam detection runs server-side via the SIP bridge — no on-device
+        // microphone foreground service. Just notify the persistent monitor.
+        onCallStarted?.invoke()
     }
 
     private fun handleCallEnded() {

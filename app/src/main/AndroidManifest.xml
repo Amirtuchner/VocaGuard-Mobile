@@ -8,7 +8,10 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Microphone FGS removed: scam detection runs server-side (SIP bridge), not via
+         on-device background mic capture. Strip it so the Linphone SDK can't merge it
+         back in — otherwise Play sees an undeclared/mismatched FGS permission. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" tools:node="remove" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- Strip unused foreground-service permissions merged in by the Linphone SDK
          (no video calls, and our call services declare their own FGS types) —
@@ -100,21 +103,14 @@
             </intent-filter>
         </service>
 
-        <!-- Foreground Service for call monitoring -->
-        <service
-            android:name=".service.CallMonitoringService"
-            android:foregroundServiceType="microphone"
-            android:enabled="true"
-            android:exported="false" />
+        <!-- CallMonitoringService (on-device microphone scam detection) removed:
+             scam detection runs server-side via the SIP bridge, so the app no longer
+             needs an on-device microphone foreground service. -->
 
         <!-- Persistent foreground service: TelephonyCallback-based call detection
-             (fallback for Samsung devices where CallScreeningService is not invoked) -->
-        <!-- specialUse ONLY. This service is started from BOOT_COMPLETED, and
-             Android 15 forbids launching a microphone-type FGS from a boot
-             receiver (Play flags it as a crash risk even with a runtime guard,
-             because it keys on the declared type). The microphone FGS lives in
-             CallMonitoringService, which is started only when a call is answered,
-             never from boot. -->
+             (fallback for Samsung devices where CallScreeningService is not invoked).
+             specialUse ONLY — it is started from BOOT_COMPLETED, and Android 15
+             forbids launching a microphone-type FGS from a boot receiver. -->
         <service
             android:name=".service.PhoneMonitorService"
             android:foregroundServiceType="specialUse"
