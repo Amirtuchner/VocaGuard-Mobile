@@ -12,7 +12,12 @@
          on-device background mic capture. Strip it so the Linphone SDK can't merge it
          back in — otherwise Play sees an undeclared/mismatched FGS permission. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" tools:node="remove" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- specialUse FGS removed too. The call-protection service now uses the
+         "shortService" type, which Google exempts from the foreground-service
+         declaration/review (per the FGS policy: systemExempted and shortService
+         are excepted). shortService needs no dedicated permission beyond
+         FOREGROUND_SERVICE, so nothing to declare here. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" tools:node="remove" />
     <!-- Strip unused foreground-service permissions merged in by the Linphone SDK
          (no video calls, and our call services declare their own FGS types) —
          Play Console requires a declaration for every FGS permission in the bundle -->
@@ -107,19 +112,16 @@
              scam detection runs server-side via the SIP bridge, so the app no longer
              needs an on-device microphone foreground service. -->
 
-        <!-- Persistent foreground service: TelephonyCallback-based call detection
-             (fallback for Samsung devices where CallScreeningService is not invoked).
-             specialUse ONLY — it is started from BOOT_COMPLETED, and Android 15
-             forbids launching a microphone-type FGS from a boot receiver. -->
+        <!-- Call-protection foreground service. Uses the "shortService" type, which
+             Google EXEMPTS from the FGS permission declaration/review. It is started
+             on demand (when an incoming-call push arrives) to reliably wake, re-register
+             and hand off to the call screen; it is not a persistent/always-on service
+             (shortService is capped at ~3 min, after which onTimeout() stops it). -->
         <service
             android:name=".service.PhoneMonitorService"
-            android:foregroundServiceType="specialUse"
+            android:foregroundServiceType="shortService"
             android:enabled="true"
-            android:exported="false">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Persistent call monitoring for real-time scam detection" />
-        </service>
+            android:exported="false" />
 
         <!-- Boot receiver to start monitoring on device boot -->
         <receiver

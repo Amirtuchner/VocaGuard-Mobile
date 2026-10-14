@@ -74,9 +74,9 @@ class MainActivity : ComponentActivity() {
 
         permissionsManager = PermissionsManager(this)
 
-        // Keep TelephonyCallback-based call detection alive in background
-        // (fallback for Samsung devices where CallScreeningService is not invoked)
-        startForegroundService(Intent(this, PhoneMonitorService::class.java))
+        // No persistent foreground service here anymore: the call-protection service is
+        // now a shortService (capped at ~3 min), started on demand when an incoming-call
+        // FCM push arrives — not kept running while the app is merely open.
 
         BillingManager.getInstance(this)   // initialise early so status is ready by first frame
         CommunityScamSyncWorker.schedule(this)

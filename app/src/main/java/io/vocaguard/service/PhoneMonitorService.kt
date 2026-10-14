@@ -72,27 +72,49 @@ class PhoneMonitorService : Service() {
         }
 
         val notification = buildNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // This service is specialUse ONLY (declared that way in the manifest) so
-            // it is legal to start from the BOOT_COMPLETED receiver — Android 15
-            // forbids launching a microphone-type FGS from boot. The app no longer
-            // uses an on-device microphone FGS at all (detection is server-side).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            // shortService type (Android 14+). Google exempts shortService from the
+            // FGS permission declaration/review. It's capped at ~3 min — plenty to
+            // wake, re-register and hand off to the call screen — then onTimeout()
+            // stops it; the visible call Activity keeps the call alive after that.
             try {
                 startForeground(NOTIFICATION_ID, notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE)
+            } catch (e: Exception) {
+                Log.e(TAG, "Cannot start short foreground service: ${e.message}")
+                stopSelf()
+                return START_NOT_STICKY
+            }
+        } else {
+            // API < 34: no shortService type exists; FGS types aren't enforced yet.
+            try {
+                startForeground(NOTIFICATION_ID, notification)
             } catch (e: Exception) {
                 Log.e(TAG, "Cannot start foreground service: ${e.message}")
                 stopSelf()
                 return START_NOT_STICKY
             }
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
         }
         phoneStateMonitor.startMonitoring()
         // No wake lock, no polling at startup — TelephonyCallback delivers events.
         // Polling is only started during active calls as a Samsung fallback.
-        Log.i(TAG, "Phone monitor service started (battery-optimized, no wake lock)")
+        Log.i(TAG, "Phone monitor service started (shortService, battery-optimized)")
         return START_STICKY
+    }
+
+    /**
+     * Required for shortService (Android 14+): the system gives a shortService ~3 min,
+     * then calls onTimeout and the service MUST stop or it is force-stopped/ANR'd. By
+     * then the call Activity (foreground) has taken over, so stopping is safe.
+     */
+    override fun onTimeout(startId: Int) {
+        Log.i(TAG, "shortService timeout — stopping")
+        stopCallStatePolling()
+        stopSelf()
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        onTimeout(startId)
     }
 
     private var pollCount = 0

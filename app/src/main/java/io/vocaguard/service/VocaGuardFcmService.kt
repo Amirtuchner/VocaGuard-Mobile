@@ -171,6 +171,15 @@ class VocaGuardFcmService : FirebaseMessagingService() {
 
         when (message.data["type"]) {
             "incoming_call" -> {
+                // Start the short-lived call-protection foreground service so the app
+                // stays alive through call setup even when launched from the background.
+                // High-priority FCM grants the FGS-start exemption; it's a shortService
+                // (exempt from Play's FGS declaration) and self-stops via onTimeout.
+                try {
+                    startForegroundService(Intent(this, PhoneMonitorService::class.java))
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not start call-protection service: ${e.message}")
+                }
                 // Reopen the SIP NAT pinhole right now, before the user accepts. On
                 // cellular CGNAT the UDP binding Asterisk has for our contact goes
                 // stale between re-registrations, so the accept-bridge INVITE can't
