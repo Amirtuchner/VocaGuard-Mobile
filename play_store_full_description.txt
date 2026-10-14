@@ -23,8 +23,8 @@ KEY FEATURES
 - In-call controls: speaker, keypad for phone menus, call recording, and hang up
 
 WHY VOCAGUARD NEEDS EACH PERMISSION
-- Microphone + foreground service (microphone type): to analyze the call audio live during a call and keep that analysis running for the whole call so a scam can be caught in real time. A persistent notification is shown whenever monitoring is running, and you can stop it at any time.
-- Foreground service (special use): to keep call detection active so an incoming monitored call is caught even when the app is in the background.
+- Microphone: to carry the audio of a monitored call so it can be analyzed for scams in real time. A persistent notification is shown whenever a monitored call is active, and you can end it at any time.
+- Foreground service: a short-lived service that keeps the app active while a monitored call is being set up and handled, so the scam warning can appear during the call.
 - Phone and call permissions (phone state, answer calls, call phone): to detect, screen, and handle incoming and returned calls — the core purpose of the app.
 - Contacts: to skip scam screening for numbers already saved in your contacts.
 
