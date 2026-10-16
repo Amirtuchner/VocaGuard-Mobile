@@ -16,4 +16,20 @@
     <string name="onboarding_back">Back</string>
     <string name="onboarding_next">Next</string>
     <string name="onboarding_get_started">Get Started</string>
+
+    <!-- Paywall -->
+    <string name="paywall_tagline">Protect every call with AI</string>
+    <string name="paywall_feature_detection">Real-time AI scam call detection</string>
+    <string name="paywall_feature_alerts">Instant on-screen alerts</string>
+    <string name="paywall_feature_family">Family Guard — notify caregivers automatically</string>
+    <string name="paywall_feature_history">Full call history with transcripts</string>
+    <string name="paywall_feature_senior">Senior Mode with simplified interface</string>
+    <string name="paywall_start_trial">Start free trial</string>
+    <string name="paywall_price_fallback">1 month free · then $4.99/month · cancel any time</string>
+    <string name="paywall_restore">Restore purchase</string>
+    <string name="paywall_code_title">Enter access code</string>
+    <string name="paywall_code_label">Code</string>
+    <string name="paywall_code_invalid">Invalid code</string>
+    <string name="paywall_code_unlock">Unlock</string>
+    <string name="paywall_code_cancel">Cancel</string>
 </resources>

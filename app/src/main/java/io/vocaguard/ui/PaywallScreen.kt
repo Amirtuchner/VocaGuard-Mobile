@@ -27,17 +27,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-
-private val features = listOf(
-    "Real-time AI scam call detection",
-    "Instant on-screen alerts",
-    "Family Guard — notify caregivers automatically",
-    "Full call history with transcripts",
-    "Senior Mode with simplified interface",
-)
+import io.vocaguard.R
 
 @Composable
 fun PaywallScreen(
@@ -57,7 +51,7 @@ fun PaywallScreen(
     if (showCodeDialog) {
         AlertDialog(
             onDismissRequest = { showCodeDialog = false; codeError = false },
-            title = { Text("Enter access code") },
+            title = { Text(stringResource(R.string.paywall_code_title)) },
             text = {
                 Column {
                     OutlinedTextField(
@@ -65,11 +59,11 @@ fun PaywallScreen(
                         onValueChange = { codeText = it; codeError = false },
                         singleLine = true,
                         isError = codeError,
-                        label = { Text("Code") },
+                        label = { Text(stringResource(R.string.paywall_code_label)) },
                     )
                     if (codeError) {
                         Text(
-                            "Invalid code",
+                            stringResource(R.string.paywall_code_invalid),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -79,10 +73,10 @@ fun PaywallScreen(
             confirmButton = {
                 TextButton(onClick = {
                     if (onRedeemCode(codeText)) showCodeDialog = false else codeError = true
-                }) { Text("Unlock") }
+                }) { Text(stringResource(R.string.paywall_code_unlock)) }
             },
             dismissButton = {
-                TextButton(onClick = { showCodeDialog = false; codeError = false }) { Text("Cancel") }
+                TextButton(onClick = { showCodeDialog = false; codeError = false }) { Text(stringResource(R.string.paywall_code_cancel)) }
             },
         )
     }
@@ -116,13 +110,20 @@ fun PaywallScreen(
         Spacer(Modifier.height(4.dp))
 
         Text(
-            text = "Protect every call with AI",
+            text = stringResource(R.string.paywall_tagline),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         Spacer(Modifier.height(32.dp))
 
+        val features = listOf(
+            stringResource(R.string.paywall_feature_detection),
+            stringResource(R.string.paywall_feature_alerts),
+            stringResource(R.string.paywall_feature_family),
+            stringResource(R.string.paywall_feature_history),
+            stringResource(R.string.paywall_feature_senior),
+        )
         features.forEach { feature ->
             Row(
                 modifier = Modifier
@@ -154,7 +155,7 @@ fun PaywallScreen(
                 .height(56.dp),
         ) {
             Text(
-                text = "Start free trial",
+                text = stringResource(R.string.paywall_start_trial),
                 style = MaterialTheme.typography.titleMedium,
             )
         }
@@ -162,7 +163,7 @@ fun PaywallScreen(
         Spacer(Modifier.height(8.dp))
 
         Text(
-            text = priceLine ?: "1 month free · then $4.99/month · cancel any time",
+            text = priceLine ?: stringResource(R.string.paywall_price_fallback),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -171,7 +172,7 @@ fun PaywallScreen(
         Spacer(Modifier.height(16.dp))
 
         TextButton(onClick = onRestoreClick) {
-            Text("Restore purchase")
+            Text(stringResource(R.string.paywall_restore))
         }
     }
 }
