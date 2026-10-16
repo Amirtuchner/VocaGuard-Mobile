@@ -62,6 +62,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -396,7 +397,7 @@ class IncomingCallActivity : ComponentActivity() {
             },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
+        val displayNumber = if (callerNumber.isNotBlank()) callerNumber else getString(R.string.common_unknown)
         val displayCaller = if (contactName != null) "$contactName ($displayNumber)" else displayNumber
         val notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("VocaGuard: Monitoring Call")
@@ -404,7 +405,7 @@ class IncomingCallActivity : ComponentActivity() {
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .setContentIntent(openVocaGuardPi)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "End Call", hangUpPi)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, getString(R.string.call_end), hangUpPi)
             .build()
         nm.notify(ActiveCallReceiver.NOTIFICATION_ID, notification)
     }
@@ -504,7 +505,7 @@ private fun ActiveCallScreen(
     onCancelConnecting: () -> Unit,
     onDtmf: (Char) -> Unit = {}
 ) {
-    val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
+    val displayNumber = if (callerNumber.isNotBlank()) callerNumber else stringResource(R.string.common_unknown)
     var showKeypad by remember { mutableStateOf(false) }
     var dtmfDigits by remember { mutableStateOf("") }
     Column(
@@ -531,20 +532,24 @@ private fun ActiveCallScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "SCAM DETECTED",
+                        stringResource(R.string.call_scam_detected),
                         color = Color.White,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        "${scamAlert.first.name.replace('_', ' ')}  •  ${(scamAlert.second * 100).toInt()}% confidence",
+                        stringResource(
+                            R.string.call_confidence_fmt,
+                            scamAlert.first.name.replace('_', ' '),
+                            (scamAlert.second * 100).toInt()
+                        ),
                         color = Color(0xFFFFCDD2),
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        "Hang up now!",
+                        stringResource(R.string.call_scam_hang_up),
                         color = Color.White,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
@@ -560,9 +565,9 @@ private fun ActiveCallScreen(
         ) {
             Spacer(Modifier.height(if (scamAlert == null) 48.dp else 16.dp))
             if (connected) {
-                Text("Call Active", color = Color(0xFF4CAF50), fontSize = 16.sp)
+                Text(stringResource(R.string.call_active), color = Color(0xFF4CAF50), fontSize = 16.sp)
             } else {
-                Text("Connecting…", color = Color(0xFFFFB300), fontSize = 16.sp)
+                Text(stringResource(R.string.call_connecting), color = Color(0xFFFFB300), fontSize = 16.sp)
             }
             Spacer(Modifier.height(16.dp))
             if (contactName != null) {
@@ -573,7 +578,7 @@ private fun ActiveCallScreen(
                 Text(displayNumber, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(8.dp))
-            Text("VocaGuard is monitoring this call", color = Color(0xFFAAAAAA), fontSize = 14.sp)
+            Text(stringResource(R.string.call_monitoring), color = Color(0xFFAAAAAA), fontSize = 14.sp)
         }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -586,7 +591,7 @@ private fun ActiveCallScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 48.dp)
                 ) {
-                    Text("Volume", color = Color(0xFFAAAAAA), fontSize = 12.sp)
+                    Text(stringResource(R.string.call_volume), color = Color(0xFFAAAAAA), fontSize = 12.sp)
                     Spacer(Modifier.height(6.dp))
                     LinearProgressIndicator(
                         progress = { volumeLevel },
@@ -622,7 +627,7 @@ private fun ActiveCallScreen(
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            if (speakerOn) "Speaker On" else "Speaker",
+                            if (speakerOn) stringResource(R.string.call_speaker_on) else stringResource(R.string.call_speaker),
                             color = Color.White, fontSize = 12.sp
                         )
                     }
@@ -640,7 +645,7 @@ private fun ActiveCallScreen(
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            if (isRecording) "Recording" else "Record",
+                            if (isRecording) stringResource(R.string.call_recording) else stringResource(R.string.call_record),
                             color = if (isRecording) Color(0xFFEF5350) else Color.White,
                             fontSize = 12.sp
                         )
@@ -659,7 +664,7 @@ private fun ActiveCallScreen(
                             Text("⌗", fontSize = 24.sp, color = Color.White)
                         }
                         Spacer(Modifier.height(4.dp))
-                        Text("Keypad", color = Color.White, fontSize = 12.sp)
+                        Text(stringResource(R.string.call_keypad), color = Color.White, fontSize = 12.sp)
                     }
                 }
                 Spacer(Modifier.height(20.dp))
@@ -682,11 +687,11 @@ private fun ActiveCallScreen(
                     containerColor = if (connected) Color(0xFFD32F2F) else Color(0xFF555555)
                 )
             ) {
-                Text("END", fontSize = 16.sp, color = Color.White)
+                Text(stringResource(R.string.call_end_short), fontSize = 16.sp, color = Color.White)
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                if (connected) "End Call" else "Cancel",
+                if (connected) stringResource(R.string.call_end) else stringResource(R.string.call_cancel),
                 color = Color.White, fontSize = 12.sp
             )
         }
@@ -733,7 +738,7 @@ private fun ConnectFailedScreen(
     contactName: String? = null,
     onDismiss: () -> Unit
 ) {
-    val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
+    val displayNumber = if (callerNumber.isNotBlank()) callerNumber else stringResource(R.string.common_unknown)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -747,7 +752,7 @@ private fun ConnectFailedScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(48.dp))
-            Text("Couldn't Connect", color = Color(0xFFEF5350), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.call_failed_title), color = Color(0xFFEF5350), fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(16.dp))
             if (contactName != null) {
                 Text(contactName, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
@@ -758,7 +763,7 @@ private fun ConnectFailedScreen(
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "The call could not be bridged. The other side may still be waiting.",
+                stringResource(R.string.call_failed_desc),
                 color = Color(0xFFAAAAAA), fontSize = 14.sp, textAlign = TextAlign.Center
             )
         }
@@ -772,10 +777,10 @@ private fun ConnectFailedScreen(
                 shape = CircleShape,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
             ) {
-                Text("OK", fontSize = 16.sp, color = Color.White)
+                Text(stringResource(R.string.common_ok), fontSize = 16.sp, color = Color.White)
             }
             Spacer(Modifier.height(8.dp))
-            Text("Dismiss", color = Color.White, fontSize = 12.sp)
+            Text(stringResource(R.string.call_dismiss), color = Color.White, fontSize = 12.sp)
         }
     }
 }
@@ -787,7 +792,7 @@ private fun IncomingCallScreen(
     onAccept: () -> Unit,
     onDecline: () -> Unit
 ) {
-    val displayNumber = if (callerNumber.isNotBlank()) callerNumber else "Unknown"
+    val displayNumber = if (callerNumber.isNotBlank()) callerNumber else stringResource(R.string.common_unknown)
 
     Column(
         modifier = Modifier
@@ -801,7 +806,7 @@ private fun IncomingCallScreen(
         Spacer(Modifier.height(48.dp))
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Incoming Call", color = Color.White, fontSize = 16.sp)
+            Text(stringResource(R.string.call_incoming), color = Color.White, fontSize = 16.sp)
             Spacer(Modifier.height(16.dp))
             if (contactName != null) {
                 Text(contactName, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
@@ -811,7 +816,7 @@ private fun IncomingCallScreen(
                 Text(displayNumber, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(8.dp))
-            Text("VocaGuard is monitoring this call", color = Color(0xFFAAAAAA), fontSize = 14.sp)
+            Text(stringResource(R.string.call_monitoring), color = Color(0xFFAAAAAA), fontSize = 14.sp)
         }
 
         Row(
@@ -830,7 +835,7 @@ private fun IncomingCallScreen(
                     Text("X", fontSize = 24.sp, color = Color.White)
                 }
                 Spacer(Modifier.height(8.dp))
-                Text("Decline", color = Color.White, fontSize = 12.sp)
+                Text(stringResource(R.string.call_decline), color = Color.White, fontSize = 12.sp)
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -843,7 +848,7 @@ private fun IncomingCallScreen(
                     Text("OK", fontSize = 20.sp, color = Color.White)
                 }
                 Spacer(Modifier.height(8.dp))
-                Text("Accept", color = Color.White, fontSize = 12.sp)
+                Text(stringResource(R.string.call_accept), color = Color.White, fontSize = 12.sp)
             }
         }
     }

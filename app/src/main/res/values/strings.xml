@@ -32,4 +32,30 @@
     <string name="paywall_code_invalid">Invalid code</string>
     <string name="paywall_code_unlock">Unlock</string>
     <string name="paywall_code_cancel">Cancel</string>
+
+    <!-- In-call / scam-warning screen -->
+    <string name="call_scam_detected">SCAM DETECTED</string>
+    <string name="call_scam_hang_up">Hang up now!</string>
+    <!-- %1$s = scam type, %2$d = confidence percent -->
+    <string name="call_confidence_fmt">%1$s  •  %2$d%% confidence</string>
+    <string name="call_active">Call Active</string>
+    <string name="call_connecting">Connecting…</string>
+    <string name="call_monitoring">VocaGuard is monitoring this call</string>
+    <string name="call_volume">Volume</string>
+    <string name="call_speaker">Speaker</string>
+    <string name="call_speaker_on">Speaker On</string>
+    <string name="call_record">Record</string>
+    <string name="call_recording">Recording</string>
+    <string name="call_keypad">Keypad</string>
+    <string name="call_end_short">END</string>
+    <string name="call_end">End Call</string>
+    <string name="call_cancel">Cancel</string>
+    <string name="call_failed_title">Couldn\'t Connect</string>
+    <string name="call_failed_desc">The call could not be bridged. The other side may still be waiting.</string>
+    <string name="call_dismiss">Dismiss</string>
+    <string name="call_incoming">Incoming Call</string>
+    <string name="call_decline">Decline</string>
+    <string name="call_accept">Accept</string>
+    <string name="common_ok">OK</string>
+    <string name="common_unknown">Unknown</string>
 </resources>
