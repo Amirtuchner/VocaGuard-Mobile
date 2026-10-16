@@ -57,6 +57,10 @@ import io.vocaguard.service.VocaGuardSipManager
 import io.vocaguard.widget.VocaGuardWidget
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
+
 
     private lateinit var permissionsManager: PermissionsManager
 

@@ -68,6 +68,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 class IncomingCallActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(io.vocaguard.LocaleHelper.wrap(newBase))
+    }
+
 
     companion object {
         const val EXTRA_CALLER_NUMBER = "caller_number"

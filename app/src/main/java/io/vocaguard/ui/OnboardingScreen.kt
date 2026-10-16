@@ -230,6 +230,35 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Language selection — picks the app language. For now it sets the spoken-alert
+        // (TTS) voice and the speech locale immediately; on-screen text switches too once
+        // the UI strings are translated (Phase 2). Tapping reloads the screen to apply it.
+        val langCtx = LocalContext.current
+        val langDs = remember { io.vocaguard.data.DetectionSettings.getInstance(langCtx) }
+        val selectedLang = io.vocaguard.LocaleHelper.uiLanguage(langDs.locale)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                Triple("English", "en-US", "en"),
+                Triple("עברית", "he-IL", "iw"),
+                Triple("Русский", "ru-RU", "ru"),
+            ).forEach { (label, tag, code) ->
+                val sel = selectedLang == code
+                Button(
+                    onClick = {
+                        langDs.locale = tag
+                        (langCtx as? android.app.Activity)?.recreate()
+                    },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (sel) MaterialTheme.colorScheme.primary
+                                         else MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = if (sel) MaterialTheme.colorScheme.onPrimary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) { Text(label, style = MaterialTheme.typography.labelMedium) }
+            }
+        }
+
         StepIcon(icon = Icons.Default.Description, isDone = accepted)
         Text(
             "Terms of Use and Privacy Policy",

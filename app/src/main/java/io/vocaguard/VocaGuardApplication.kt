@@ -1,10 +1,15 @@
 package io.vocaguard
 
 import android.app.Application
+import android.content.Context
 import io.vocaguard.service.ServerDetectionManager
 import io.vocaguard.service.VocaGuardSipManager
 
 class VocaGuardApplication : Application() {
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(LocaleHelper.wrap(base))
+    }
+
     override fun onCreate() {
         super.onCreate()
         // Load registration prefs before SIP so credentials are available at init time
