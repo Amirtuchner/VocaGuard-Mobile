@@ -297,7 +297,14 @@ class IncomingCallActivity : ComponentActivity() {
                                 finish()
                             } else hangUpAndFinish()
                         },
-                        onCancelConnecting = { pendingCancel = true },
+                        onCancelConnecting = {
+                            // "End" during Connecting must respond immediately — previously
+                            // it only set pendingCancel and waited for the bridge (or the 35s
+                            // timeout), so if the bridge never formed the button looked frozen.
+                            // Tear down the waiting call on the server and close the screen now.
+                            pendingCancel = true
+                            if (demoMode) finish() else hangUpAndFinish()
+                        },
                         onDtmf = { if (!demoMode) VocaGuardSipManager.sendDtmf(it) }
                     )
                 }
