@@ -328,6 +328,58 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
                 color = MaterialTheme.colorScheme.error
             )
         }
+
+        // Employee / admin access — VocaGuard staff enter a key to use the app for
+        // free (no payment details; skips the paywall). Internal; English-only.
+        var showAdminDialog by remember { mutableStateOf(false) }
+        var adminKey by remember { mutableStateOf("") }
+        var adminError by remember { mutableStateOf(false) }
+        var adminOk by remember { mutableStateOf(false) }
+        if (adminOk) {
+            Text(
+                "✓ Employee access unlocked — the app is free for you.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else {
+            TextButton(onClick = { showAdminDialog = true }) {
+                Text("Employee / admin access")
+            }
+        }
+        if (showAdminDialog) {
+            AlertDialog(
+                onDismissRequest = { showAdminDialog = false; adminError = false },
+                title = { Text("Employee access") },
+                text = {
+                    Column {
+                        OutlinedTextField(
+                            value = adminKey,
+                            onValueChange = { adminKey = it; adminError = false },
+                            singleLine = true,
+                            isError = adminError,
+                            label = { Text("Admin key") }
+                        )
+                        if (adminError) {
+                            Text(
+                                "Invalid key",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val ok = io.vocaguard.billing.BillingManager
+                            .getInstance(langCtx).redeemReviewerCode(adminKey)
+                        if (ok) { adminOk = true; showAdminDialog = false } else adminError = true
+                    }) { Text("Unlock") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAdminDialog = false; adminError = false }) { Text("Cancel") }
+                }
+            )
+        }
     }
 }
 

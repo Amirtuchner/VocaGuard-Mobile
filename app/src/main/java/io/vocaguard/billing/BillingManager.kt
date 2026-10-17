@@ -47,6 +47,12 @@ class BillingManager private constructor(private val context: Context) :
          *  reviewer can evaluate the paid functionality without a live subscription. */
         const val REVIEWER_CODE = "vocaguard-review-2026"
 
+        /** Admin/employee key: VocaGuard staff enter this during onboarding to use the
+         *  app for free (no payment details). Same effect as a redeemed subscription.
+         *  Compiled into the app, so treat as semi-public (extractable from the APK) —
+         *  fine for internal free access; rotate by changing this constant. */
+        const val ADMIN_KEY = "vocaguard-team-2026"
+
         @Volatile private var instance: BillingManager? = null
         fun getInstance(context: Context): BillingManager =
             instance ?: synchronized(this) {
@@ -63,10 +69,11 @@ class BillingManager private constructor(private val context: Context) :
 
     private fun isReviewerUnlocked(): Boolean = prefs.getBoolean("reviewer_unlocked", false)
 
-    /** Redeem the reviewer/testing code. Returns true if it matched and premium was
-     *  granted (persisted), so Google reviewers can evaluate paid features. */
+    /** Redeem an access code — the Google-review code OR the admin/employee key.
+     *  Either grants free premium (persisted). Returns true if the code matched. */
     fun redeemReviewerCode(code: String): Boolean {
-        if (code.trim().equals(REVIEWER_CODE, ignoreCase = true)) {
+        val c = code.trim()
+        if (c.equals(REVIEWER_CODE, ignoreCase = true) || c.equals(ADMIN_KEY, ignoreCase = true)) {
             prefs.edit().putBoolean("reviewer_unlocked", true).apply()
             _status.value = SubscriptionStatus.Active
             return true
