@@ -165,7 +165,12 @@ class BillingManager private constructor(private val context: Context) :
                 purchase.products.contains(PRODUCT_ID) &&
                     purchase.purchaseState == Purchase.PurchaseState.PURCHASED
             }
-            if (active) _status.value = SubscriptionStatus.Active
+            if (active) {
+                _status.value = SubscriptionStatus.Active
+                // Conversion event — fires when the user actually completes a purchase
+                // (this callback), not on every launch of an existing subscription.
+                io.vocaguard.TenjinEvents.send(context, io.vocaguard.TenjinEvents.SUBSCRIBED)
+            }
             scope.launch {
                 purchases
                     .filter { !it.isAcknowledged && it.purchaseState == Purchase.PurchaseState.PURCHASED }

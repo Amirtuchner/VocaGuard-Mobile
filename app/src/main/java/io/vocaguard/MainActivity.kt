@@ -124,6 +124,7 @@ class MainActivity : ComponentActivity() {
                         onFinish = {
                             detectionSettings.onboardingComplete = true
                             detectionSettings.installTimestamp = System.currentTimeMillis()
+                            TenjinEvents.send(this@MainActivity, TenjinEvents.ONBOARDING_COMPLETE)
                             onboardingDone = true
                         }
                     )

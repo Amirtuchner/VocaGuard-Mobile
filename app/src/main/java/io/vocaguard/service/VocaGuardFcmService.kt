@@ -263,6 +263,7 @@ class VocaGuardFcmService : FirebaseMessagingService() {
 
         // Notify IncomingCallActivity to show an in-screen banner immediately
         scamAlertFlow.value = Pair(scamType, confidence)
+        io.vocaguard.TenjinEvents.send(applicationContext, io.vocaguard.TenjinEvents.SCAM_DETECTED)
 
         // Notification + TTS + vibration
         val alertManager = ScamAlertManager(applicationContext)

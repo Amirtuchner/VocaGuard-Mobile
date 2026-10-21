@@ -281,6 +281,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setCallForwardingEnabled(value: Boolean) {
         detectionSettings.callForwardingEnabled = value
         _callForwardingEnabled.value = value
+        if (value) io.vocaguard.TenjinEvents.send(context, io.vocaguard.TenjinEvents.CALL_FORWARDING_ENABLED)
     }
 
     // ── Report endpoint ───────────────────────────────────────────────────────
@@ -446,6 +447,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     val result = sdm.register(_serverPhoneInput.value.trim(), fcmToken)
                     if (result.success) {
                         _serverRegistered.value = true
+                        io.vocaguard.TenjinEvents.send(context, io.vocaguard.TenjinEvents.REGISTERED)
                         _serverSipExtension.value = result.sipExtension
                         _serverActivationCode.value = sdm.getActivationCode(getApplication())
                         _serverRegStatus.value =
