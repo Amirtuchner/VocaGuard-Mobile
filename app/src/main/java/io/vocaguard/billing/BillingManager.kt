@@ -175,6 +175,18 @@ class BillingManager private constructor(private val context: Context) :
                 purchases
                     .filter { !it.isAcknowledged && it.purchaseState == Purchase.PurchaseState.PURCHASED }
                     .forEach { acknowledge(it) }
+                // Report verified revenue to Tenjin (ROAS) with the real price + receipt.
+                val price = queryProductDetails()?.let { paidPrice(it) }
+                if (price != null) {
+                    purchases
+                        .filter { it.products.contains(PRODUCT_ID) && it.purchaseState == Purchase.PurchaseState.PURCHASED }
+                        .forEach { p ->
+                            io.vocaguard.TenjinEvents.sendPurchase(
+                                context, PRODUCT_ID, price.second, price.first,
+                                p.originalJson, p.signature
+                            )
+                        }
+                }
             }
         }
     }
@@ -199,6 +211,13 @@ class BillingManager private constructor(private val context: Context) :
         return offers.firstOrNull { offer ->
             offer.pricingPhases.pricingPhaseList.any { it.priceAmountMicros == 0L }
         } ?: offers.firstOrNull()
+    }
+
+    /** (unitPrice, currencyCode) of the recurring paid phase — for Tenjin revenue. */
+    private fun paidPrice(details: ProductDetails): Pair<Double, String>? {
+        val paid = bestOffer(details)?.pricingPhases?.pricingPhaseList
+            ?.lastOrNull { it.priceAmountMicros > 0 } ?: return null
+        return (paid.priceAmountMicros / 1_000_000.0) to paid.priceCurrencyCode
     }
 
     private fun formatPriceLine(details: ProductDetails): String? {

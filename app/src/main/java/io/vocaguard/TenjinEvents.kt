@@ -25,4 +25,25 @@ object TenjinEvents {
             Log.w("TenjinEvents", "event '$name' failed: ${e.message}")
         }
     }
+
+    /**
+     * Report a verified purchase (revenue) to Tenjin for ROAS / campaign optimization.
+     * Passes the Google Play receipt (purchaseData + signature) so Tenjin can verify it.
+     */
+    fun sendPurchase(
+        context: Context,
+        productId: String,
+        currencyCode: String,
+        unitPrice: Double,
+        purchaseData: String,
+        dataSignature: String,
+    ) {
+        if (BuildConfig.TENJIN_API_KEY.isEmpty()) return
+        try {
+            TenjinSDK.getInstance(context.applicationContext, BuildConfig.TENJIN_API_KEY)
+                .transaction(productId, currencyCode, 1, unitPrice, purchaseData, dataSignature)
+        } catch (e: Exception) {
+            Log.w("TenjinEvents", "purchase event failed: ${e.message}")
+        }
+    }
 }
