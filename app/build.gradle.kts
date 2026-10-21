@@ -163,6 +163,8 @@ dependencies {
     // Tenjin attribution/analytics SDK + Google Advertising ID (for attribution)
     implementation("com.tenjin:android-sdk:1.24.0")
     implementation("com.google.android.gms:play-services-ads-identifier:18.0.1")
+    // ProcessLifecycleOwner — fire Tenjin connect() on every app foreground (App Open)
+    implementation("androidx.lifecycle:lifecycle-process:2.8.7")
     // Pinned to exact versions that ship 16 KB-page-aligned native libs
     // (required for targetSdk 35+; 5.3.x / 0.3.47 were 4 KB-aligned and Play
     // rejects them for production). See 16KB alignment check before bumping.
