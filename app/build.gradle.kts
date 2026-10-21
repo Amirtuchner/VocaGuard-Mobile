@@ -48,6 +48,13 @@ android {
             ?: System.getenv("TOKEN_SERVER_HOST")
             ?: "api.vocaguard.com"
         buildConfigField("String", "TOKEN_SERVER_HOST", "\"$tokenServerHost\"")
+
+        // Tenjin (attribution/analytics) API key — put `tenjin_api_key=...` in
+        // local.properties (or TENJIN_API_KEY env). Empty = Tenjin init is skipped.
+        val tenjinApiKey = localProperties.getProperty("tenjin_api_key")
+            ?: System.getenv("TENJIN_API_KEY")
+            ?: ""
+        buildConfigField("String", "TENJIN_API_KEY", "\"$tenjinApiKey\"")
     }
 
     // Signing config for CI — reads from environment variables set by the workflow.
@@ -152,6 +159,10 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation(libs.billing.ktx)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Tenjin attribution/analytics SDK + Google Advertising ID (for attribution)
+    implementation("com.tenjin:android-sdk:1.24.0")
+    implementation("com.google.android.gms:play-services-ads-identifier:18.0.1")
     // Pinned to exact versions that ship 16 KB-page-aligned native libs
     // (required for targetSdk 35+; 5.3.x / 0.3.47 were 4 KB-aligned and Play
     // rejects them for production). See 16KB alignment check before bumping.

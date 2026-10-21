@@ -27,6 +27,9 @@
          anywhere), so its dataSync foreground service can never start -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" tools:node="remove" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Google Advertising ID — required on Android 13+ for Tenjin attribution.
+         Declare this use in Play Console → Data safety (Advertising/analytics). -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Optional: shows an on-screen warning overlay during detected scam calls -->
