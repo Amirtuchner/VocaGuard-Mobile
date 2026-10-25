@@ -283,6 +283,9 @@ def provision_pjsip_user(ext: str, password: str):
         # goes silent until the path re-learns — the "audio drops then comes back"
         # mid-call symptom reported 2026-10-25. Required for reliable mobile audio.
         f"rtp_symmetric=yes\n"
+        # rtp_keepalive: keepalive RTP during silence keeps the media pinhole open
+        # so audio doesn't drop out after a quiet moment mid-call.
+        f"rtp_keepalive=5\n"
         f"\n[auth_{ext}]\n"
         f"type=auth\n"
         f"auth_type=userpass\n"
