@@ -31,7 +31,11 @@ class VocaGuardApplication : Application() {
             ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
                 override fun onStart(owner: LifecycleOwner) {
                     try {
-                        TenjinSDK.getInstance(this@VocaGuardApplication, BuildConfig.TENJIN_API_KEY).connect()
+                        val tenjin = TenjinSDK.getInstance(this@VocaGuardApplication, BuildConfig.TENJIN_API_KEY)
+                        // Tell Tenjin the install source is Google Play (otherwise it logs
+                        // "source_app_store=unspecified", hurting attribution accuracy).
+                        tenjin.setAppStore(TenjinSDK.AppStoreType.googleplay)
+                        tenjin.connect()
                     } catch (e: Exception) {
                         Log.w("VocaGuardApp", "Tenjin connect failed: ${e.message}")
                     }
