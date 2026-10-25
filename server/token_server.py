@@ -276,6 +276,13 @@ def provision_pjsip_user(ext: str, password: str):
         f"direct_media=no\n"
         f"force_rport=yes\n"
         f"rewrite_contact=yes\n"
+        # rtp_symmetric: send RTP back to the address/port the phone's RTP actually
+        # comes FROM, not the (often wrong) address in its SDP. On cellular CGNAT the
+        # carrier rebinds the phone's RTP port mid-call (Doze, radio sleep, handover);
+        # without this, Asterisk keeps sending audio to the stale port and the call
+        # goes silent until the path re-learns — the "audio drops then comes back"
+        # mid-call symptom reported 2026-10-25. Required for reliable mobile audio.
+        f"rtp_symmetric=yes\n"
         f"\n[auth_{ext}]\n"
         f"type=auth\n"
         f"auth_type=userpass\n"
@@ -286,7 +293,10 @@ def provision_pjsip_user(ext: str, password: str):
         f"max_contacts=1\n"
         f"remove_existing=yes\n"
         f"qualify_frequency=60\n"
-        f"qualify_timeout=3\n"
+        # qualify_timeout=10 (was 3): a phone dozing on LTE routinely can't answer the
+        # OPTIONS ping within 3s, so Asterisk marked the contact Unreachable and dropped
+        # it mid-session. 10s tolerates normal mobile radio latency without flapping.
+        f"qualify_timeout=10\n"
     )
     with open(PJSIP_USERS_FILE, "a") as f:
         f.write(block)
