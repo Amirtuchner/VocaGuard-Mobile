@@ -31,22 +31,14 @@ class PhoneStateReceiver : BroadcastReceiver() {
         val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE) ?: return
         Log.i(TAG, "Phone state broadcast: $state")
 
-        // Ensure PhoneMonitorService is running — it handles the actual
-        // call monitoring logic via its PhoneStateMonitor instance.
-        try {
-            context.startForegroundService(
-                Intent(context, PhoneMonitorService::class.java)
-            )
-        } catch (e: Exception) {
-            Log.w(TAG, "Cannot start PhoneMonitorService: ${e.message}")
-        }
-
-        // Forward the state change to PhoneMonitorService so it can act
-        // even if its TelephonyCallback was frozen.
-        // Feed the same shared ringing/direction state that PhoneStateMonitor uses,
-        // so whichever path (this broadcast, or PhoneStateMonitor's own registered
-        // listener) delivers a given transition first, direction is computed the
-        // same way instead of one path leaving it stale from the previous call.
+        // IMPORTANT: do NOT start PhoneMonitorService from here. It is a shortService
+        // (restricted) foreground service, and Android 15 forbids launching restricted
+        // foreground-service types from a background-woken manifest broadcast receiver
+        // — Play flags it as a crash risk ("Limited types of services running in the
+        // foreground"). The service is started on the exempt paths only: the FCM
+        // incoming_call push (which carries the FGS-start grant) and the foreground
+        // IncomingCallActivity. This receiver only updates shared call state and
+        // forwards transitions to the service when it is ALREADY running.
         val scamDatabaseManager = ScamDatabaseManager.getInstance(context)
         when (state) {
             TelephonyManager.EXTRA_STATE_RINGING -> {
@@ -56,21 +48,29 @@ class PhoneStateReceiver : BroadcastReceiver() {
             TelephonyManager.EXTRA_STATE_OFFHOOK -> {
                 Log.i(TAG, "Call answered — notifying PhoneMonitorService")
                 scamDatabaseManager.resolveActiveCallDirectionOnOffhook()
-                context.startService(
-                    Intent(context, PhoneMonitorService::class.java).apply {
-                        action = "io.vocaguard.ACTION_CALL_OFFHOOK"
-                    }
-                )
+                forwardIfRunning(context, PhoneMonitorService.ACTION_CALL_OFFHOOK)
             }
             TelephonyManager.EXTRA_STATE_IDLE -> {
                 Log.i(TAG, "Call ended — notifying PhoneMonitorService")
                 scamDatabaseManager.markCallIdle()
-                context.startService(
-                    Intent(context, PhoneMonitorService::class.java).apply {
-                        action = "io.vocaguard.ACTION_CALL_IDLE"
-                    }
-                )
+                forwardIfRunning(context, PhoneMonitorService.ACTION_CALL_IDLE)
             }
+        }
+    }
+
+    /**
+     * Deliver a call-state action to PhoneMonitorService using startService (NOT
+     * startForegroundService, so it never launches a restricted FGS). If the service
+     * isn't already running, a background startService throws — swallow it, since
+     * there's nothing to notify in that case.
+     */
+    private fun forwardIfRunning(context: Context, action: String) {
+        try {
+            context.startService(
+                Intent(context, PhoneMonitorService::class.java).apply { this.action = action }
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Not forwarding $action (service not running): ${e.message}")
         }
     }
 }
