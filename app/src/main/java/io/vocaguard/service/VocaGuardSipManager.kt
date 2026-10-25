@@ -60,40 +60,49 @@ object VocaGuardSipManager {
             c.isVideoCaptureEnabled = false
             c.isVideoDisplayEnabled = false
 
-            // Enable Opus codec for better audio quality (lower latency, better compression)
+            // Opus with in-band FEC (forward error correction) is the key to resilient,
+            // clear voice over lossy cellular — the same technique apps like WhatsApp
+            // use. FEC lets the decoder reconstruct lost packets instead of producing
+            // gaps / robotic dropouts (reported as mid-call "hang-ups" 2026-10-25).
             for (pt in c.audioPayloadTypes) {
                 when (pt.mimeType.lowercase()) {
-                    "opus" -> pt.enable(true)
+                    "opus" -> {
+                        pt.enable(true)
+                        // useinbandfec=1 → recover lost packets; wideband playback.
+                        pt.sendFmtp = "useinbandfec=1;maxplaybackrate=16000;maxaveragebitrate=32000;stereo=0"
+                        pt.recvFmtp = "useinbandfec=1;maxplaybackrate=16000"
+                        pt.normalBitrate = 32  // kbps — ample for wideband voice on the app leg
+                    }
                     "pcmu", "pcma" -> pt.enable(true)    // keep G.711 as fallback
                     else -> pt.enable(false)
                 }
             }
 
-            // Increase jitter buffer to absorb network variance — reduces clicks/pops
-            c.audioJittcomp = 80   // ms (default 60)
+            // Larger, adaptive jitter buffer absorbs cellular jitter and loss bursts so
+            // audio stays smooth instead of clicking or cutting out mid-call.
+            c.isAudioAdaptiveJittcompEnabled = true
+            c.audioJittcomp = 160   // ms (was 80)
 
             // Enable adaptive rate control for smoother audio
             c.isAdaptiveRateControlEnabled = true
 
-            // Acoustic echo cancellation — without this the caller hears themselves:
-            // the caller's voice plays out the user's speaker, the mic picks it up,
-            // and it's sent back down the bridge. Not enabled by default in this SDK
-            // build, so turn it on explicitly. (Reported 2026-09-23: "heard himself".)
-            c.isEchoCancellationEnabled = true
+            // Echo cancellation: prefer the DEVICE's hardware canceller (what WhatsApp
+            // and the native dialer use) for clean full-duplex. The old software echo
+            // *limiter* stopped speaker echo but attenuated the mic whenever the remote
+            // party spoke, making audio choppy/half-duplex (reported as "low quality"
+            // 2026-10-25). Use hardware AEC where present and drop the limiter entirely.
+            if (c.hasBuiltinEchoCanceller()) {
+                c.isEchoCancellationEnabled = false   // hardware AEC handles echo cleanly
+            } else {
+                c.isEchoCancellationEnabled = true    // software AEC fallback
+                // Longer filter tail covers the speakerphone echo path on devices
+                // without a hardware canceller.
+                c.config?.setInt("sound", "ec_tail_len", 200)
+            }
+            // No echo limiter — it was the main cause of choppy, half-duplex audio.
+            c.isEchoLimiterEnabled = false
 
-            // Speakerphone has a longer, louder echo path than the earpiece, so the
-            // default AEC filter tail is too short to model it and echo leaks back.
-            // A longer tail (200 ms) lets the canceller cover the speakerphone delay.
-            c.config?.setInt("sound", "ec_tail_len", 200)
-
-            // Echo limiter — AEC alone still left residual echo on speakerphone
-            // (reported 2026-09-23). The limiter attenuates the mic while the remote
-            // party is speaking, which suppresses hands-free echo the AEC misses.
-            // Trade-off: slightly less smooth full-duplex (mild ducking), accepted
-            // here to keep the caller from hearing themselves on speaker.
-            c.config?.setInt("sound", "echolimiter", 1)
-
-            // Keep NAT pinhole open with UDP CRLF keep-alives
+            // Keep NAT pinhole open with CRLF keep-alives
             c.isKeepAliveEnabled = true
 
             // Use per-user SIP credentials if registered, otherwise fall back to legacy
@@ -293,8 +302,9 @@ object VocaGuardSipManager {
             core.outputAudioDevice = core.audioDevices
                 .firstOrNull { it.type == AudioDevice.Type.Earpiece }
                 ?: core.outputAudioDevice
-            // Boost received audio to match regular call loudness
-            core.playbackGainDb = 6.0f
+            // Modest boost for loudness. +6 dB previously could clip/distort narrowband
+            // PSTN audio; +3 dB stays loud without the distortion that read as "low quality".
+            core.playbackGainDb = 3.0f
             // Maximize the Android voice call stream volume
             appContext?.let { ctx ->
                 val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
