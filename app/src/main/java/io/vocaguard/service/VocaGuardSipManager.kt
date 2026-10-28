@@ -105,6 +105,11 @@ object VocaGuardSipManager {
             // Keep NAT pinhole open with CRLF keep-alives
             c.isKeepAliveEnabled = true
 
+            // Be lenient with the no-RTP timeout (default ~30s) so a transient RTP
+            // gap during a cellular NAT rebind doesn't terminate an otherwise healthy
+            // call. 90s is plenty for the path to re-learn.
+            c.config?.setInt("rtp", "nortp_timeout", 90)
+
             // Use per-user SIP credentials if registered, otherwise fall back to legacy
             val serverIp = BuildConfig.TOKEN_SERVER_HOST
             val sipUser  = if (ServerDetectionManager.isRegistered()) ServerDetectionManager.getSipExtension() else FALLBACK_USER
@@ -153,6 +158,12 @@ object VocaGuardSipManager {
                             _callState.value = CallState.ACTIVE
                         }
                         Call.State.End, Call.State.Released, Call.State.Error -> {
+                            // DIAGNOSTIC: log exactly why the call ended (reason + SIP
+                            // protocol code + phrase + duration). no-RTP timeout shows a
+                            // distinct reason vs a real remote BYE.
+                            Log.i(TAG, "Call END state=$state msg='$message' " +
+                                "reason=${call.reason} dur=${call.duration}s " +
+                                "err=${call.errorInfo?.protocolCode}/${call.errorInfo?.phrase}")
                             _callState.value = CallState.ENDED
                             pendingAccept = false
                             currentRecordFile = null

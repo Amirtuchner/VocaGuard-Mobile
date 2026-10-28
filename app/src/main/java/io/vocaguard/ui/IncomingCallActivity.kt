@@ -134,6 +134,13 @@ class IncomingCallActivity : ComponentActivity() {
 
         isShowing = true
 
+        // Blank the screen while the phone is held to the ear so a cheek/ear touch
+        // can't hit the on-screen controls (End, speaker, etc.) and drop the call
+        // mid-conversation. Diagnosed 2026-10-28: "mid-call disconnections" were
+        // accidental End-button taps — audio was healthy (0% loss) right up to a
+        // touch event, then the app sent a BYE. This is standard dialer behaviour.
+        acquireProximityLock()
+
         val callerNumber    = intent.getStringExtra(EXTRA_CALLER_NUMBER) ?: ""
         val asteriskChannel = intent.getStringExtra(EXTRA_CHANNEL) ?: ""
         val demoMode        = intent.getBooleanExtra(EXTRA_DEMO, false)
@@ -427,8 +434,33 @@ class IncomingCallActivity : ComponentActivity() {
         finish()
     }
 
+    private var proximityWakeLock: android.os.PowerManager.WakeLock? = null
+
+    /** Turn the screen off (and ignore touches) while the proximity sensor is covered
+     *  — i.e. the phone is at the ear — so accidental face touches can't press the
+     *  in-call controls. Released in onDestroy. */
+    private fun acquireProximityLock() {
+        try {
+            val pm = getSystemService(android.os.PowerManager::class.java) ?: return
+            if (pm.isWakeLockLevelSupported(android.os.PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK)) {
+                proximityWakeLock = pm.newWakeLock(
+                    android.os.PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK,
+                    "vocaguard:incall_proximity"
+                ).also { it.acquire(60 * 60 * 1000L) }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("IncomingCallActivity", "proximity lock failed: ${e.message}")
+        }
+    }
+
+    private fun releaseProximityLock() {
+        try { proximityWakeLock?.let { if (it.isHeld) it.release() } } catch (_: Exception) {}
+        proximityWakeLock = null
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        releaseProximityLock()
         ringtone?.stop()
         isShowing = false
         // Save a clean-call record when the call ends, so "calls analyzed" counts every
