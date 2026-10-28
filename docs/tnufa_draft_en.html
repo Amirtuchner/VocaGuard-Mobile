@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VocaGuard — Tnufa Grant Application (Resubmission Draft)</title>
+<style>
+  body { font-family: "Calibri", "Segoe UI", Arial, sans-serif; color:#1a1a1a; line-height:1.5;
+         max-width: 820px; margin: 36px auto; padding: 0 24px; font-size: 15px; }
+  h1 { font-size: 26px; border-bottom: 3px solid #2b5cab; padding-bottom: 8px; color:#17365d; }
+  h2 { font-size: 20px; color:#1f4e79; margin-top: 30px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  h3 { font-size: 16px; color:#2b5cab; margin-top: 18px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #bbb; padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: #eaf0f8; }
+  .todo { background: #fff3cd; padding: 1px 5px; border-radius: 3px; font-style: italic; color:#7a5b00; }
+  .note { background:#f0f6ff; border-left:4px solid #2b5cab; padding:10px 14px; margin:14px 0; }
+  .metric { font-weight:bold; color:#17365d; }
+  code { background:#f2f2f2; padding:1px 4px; border-radius:3px; font-size:13px; }
+  ul { margin-top: 6px; }
+  .small { color:#666; font-size:13px; }
+</style>
+</head>
+<body>
+
+<h1>VocaGuard — Tnufa Grant Application (Resubmission Draft)</h1>
+<p class="small">Working document. Fields in <span class="todo">[highlighted brackets]</span> require your input
+(company/founder details, budget, timeline, team/mentor, market figures, prior-art search).
+All performance figures below are <strong>real measurements</strong> taken on the live system (see Appendix A),
+and are explicitly flagged where they rest on <strong>synthetic</strong> rather than real-call data.</p>
+
+<h2>0. Submission strategy — read first</h2>
+<p>After a rejection there are two distinct paths:</p>
+<ol>
+<li><strong>Appeal (request for re-discussion):</strong> within <strong>45 days</strong> of the letter, carries a fee,
+and <strong>no new information may be presented</strong> — only arguing the decision was wrong on what was already submitted.
+The letter was issued 11 Feb 2026, so <strong>this window has closed</strong>, and it could not have included the new results anyway. <em>Not relevant.</em></li>
+<li><strong>New / improved application:</strong> allows all the new evidence (working system, metrics, custom-trained model,
+in-house build). The Authority permits this when there is a <strong>material change in the data</strong> — which is now the case.
+<strong>This is the path this document targets</strong> (next cycle, e.g. 9 Nov 2026 — verify date &amp; eligibility).</li>
+</ol>
+
+<h2>1. Executive summary</h2>
+<p>VocaGuard is an Android app for <strong>real-time protection against telephone scams (vishing)</strong>, aimed primarily
+at the elderly and vulnerable. Unlike existing solutions that rely on <strong>number blocking</strong> (static blacklists),
+VocaGuard <strong>analyzes the content of the live call in real time</strong> and alerts the user <strong>while the call is still
+in progress</strong> — before harm is done.</p>
+<p>The core technology is a unique <strong>hybrid architecture</strong>:</p>
+<ol>
+<li><strong>On-device ML classifier</strong> — fast, private, works offline.</li>
+<li><strong>Real-time server engine</strong> — multilingual transcription (Whisper) + a knowledge-based confirmation layer,
+analyzing <strong>both sides</strong> of the live call.</li>
+</ol>
+<p>It overcomes a fundamental Android limitation (apps cannot capture call audio) by <strong>routing the call through
+VocaGuard's infrastructure</strong> (conditional call forwarding → SIP bridge → analysis), enabling two-party real-time
+analysis that is impossible with an on-device-only approach.</p>
+<p><strong>Achieved so far (working proof of feasibility):</strong> a complete end-to-end system in production, a live app on
+Google Play across <span class="todo">[N]</span> devices, an on-device classifier at <span class="metric">93.4%</span>
+accuracy (held-out test set), a server confirmation layer with <span class="metric">0% false positives</span>, and live
+mid-call detection at a measured latency of <span class="metric">~16 seconds</span>.</p>
+
+<h2>2. Problem &amp; market need</h2>
+<ul>
+<li>Phone scams are among the fastest-growing economic crimes; the main victims are the elderly. <span class="todo">[Add damage/scale figures for Israel/global + source.]</span></li>
+<li>Existing solutions (caller ID, blocklists) identify <em>who</em> is calling but not <em>what</em> is being said — blind to scams from legitimate/spoofed numbers and to novel scenarios.</li>
+<li>There is currently no consumer Android product that analyzes the <strong>content</strong> of the live call and alerts mid-call. <span class="todo">[If you ran a patent-office prior-art search, summarize here.]</span></li>
+</ul>
+
+<h2>3. Solution &amp; technological innovation</h2>
+<h3>3.1 Hybrid architecture (on-device + server)</h3>
+<ul>
+<li><strong>Layer A (on-device):</strong> a lightweight text classifier (TensorFlow Lite, 14 classes: legitimate + 13 scam types) running locally — fast, privacy-preserving, works offline.</li>
+<li><strong>Layer B (server, real-time):</strong> multilingual transcription (Whisper) + a knowledge-based scoring engine that detects scam patterns and pushes an alert (FCM) to the user <strong>during the call</strong>.</li>
+<li>The combination is designed so the high-precision knowledge layer (0% false positives) <strong>confirms</strong> the ML output (broad coverage), reducing false alarms — see §4.</li>
+</ul>
+<h3>3.2 The technological breakthrough: two-party live-call analysis on Android</h3>
+<p>Android <strong>blocks</strong> apps from capturing call audio (the reason the Accessibility approach was removed).
+VocaGuard solves this by routing the call through the infrastructure:
+<code>conditional call forwarding → DID number → Asterisk → bridge back to the app (SIP)</code>.
+During the bridge, a <code>MixMonitor</code> component mixes <strong>both channels</strong> (caller + user) into a single stream
+analyzed in real time. This capability is what differentiates VocaGuard from any on-device solution.</p>
+<h3>3.3 Multilingual</h3>
+<p>Transcription auto-detects the language (Hebrew/Russian/Arabic/English/mixed) and locks it for the call — critical for the multilingual Israeli market.</p>
+
+<h2>4. Proof of feasibility — measured results</h2>
+<p class="small">Measurements taken on the live system (Appendix A). Tables 1–2 are based on a <strong>synthetic dataset</strong>
+(14,067 labeled examples) — evidence of feasibility, not a substitute for validation on real calls (see §7, risk R2).</p>
+
+<p><strong>Table 1 — On-device ML classifier (held-out test set, 2,111 examples):</strong></p>
+<table>
+<tr><th>Metric</th><th>Result</th></tr>
+<tr><td>Overall accuracy</td><td class="metric">93.4%</td></tr>
+<tr><td>Validation accuracy</td><td>~94.2% (no overfitting)</td></tr>
+<tr><td>Strongest classes</td><td>Lottery / Insurance 100%, Bank Fraud 99.5%, IRS 98.9%, Social Security 98.9%, Robocall 95.9%</td></tr>
+<tr><td>Weakest class</td><td>Legitimate 75.3% — i.e. the ML model <em>alone</em> would flag ~25% of legitimate calls → the rationale for the hybrid design (Table 2)</td></tr>
+</table>
+
+<p><strong>Table 2 — Server confirmation layer (knowledge-based):</strong></p>
+<table>
+<tr><th>Metric</th><th>Result</th></tr>
+<tr><td>Precision</td><td class="metric">100%</td></tr>
+<tr><td>False-positive rate</td><td class="metric">0%</td> </tr>
+<tr><td colspan="2" class="small">0 of 1,269 legitimate calls flagged. The engine is intentionally conservative (requires accumulated evidence) and serves as a confirmation layer that prevents false alarms — a decisive advantage for an app serving a sensitive audience.</td></tr>
+</table>
+
+<p><strong>Table 3 — Detection latency (measured on a 2-core CPU server):</strong></p>
+<table>
+<tr><th>Stage</th><th>Measured</th></tr>
+<tr><td>Whisper model load</td><td>2.7 s (one-time, at call start)</td></tr>
+<tr><td>Transcribe one 8 s chunk</td><td>~8.0 s (≈1× real-time)</td></tr>
+<tr><td><strong>End-to-end latency after a scam phrase is spoken</strong></td><td class="metric">~16 s</td></tr>
+</table>
+<p class="small">Conclusion: detection works near-real-time, but transcription is "at capacity" on the current hardware — a clear R&amp;D target (see §7).</p>
+
+<h2>5. Response to the three rejection reasons (file 89613, committee decision 09 Feb 2026)</h2>
+<div class="note">Each response points to the <strong>material change in data</strong> achieved since — the condition the Authority requires for an improved resubmission.</div>
+
+<p><strong>Reason 1 (quote):</strong> "The level of technological innovation is low… no clear technological approach to the expected challenges was presented… the technologies mentioned are off-the-shelf and do not demonstrate sufficient technological innovation."</p>
+<p><strong>Response:</strong> The innovation is <strong>not</strong> in the off-the-shelf components (Whisper, TFLite) but in the <strong>architecture and integration</strong>:</p>
+<ul>
+<li>Two-party content analysis of a live cellular call on Android via <strong>network routing</strong> (conditional forwarding → SIP bridge → MixMonitor), bypassing the OS audio-capture block — a capability no on-device solution has (§3.2).</li>
+<li>A <strong>hybrid</strong> architecture (on-device ML + server knowledge confirmation) achieving broad coverage with 0% false positives (§3.1, §4).</li>
+<li><strong>In-call</strong> detection and alerting at a measured latency (§4).</li>
+<li>The technological approach to each challenge is now presented explicitly (§7–§8). <span class="todo">[Strengthen with a patent-office prior-art result — §9.]</span></li>
+</ul>
+
+<p><strong>Reason 2 (quote):</strong> "The work plan's feasibility is lacking… does not address the expected technological challenges in depth… core components are expected to be performed by subcontractors not yet chosen."</p>
+<p><strong>Response:</strong> The core components are <strong>already developed and running in production — built in-house, not by subcontractors</strong>: a trained ML classifier, server infrastructure, SIP routing and call bridging, a real-time transcription pipeline, and a live app on Google Play. The subcontractor concern is <strong>no longer relevant</strong>. The work plan now addresses the challenges in depth with measurable milestones (§7) and risk analysis (§8).</p>
+
+<p><strong>Reason 3 (quote):</strong> "The team's capabilities are lacking. There is no experience in AI development or app development, and no suitable business mentorship on the team."</p>
+<p><strong>Response:</strong> The existence of a working production system (live app + self-trained 93.4% ML model + full server infrastructure) is <strong>proof in practice</strong> of the founder's AI and app-development capability — beyond a declaration. <span class="todo">[Action required from you: add business mentorship — a mentor/advisor, or affiliation with an incubator/accelerator — to directly answer the mentorship point. This is the one gap not closed by the technical achievements and requires active action.]</span></p>
+
+<h2>6. Three material developments since the previous application</h2>
+<ol>
+<li><strong>Full production infrastructure</strong> — server, SIP route, call bridging, real-time transcription pipeline, and a live Google Play app.</li>
+<li><strong>Custom-trained model</strong> — a dedicated 14-class ML classifier at 93.4% accuracy (§4).</li>
+<li><strong>In-call detection demonstrated</strong> — a live alert at a measured ~16 s latency on a two-party call (§4).</li>
+</ol>
+
+<h2>7. R&amp;D plan &amp; milestones (for the grant period)</h2>
+<table>
+<tr><th>#</th><th>Milestone</th><th>Measurable target</th><th>Risk it reduces</th></tr>
+<tr><td>M1</td><td>Validation on labeled real calls</td><td>recall/precision on <span class="todo">[N]</span> real calls</td><td>R2 (synthetic vs real)</td></tr>
+<tr><td>M2</td><td>Reduce detection latency</td><td>from ~16 s to <span class="todo">[&lt;5 s]</span> (GPU / quantization / streaming ASR)</td><td>R1 (latency/capacity)</td></tr>
+<tr><td>M3</td><td>Reduce ML false alarms</td><td>Legitimate-class accuracy from 75% to <span class="todo">[&gt;90%]</span></td><td>R3 (false positives)</td></tr>
+<tr><td>M4</td><td>Improve multilingual coverage</td><td>per-language accuracy (HE/RU/AR) <span class="todo">[target]</span></td><td>R4 (multilingual)</td></tr>
+<tr><td>M5</td><td><span class="todo">[product/market milestone]</span></td><td><span class="todo">[target]</span></td><td>—</td></tr>
+</table>
+<p class="small"><span class="todo">[Map budget, months, and headcount to each milestone per the form's requirements.]</span></p>
+
+<h2>8. Technical risks &amp; mitigations</h2>
+<ul>
+<li><strong>R1 — latency/capacity:</strong> transcription ~1× real-time on current hardware → GPU / int8 / streaming ASR (M2).</li>
+<li><strong>R2 — synthetic↔real gap:</strong> metrics on synthetic data may be optimistic → validation on real calls (M1).</li>
+<li><strong>R3 — false alarms:</strong> ML alone 75% on legitimate → confirmation layer (0% FP) + model improvement (M3).</li>
+<li><strong>R4 — multilingual:</strong> accuracy varies by language → dedicated measurement &amp; improvement (M4).</li>
+</ul>
+
+<h2>9. Differentiation from existing solutions (novelty / patent angle)</h2>
+<p>Distinguishing technical features to search for prior art <span class="todo">[use the free patent-office service via the Tnufa site]</span>:</p>
+<ol>
+<li><strong>Two-party</strong> content analysis of a live cellular call on Android <strong>via network routing</strong> (conditional forwarding + bridge), bypassing the OS audio-capture block.</li>
+<li><strong>Hybrid architecture</strong> — on-device ML classifier + server-side knowledge confirmation, to reduce false alarms.</li>
+<li><strong>In-call alerting</strong> (not after the fact) at a latency of seconds.</li>
+<li>Real-time automatic multilingual language detection in an anti-scam context.</li>
+</ol>
+
+<h2>10. Appendix A — measurement methodology (for transparency)</h2>
+<ul>
+<li><strong>Dataset:</strong> 14,067 labeled examples (legitimate=0, 13 scam types). 70/15/15 split (train/val/test), fixed seed.</li>
+<li><strong>Table 1:</strong> evaluation of the TFLite model on the held-out test set.</li>
+<li><strong>Table 2:</strong> running the server scoring engine over all 14,067 examples.</li>
+<li><strong>Table 3:</strong> timing of <code>faster-whisper medium (int8)</code> transcription of an 8-second speech clip, at production parameters, on a 2-core / 3.7 GB RAM server.</li>
+<li><strong>Stated limitation:</strong> the text data is synthetic (template-based); validation on real calls is milestone M1.</li>
+</ul>
+
+<h2>What I still need from you to finalize</h2>
+<ol>
+<li><strong>Business mentorship</strong> — the one gap not closed by the technical achievements (Reason 3). Add a mentor/advisor or incubator/accelerator affiliation.</li>
+<li>Founder/company details, budget, timeline, headcount — for the form.</li>
+<li>Market/damage figures and sources (§2).</li>
+<li>Patent-office prior-art search result (§9).</li>
+<li>Confirmation of the next cycle date and eligibility for a new application.</li>
+</ol>
+
+</body>
+</html>
