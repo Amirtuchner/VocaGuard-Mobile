@@ -64,6 +64,22 @@
 -dontwarn kotlin.**
 
 # ============================================================
+# Tenjin attribution SDK + its identifier providers.
+# Tenjin loads the Google Advertising ID, AppSet ID and Install Referrer via
+# REFLECTION, so R8 can't see the references and strips those classes in release.
+# Result: advertising_id comes back null and Tenjin rejects every event with
+# 202 "invalid device identifier" — zero installs recorded in production (debug
+# works because R8 isn't applied). Diagnosed 2026-10-28. Keep them all.
+# ============================================================
+-keep class com.tenjin.** { *; }
+-dontwarn com.tenjin.**
+-keep class com.google.android.gms.ads.identifier.** { *; }
+-keep class com.google.android.gms.appset.** { *; }
+-dontwarn com.google.android.gms.appset.**
+-keep class com.android.installreferrer.** { *; }
+-dontwarn com.android.installreferrer.**
+
+# ============================================================
 # Misc AndroidX suppressions
 # ============================================================
 -dontwarn androidx.lifecycle.**
