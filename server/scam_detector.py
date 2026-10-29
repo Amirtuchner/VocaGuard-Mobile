@@ -343,6 +343,21 @@ SCAM_KEYWORDS_HE = [
 ]
 
 SCAM_KEYWORDS_RU = [
+    # --- Israel-targeting RU scams, mined from real calls 2026-10-29 ---
+    ("вернуть деньги", 2), ("вернуть вам деньги", 2),
+    ("возврат подоходного налога", 2), ("возврат налога", 2),
+    ("накладная", 2), ("код получения", 2),
+    ("скину ссылку", 2), ("скину вам ссылку", 2), ("перейдите по ссылке", 2),
+    ("введите пароль", 2), ("поменяем пароль", 2),
+    ("доступ к аккаунт", 2), ("арендовала ваш аккаунт", 2), ("арендовали ваш аккаунт", 2),
+    ("криптоэволюционн", 2), ("государственный проект", 2), ("бонус в размере", 2),
+    ("акций и валют", 2), ("торгуете на бирже", 2),
+    ("торговый счет", 1), ("торговый счёт", 1), ("биржев", 1), ("биржа", 1),
+    ("вас обманули", 1), ("регуляц", 1),
+    ("посылк", 1), ("почтовое отделение", 1), ("сортировочн", 1),
+    ("личный кабинет", 1), ("шаблонный", 1), ("пассивный доход", 1),
+    ("подписать договор", 1), ("комиссионн", 1), ("выплат", 1),
+    ("есть телеграм", 1), ("переверните", 1), ("продиктуйте", 1), ("продиктует", 1),
     ("ордер на арест", 2), ("федеральное расследование", 2), ("безопасный счет", 2),
     ("никому не говорите", 2), ("конфиденциально", 2),
     ("подарочная карта", 2), ("банковский перевод", 2), ("биткоин", 2),
@@ -534,10 +549,13 @@ def detect_scam(window_text: str):
     matched = []
     has_high_signal = False
     for table in ALL_KEYWORD_TABLES:
+        is_ru = table is SCAM_KEYWORDS_RU
         for kw, weight in table:
             kw_s = _WORD_SEP.sub(" ", kw.lower()).strip()  # normalised keyword, no padding
-            # Standard word-boundary match
-            found = f" {kw_s} " in normed_text
+            # Russian is heavily inflected (suffixes) -> match on word-
+            # prefix so a stem like "биржев" matches "биржевой". Hebrew/
+            # English stay whole-word to avoid false sub-word matches.
+            found = (f" {kw_s}" in normed_text) if is_ru else (f" {kw_s} " in normed_text)
             # Hebrew prefix match: keyword may be preceded by a single
             # grammatical prefix letter (מבנק הפועלים, לביטוח לאומי, etc.)
             if not found:
