@@ -1,0 +1,16 @@
+[Unit]
+Description=VocaGuard shared Whisper transcription service
+After=network.target
+
+[Service]
+Type=simple
+User=asterisk
+Group=asterisk
+ExecStart=/opt/vocaguard-venv/bin/python3 /opt/vocaguard/whisper_service.py
+Restart=always
+RestartSec=3
+# Raise on a bigger CPU / GPU host to allow parallel transcriptions.
+Environment=WHISPER_WORKERS=1
+
+[Install]
+WantedBy=multi-user.target

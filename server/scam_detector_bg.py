@@ -93,7 +93,37 @@ def send_fcm_with_token(token: str, keywords, transcript, scam_type,
 
 import numpy as np
 from vosk import Model, KaldiRecognizer
-from faster_whisper import WhisperModel
+import socket, struct, pickle
+
+# Whisper runs as a shared, always-loaded service (vocaguard-whisper.service)
+# reached over this Unix socket. We no longer load a 1.4 GB model per call —
+# that OOM-capped the box at ~1 concurrent call and added ~2.7s load latency.
+WHISPER_SOCK = "/var/lib/asterisk/whisper.sock"
+
+
+def _recvall(sock, n):
+    buf = b""
+    while len(buf) < n:
+        chunk = sock.recv(n - len(buf))
+        if not chunk:
+            raise ConnectionError("whisper service closed connection")
+        buf += chunk
+    return buf
+
+
+def _whisper_rpc(audio_np, language, timeout=120):
+    """Send one audio chunk to the shared Whisper service; returns
+    {'text','language','language_probability'}. Raises on connection failure."""
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.settimeout(timeout)
+    try:
+        s.connect(WHISPER_SOCK)
+        req = pickle.dumps({"audio": audio_np, "language": language})
+        s.sendall(struct.pack(">I", len(req)) + req)
+        n = struct.unpack(">I", _recvall(s, 4))[0]
+        return pickle.loads(_recvall(s, n))
+    finally:
+        s.close()
 
 MODEL_PATH_EN       = "/opt/vocaguard/model-en"
 SAMPLE_RATE         = 16000
@@ -149,16 +179,15 @@ def main():
         log.error(f"BG: Vosk load error: {e}")
         return
 
-    whisper_model = None
-    try:
-        # local_files_only: the model is already cached on disk — without this,
-        # faster_whisper/huggingface_hub hits the HF API to check for a newer
-        # revision on every single call, adding a network round-trip to the
-        # model-load latency each time.
-        whisper_model = WhisperModel("medium", device="cpu", compute_type="int8", local_files_only=True)
-        log.info("BG: Whisper model loaded")
-    except Exception as e:
-        log.warning(f"BG: Whisper load error: {e}")
+    # Whisper runs in the shared vocaguard-whisper.service (model loaded once);
+    # here we just confirm the socket exists. No per-call model load → flat RAM
+    # no matter how many calls are concurrent (the service serializes/parallelizes
+    # transcription itself).
+    whisper_available = os.path.exists(WHISPER_SOCK)
+    if whisper_available:
+        log.info("BG: using shared Whisper service at %s", WHISPER_SOCK)
+    else:
+        log.warning("BG: Whisper service socket %s missing — multilingual detection degraded", WHISPER_SOCK)
 
     fifo_ready.wait(timeout=300)
     if fifo_holder[0] is None:
@@ -245,18 +274,14 @@ def main():
                 )
                 # language=locked_language once locked (else auto-detect). Gentler
                 # VAD padding (speech_pad_ms) so word edges aren't clipped.
-                segments, info = whisper_model.transcribe(
-                    audio_np, beam_size=5, best_of=3,
-                    vad_filter=True,
-                    vad_parameters=dict(min_silence_duration_ms=1000, speech_pad_ms=400),
-                    language=locked_language,
-                )
-                if locked_language is None and info.language and \
-                        getattr(info, "language_probability", 0.0) >= 0.7:
-                    locked_language = info.language
+                resp = _whisper_rpc(audio_np, locked_language)
+                info_lang = resp.get("language")
+                info_prob = resp.get("language_probability", 0.0) or 0.0
+                if locked_language is None and info_lang and info_prob >= 0.7:
+                    locked_language = info_lang
                     log.info(f"BG: locked transcription language = {locked_language}")
-                lang = locked_language or info.language
-                text = " ".join(seg.text for seg in segments).strip()
+                lang = locked_language or info_lang
+                text = (resp.get("text") or "").strip()
                 if text:
                     if lang and lang != "en":
                         non_english_chunks += 1
@@ -271,7 +296,7 @@ def main():
             finally:
                 whisper_q.task_done()
 
-    if whisper_model:
+    if whisper_available:
         _wt = threading.Thread(target=_whisper_worker, daemon=True)
         _wt.start()
 
@@ -322,7 +347,7 @@ def main():
 
                 whisper_buf.extend(resampled)
                 if len(whisper_buf) >= WHISPER_CHUNK_BYTES:
-                    if whisper_model:
+                    if whisper_available:
                         try:
                             whisper_q.put_nowait(bytes(whisper_buf))
                         except _queue.Full:
@@ -339,7 +364,7 @@ def main():
     if final_en:
         add_text(final_en, "EN-final")
 
-    if whisper_model:
+    if whisper_available:
         # Route the tail audio through the same worker queue so text stays in
         # call order, then drain the queue completely before sending the
         # transcript — otherwise in-flight chunks are silently lost.
