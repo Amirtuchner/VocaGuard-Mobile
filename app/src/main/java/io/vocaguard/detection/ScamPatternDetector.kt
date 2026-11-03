@@ -18,6 +18,7 @@ class ScamPatternDetector() {
                 "IRS", "internal revenue", "owe money", "arrest warrant",
                 "legal action", "tax refund", "tax fraud", "tax lien", "back taxes",
                 // Russian
+
                 "налоговая служба", "налоговый долг", "задолженность по налогам", "фнс",
                 // Hebrew
                 "מס הכנסה", "רשות המסים", "חוב מס", "עיקול מס",

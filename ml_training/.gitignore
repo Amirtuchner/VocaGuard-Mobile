@@ -1,1 +1,3 @@
 ﻿real_recordings/
+# Transient transcription run logs (reference real recording filenames / counts)
+*_run.log
