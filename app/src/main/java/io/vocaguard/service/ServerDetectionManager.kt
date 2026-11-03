@@ -36,6 +36,7 @@ object ServerDetectionManager {
     private const val KEY_SIP_PASS    = "sip_password"
     private const val KEY_DID         = "did_number"
     private const val KEY_REGISTERED  = "registered"
+    private const val KEY_TRIAL_START = "trial_start_epoch"  // server-authoritative, reinstall-proof
 
     private lateinit var prefs: SharedPreferences
 
@@ -50,6 +51,11 @@ object ServerDetectionManager {
     fun getSipExtension(): String = prefs.getString(KEY_SIP_EXT, "") ?: ""
     fun getSipPassword(): String  = prefs.getString(KEY_SIP_PASS, "") ?: ""
     fun getDidNumber(): String    = prefs.getString(KEY_DID,     "") ?: ""
+
+    /** Unix epoch (seconds) when this user's free trial started (first server
+     *  registration), per the server. 0 = never registered. Reinstall-proof: the
+     *  server returns the original start, so it can't be reset by reinstalling. */
+    fun getTrialStartEpoch(): Long = prefs.getLong(KEY_TRIAL_START, 0L)
 
     /**
      * Activation code the user dials to enable call forwarding.
@@ -107,6 +113,7 @@ object ServerDetectionManager {
                 val sipExt     = json.optString("sip_extension")
                 val sipPass    = json.optString("sip_password")
                 val didNumber  = json.optString("did_number")
+                val trialStart = json.optLong("trial_start_epoch", 0L)
 
                 if (sipExt.isEmpty() || sipPass.isEmpty()) {
                     return@withContext RegistrationResult(
@@ -121,6 +128,12 @@ object ServerDetectionManager {
                     .putString(KEY_DID,        didNumber)
                     .putBoolean(KEY_REGISTERED, true)
                     .apply()
+                // Store the server's trial start (only if provided) so the paywall
+                // logic knows when the free month began. Never overwrite a good
+                // value with 0 (older server / missing field).
+                if (trialStart > 0L) {
+                    prefs.edit().putLong(KEY_TRIAL_START, trialStart).apply()
+                }
 
                 RegistrationResult(
                     success      = true,

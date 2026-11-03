@@ -136,8 +136,31 @@ def get_user_by_phone(phone: str) -> dict | None:
     }
 
 
+TRIAL_DAYS = 30  # app-managed free trial length (no card required until it ends)
+
+
+def _trial_info(created_at) -> dict:
+    """Trial fields derived from users.created_at (UTC 'YYYY-MM-DD HH:MM:SS').
+    created_at is set ONCE at first registration and never reset, so reinstalling
+    the app cannot grant a fresh trial. None => brand-new user (full trial now)."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    dt = now
+    if created_at:
+        try:
+            dt = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        except Exception:
+            dt = now
+    elapsed_days = (now - dt).total_seconds() / 86400.0
+    return {
+        "trial_start_epoch": int(dt.timestamp()),
+        "trial_days_left":   max(0, TRIAL_DAYS - int(elapsed_days)),
+        "trial_active":      elapsed_days < TRIAL_DAYS,
+    }
+
+
 def register_user(phone: str, fcm_token: str) -> dict:
-    """Create user or update their FCM token. Returns SIP credentials."""
+    """Create user or update their FCM token. Returns SIP credentials + trial status."""
     # Store the canonical (normalized) phone so /delete, /register-token and the
     # incoming-call lookups all match. _normalize_phone strips the leading "+"
     # (PJSIP dials digits only); it is idempotent, so re-registration matches the
@@ -145,7 +168,7 @@ def register_user(phone: str, fcm_token: str) -> dict:
     phone = _normalize_phone(phone)
     conn = db_connect()
     existing = conn.execute(
-        "SELECT sip_extension, sip_password FROM users WHERE phone_number=?",
+        "SELECT sip_extension, sip_password, created_at FROM users WHERE phone_number=?",
         (phone,)
     ).fetchone()
 
@@ -161,6 +184,7 @@ def register_user(phone: str, fcm_token: str) -> dict:
             "sip_extension": existing[0],
             "sip_password":  existing[1],
             "did_number":    DID_NUMBER,
+            **_trial_info(existing[2]),
         }
 
     # New user: assign next extension number. "vocaguard_" is 10 chars, so the
@@ -193,6 +217,7 @@ def register_user(phone: str, fcm_token: str) -> dict:
         "sip_extension": sip_ext,
         "sip_password":  sip_pass,
         "did_number":    DID_NUMBER,
+        **_trial_info(None),   # brand-new user → full trial starting now
     }
 
 

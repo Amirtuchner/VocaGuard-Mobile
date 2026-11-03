@@ -41,6 +41,9 @@ class BillingManager private constructor(private val context: Context) :
 
     companion object {
         const val PRODUCT_ID = "vocaguard_monthly"
+        /** App-managed free-trial length (days). The first month is free with no
+         *  card; the Play subscription (card) is only invoked once this ends. */
+        const val TRIAL_DAYS = 30
         /** Code that unlocks premium for app review / testing (provided to Google in
          *  Play Console → App access). Entered via the hidden tap on the paywall
          *  title. Not secret-grade — it only grants the trial feature set so a
@@ -68,6 +71,17 @@ class BillingManager private constructor(private val context: Context) :
     private val prefs = context.getSharedPreferences("vocaguard_billing", Context.MODE_PRIVATE)
 
     private fun isReviewerUnlocked(): Boolean = prefs.getBoolean("reviewer_unlocked", false)
+
+    /** True while the user is within their app-managed free trial — or hasn't
+     *  registered yet (grace, so they can complete onboarding before the clock
+     *  starts). Trial start comes from the server (ServerDetectionManager),
+     *  which never resets it, so reinstalling can't grant a fresh month. */
+    private fun trialActive(): Boolean {
+        val start = io.vocaguard.service.ServerDetectionManager.getTrialStartEpoch()
+        if (start <= 0L) return true  // not registered yet → let them onboard
+        val elapsedDays = (System.currentTimeMillis() / 1000.0 - start) / 86400.0
+        return elapsedDays < TRIAL_DAYS
+    }
 
     /** Redeem an access code — the Google-review code OR the admin/employee key.
      *  Either grants free premium (persisted). Returns true if the code matched. */
@@ -138,9 +152,16 @@ class BillingManager private constructor(private val context: Context) :
         }
         if (active) {
             _status.value = SubscriptionStatus.Active
+        } else if (trialActive()) {
+            // App-managed free trial: the first 30 days after the user registers are
+            // free with NO payment method required. Only after it ends do we show the
+            // paywall (and ask for a card). Reinstall-proof — the trial start is the
+            // server's created_at, which it never resets.
+            _status.value = SubscriptionStatus.Active
+            queryProductDetails()?.let { _priceLine.value = formatPriceLine(it) }
         } else {
-            // Only block with paywall if the product actually exists in Play Console.
-            // If it hasn't been created yet, stay Unknown so access isn't blocked.
+            // Trial ended and no active subscription → paywall, but only if the
+            // product actually exists in Play Console (else stay Unknown, don't block).
             val details = queryProductDetails()
             details?.let { _priceLine.value = formatPriceLine(it) }
             _status.value = if (details != null) SubscriptionStatus.Expired else SubscriptionStatus.Unknown
