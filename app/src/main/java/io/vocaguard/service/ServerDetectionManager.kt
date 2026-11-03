@@ -146,6 +146,46 @@ object ServerDetectionManager {
             }
         }
 
+    data class VerifyStartResult(
+        val success: Boolean,
+        val verifyNumber: String = "",
+        val code: String = "",
+        val error: String = "",
+    )
+
+    /**
+     * Start CLI-capture number detection. Sends our FCM token to the server, which
+     * returns a DID to call plus a short numeric nonce. The caller then places a
+     * brief call to [VerifyStartResult.verifyNumber] sending [VerifyStartResult.code]
+     * as DTMF; the server reads the call's ANI (the device's real number) and pushes
+     * it back via FCM ("number_verified"). No phone-number permission or typing needed.
+     */
+    suspend fun startNumberVerification(fcmToken: String): VerifyStartResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val body = JSONObject().apply { put("fcm_token", fcmToken) }.toString()
+                val client = buildHttpClient()
+                val request = Request.Builder()
+                    .url("https://${BuildConfig.TOKEN_SERVER_HOST}/verify-number/start")
+                    .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                    .post(body.toRequestBody("application/json".toMediaType()))
+                    .build()
+                val response = client.newCall(request).execute()
+                if (!response.isSuccessful) {
+                    return@withContext VerifyStartResult(false, error = "Server returned ${response.code}")
+                }
+                val json = JSONObject(response.body?.string() ?: "{}")
+                val num  = json.optString("verify_number")
+                val code = json.optString("code")
+                if (num.isEmpty() || code.isEmpty()) {
+                    return@withContext VerifyStartResult(false, error = "Invalid server response")
+                }
+                VerifyStartResult(true, verifyNumber = num, code = code)
+            } catch (e: Exception) {
+                VerifyStartResult(false, error = e.message ?: "Unknown error")
+            }
+        }
+
     fun clear() {
         prefs.edit().clear().apply()
     }

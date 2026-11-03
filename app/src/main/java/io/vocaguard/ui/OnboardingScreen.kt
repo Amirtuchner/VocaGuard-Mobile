@@ -28,9 +28,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.launch
 
-private const val TOTAL_STEPS = 7  // Terms · Welcome · Call Screening · Notification Access · Registration · Battery · Forwarding
+private const val TOTAL_STEPS = 6  // Terms · Welcome · Call Screening · Notification Access · Activate (register + forwarding) · Battery
 
 /** True if the app is exempt from battery optimization (won't be frozen in the background). */
 private fun isBatteryUnrestricted(context: android.content.Context): Boolean {
@@ -75,20 +74,16 @@ fun OnboardingScreen(
     val serverPhoneInput    by viewModel.serverPhoneInput.collectAsStateWithLifecycle()
     val activationCode      by viewModel.serverActivationCode.collectAsStateWithLifecycle()
     val callForwardingEnabled by viewModel.callForwardingEnabled.collectAsStateWithLifecycle()
+    val awaitingNumberVerify by viewModel.awaitingNumberVerify.collectAsStateWithLifecycle()
 
     val callScreeningLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { callScreeningOk = permissionsManager.isCallScreeningEnabled() }
 
-    // One-tap activation: detect the user's number (silent → Hint picker → manual),
-    // then register + enable call forwarding in a single step.
-    val scope = rememberCoroutineScope()
-    val hintLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartIntentSenderForResult()
-    ) { res ->
-        val num = io.vocaguard.service.PhoneNumberHelper.parseHintResult(context, res.data)
-        if (num.isNotBlank()) viewModel.activateProtection(num) else viewModel.promptManualEntry()
-    }
+    // One-tap activation: detect the user's number, then register + enable call
+    // forwarding in a single step. Detection order: silent telephony read → CLI-capture
+    // verification call (reveals the number on carriers that hide it, e.g. Israeli
+    // SIMs) → manual entry. Server registration + forwarding follow automatically.
     val onActivate: () -> Unit = {
         val existing = serverPhoneInput.ifBlank {
             io.vocaguard.service.PhoneNumberHelper.readSimNumber(context)
@@ -96,14 +91,7 @@ fun OnboardingScreen(
         if (existing.isNotBlank()) {
             viewModel.activateProtection(existing)
         } else {
-            scope.launch {
-                val sender = io.vocaguard.service.PhoneNumberHelper.phoneNumberHintIntent(context)
-                if (sender != null) {
-                    hintLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
-                } else {
-                    viewModel.promptManualEntry()
-                }
-            }
+            viewModel.verifyNumberThenActivate()
         }
     }
 
@@ -166,15 +154,19 @@ fun OnboardingScreen(
                 4 -> RegistrationStep(
                     phoneInput      = serverPhoneInput,
                     onPhoneChange   = viewModel::updateServerPhoneInput,
-                    onRegister      = viewModel::registerWithServer,
+                    // Manual "Register this number" also enables forwarding silently.
+                    onRegister      = { viewModel.activateProtection(serverPhoneInput) },
                     onActivate      = onActivate,
                     onChangeNumber  = {
                         viewModel.unregisterFromServer()
                         viewModel.updateServerPhoneInput("")
                     },
                     isRegistering   = serverIsRegistering,
+                    isDetecting     = awaitingNumberVerify,
                     isRegistered    = serverRegistered,
-                    status          = serverRegStatus
+                    status          = serverRegStatus,
+                    forwardingEnabled = callForwardingEnabled,
+                    onEnableForwarding = viewModel::enableCallForwarding
                 )
                 5 -> BatteryOptimizationStep(
                     isDone = batteryUnrestricted,
@@ -192,24 +184,6 @@ fun OnboardingScreen(
                         }
                     }
                 )
-                6 -> {
-                    val fallbackDid = if (simCountry == "us" || simCountry == "ca")
-                        "+13373828491" else "+97233741493"
-                    val fallbackCode = if (isVerizon) "*72$fallbackDid"
-                        else "*21*$fallbackDid#"
-                    CallForwardingStep(
-                        activationCode = activationCode.ifEmpty { fallbackCode },
-                        isVerizon      = isVerizon,
-                        isEnabled      = callForwardingEnabled,
-                        onDial         = {
-                            val code = activationCode.ifEmpty { fallbackCode }
-                            val intent = Intent(Intent.ACTION_DIAL,
-                                Uri.parse("tel:" + code.replace("#", "%23")))
-                            context.startActivity(intent)
-                        },
-                        onToggle = viewModel::setCallForwardingEnabled
-                    )
-                }
             }
         }
 
@@ -227,7 +201,7 @@ fun OnboardingScreen(
                 Spacer(Modifier.width(64.dp))
             }
 
-            val lastStep = TOTAL_STEPS - 1  // step 6 (Call Forwarding)
+            val lastStep = TOTAL_STEPS - 1  // step 5 (Battery)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // No Skip on the Terms step — acceptance is required
                 if (step in 1 until lastStep) {
@@ -239,11 +213,7 @@ fun OnboardingScreen(
                     enabled = step != 0 || termsAccepted,
                     modifier = Modifier.defaultMinSize(minWidth = 120.dp)
                 ) {
-                    Text(when {
-                        step < lastStep        -> "Next"
-                        callForwardingEnabled  -> "Get Started"
-                        else                   -> "Skip (not recommended)"
-                    })
+                    Text(if (step < lastStep) "Next" else "Get Started")
                 }
             }
         }
@@ -270,6 +240,7 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
                 Triple("English", "en-US", "en"),
                 Triple("עברית", "he-IL", "iw"),
                 Triple("Русский", "ru-RU", "ru"),
+                Triple("العربية", "ar-SA", "ar"),
             ).forEach { (label, tag, code) ->
                 val sel = selectedLang == code
                 Button(
@@ -478,9 +449,13 @@ private fun RegistrationStep(
     onActivate: () -> Unit,
     onChangeNumber: () -> Unit,
     isRegistering: Boolean,
+    isDetecting: Boolean,
     isRegistered: Boolean,
-    status: String
+    status: String,
+    forwardingEnabled: Boolean,
+    onEnableForwarding: () -> Unit
 ) {
+    val busy = isRegistering || isDetecting
     var showManual by remember { mutableStateOf(false) }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -494,18 +469,18 @@ private fun RegistrationStep(
             textAlign = TextAlign.Center
         )
         Text(
-            text = "One tap — VocaGuard sets up scam detection and turns on call forwarding automatically. No typing needed.",
+            text = "One tap — VocaGuard detects your number with a quick call to itself, then turns on scam detection and call forwarding automatically. No typing needed.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        // Primary one-tap CTA: auto-detect number → register → enable forwarding.
+        // Primary one-tap CTA: detect number → register → enable forwarding.
         Button(
             onClick = onActivate,
-            enabled = !isRegistering && !isRegistered,
+            enabled = !busy && !isRegistered,
             modifier = Modifier.fillMaxWidth()
         ) {
-            if (isRegistering) {
+            if (busy) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(18.dp),
                     strokeWidth = 2.dp,
@@ -535,11 +510,25 @@ private fun RegistrationStep(
                 )
                 TextButton(
                     onClick = onRegister,
-                    enabled = !isRegistering,
+                    enabled = !busy,
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Register this number") }
             }
         } else {
+            // Registered. Forwarding is set by the same Activate tap; if the carrier
+            // didn't accept it, offer an inline retry here (still one screen).
+            if (forwardingEnabled) {
+                Text(
+                    text = "Call forwarding is on ✓",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                Button(onClick = onEnableForwarding, modifier = Modifier.fillMaxWidth()) {
+                    Text("Turn on call forwarding")
+                }
+            }
             TextButton(onClick = onChangeNumber, modifier = Modifier.fillMaxWidth()) {
                 Text("Change number")
             }

@@ -49,6 +49,11 @@ class VocaGuardFcmService : FirebaseMessagingService() {
          *  out of "Connecting" instead of bridging into a dead call. */
         val callGoneFlow = MutableStateFlow<String?>(null)
 
+        /** Emits the device's own phone number (E.164) once the server has verified it
+         *  via the onboarding CLI-capture flow (a brief call that reveals the ANI).
+         *  SettingsViewModel collects this to auto-fill + register without typing. */
+        val numberVerifiedFlow = MutableStateFlow<String?>(null)
+
         // Upload current device token to the Asterisk server over HTTPS.
         // Includes phone_number for multi-tenant routing if the user has registered.
         fun uploadToken(token: String) {
@@ -224,6 +229,14 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                     }
                 }
                 callGoneFlow.value = asteriskChannel
+                return
+            }
+            "number_verified" -> {
+                // Onboarding CLI-capture: the server detected this device's own number
+                // from the verification call's ANI. Hand it to the ViewModel to register.
+                val phone = message.data["phone_number"] ?: ""
+                Log.i(TAG, "Number verified by server: $phone")
+                if (phone.isNotBlank()) numberVerifiedFlow.value = phone
                 return
             }
             "error_report" -> {

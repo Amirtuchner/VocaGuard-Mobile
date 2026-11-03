@@ -2,6 +2,9 @@ package io.vocaguard.ui
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.vocaguard.billing.BillingManager
@@ -435,6 +438,26 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _serverIsRegistering = MutableStateFlow(false)
     val serverIsRegistering: StateFlow<Boolean> = _serverIsRegistering.asStateFlow()
 
+    /** True while the one-tap flow is placing/awaiting the number-detection call. */
+    private val _awaitingNumberVerify = MutableStateFlow(false)
+    val awaitingNumberVerify: StateFlow<Boolean> = _awaitingNumberVerify.asStateFlow()
+
+    init {
+        // When the server pushes back the device's own number (CLI-capture onboarding),
+        // auto-fill it and continue straight into registration + call forwarding.
+        viewModelScope.launch {
+            io.vocaguard.service.VocaGuardFcmService.numberVerifiedFlow.collect { num ->
+                if (!num.isNullOrBlank() && _awaitingNumberVerify.value) {
+                    _awaitingNumberVerify.value = false
+                    io.vocaguard.service.VocaGuardFcmService.numberVerifiedFlow.value = null
+                    updateServerPhoneInput(num)
+                    _serverRegStatus.value = "Number detected: $num"
+                    activateProtection(num)
+                }
+            }
+        }
+    }
+
     fun updateServerPhoneInput(phone: String) {
         _serverPhoneInput.value = phone
     }
@@ -475,6 +498,62 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
+     * One-tap "detect my number": CLI-capture verification. Asks the server for a
+     * nonce, places a brief call to the verification DID with the nonce as DTMF, and
+     * waits for the server to push back the ANI (this device's real number), which the
+     * [numberVerifiedFlow] observer feeds into [activateProtection]. Carrier-agnostic —
+     * works where getLine1Number / the Hint API return nothing (e.g. Israeli SIMs).
+     * Falls back to manual entry on any failure or a ~35s timeout.
+     */
+    fun verifyNumberThenActivate() {
+        if (_serverIsRegistering.value || _awaitingNumberVerify.value) return
+        _awaitingNumberVerify.value = true
+        _serverRegStatus.value = "Detecting your number…"
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { fcmToken ->
+                viewModelScope.launch {
+                    val vs = sdm.startNumberVerification(fcmToken)
+                    if (!vs.success) {
+                        _awaitingNumberVerify.value = false
+                        _serverRegStatus.value =
+                            "Couldn't start number detection — enter it manually below."
+                        return@launch
+                    }
+                    // Dial the verification DID; the commas are post-dial pauses after
+                    // which the dialer emits the nonce as DTMF (same as a conference PIN).
+                    val dial = "${vs.verifyNumber},,${vs.code}"
+                    try {
+                        context.startActivity(
+                            Intent(Intent.ACTION_CALL, Uri.fromParts("tel", dial, null))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                        Log.i("VGActivate", "placed number-detect call to $dial")
+                        _serverRegStatus.value = "Placing a quick call to detect your number…"
+                    } catch (e: Exception) {
+                        _awaitingNumberVerify.value = false
+                        Log.w("VGActivate", "number-detect ACTION_CALL failed: ${e.message}")
+                        _serverRegStatus.value =
+                            "Couldn't place the detection call — enter your number manually below."
+                        return@launch
+                    }
+                    // Timeout → fall back to manual entry if nothing came back.
+                    kotlinx.coroutines.delay(35_000)
+                    if (_awaitingNumberVerify.value) {
+                        _awaitingNumberVerify.value = false
+                        if (!_serverRegistered.value) {
+                            _serverRegStatus.value =
+                                "Couldn't detect your number automatically — enter it manually below."
+                        }
+                    }
+                }
+            }
+            .addOnFailureListener { e ->
+                _awaitingNumberVerify.value = false
+                _serverRegStatus.value = "Couldn't get a device token: ${e.message}"
+            }
+    }
+
+    /**
      * One-tap activation for the simplified onboarding: register with the server
      * AND silently enable call forwarding (no dialer), in a single step. Falls back
      * to the manual "dial this code" flow if the silent USSD fails on the carrier.
@@ -493,6 +572,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             .addOnSuccessListener { fcmToken ->
                 viewModelScope.launch {
                     val result = sdm.register(phone, fcmToken)
+                    Log.i("VGActivate", "register success=${result.success} ext=${result.sipExtension} err=${result.error}")
                     if (!result.success) {
                         _serverRegStatus.value = "Activation failed: ${result.error}"
                         ErrorReporter.report(getApplication(), "Activation failed: ${result.error}")
@@ -504,8 +584,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     _serverSipExtension.value = result.sipExtension
                     _serverActivationCode.value = sdm.getActivationCode(getApplication())
                     io.vocaguard.service.VocaGuardSipManager.reinitialize(getApplication())
-                    // Silently enable call forwarding (no dialer UI).
-                    if (enableForwardingSilentlyNow()) {
+                    // Enable call forwarding (silent USSD → auto-dial fallback).
+                    if (enableForwardingNow()) {
                         setCallForwardingEnabled(true)
                         _serverRegStatus.value = "Protection active ✓"
                     } else {
@@ -522,13 +602,32 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             }
     }
 
-    /** Enable call forwarding via a silent USSD request (no dialer). Returns true on
-     *  carrier acknowledgement. Same mechanism as ReEnableForwardingWorker. */
-    @android.annotation.SuppressLint("MissingPermission")
-    private suspend fun enableForwardingSilentlyNow(): Boolean {
+    /** Enable call forwarding. Tries a silent USSD first (works on some carriers);
+     *  if that's rejected (common for CF supplementary-service codes), auto-dials the
+     *  code via ACTION_CALL — the reliable path, same as the user dialing it (brief
+     *  dialer flash). Returns true if either path was triggered. */
+    private suspend fun enableForwardingNow(): Boolean {
         val code = sdm.getActivationCode(getApplication())
-        if (code.isEmpty()) return false
-        return suspendCancellableCoroutine { cont ->
+        if (code.isEmpty()) { Log.w("VGActivate", "no activation code — can't enable forwarding"); return false }
+        val silentOk = kotlinx.coroutines.withTimeoutOrNull(12_000) { trySilentUssd(code) } ?: false
+        Log.i("VGActivate", "silent USSD ok=$silentOk code=$code")
+        if (silentOk) return true
+        return try {
+            context.startActivity(
+                Intent(Intent.ACTION_CALL, Uri.fromParts("tel", code, null))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            Log.i("VGActivate", "dialed CF code via ACTION_CALL: $code")
+            true
+        } catch (e: Exception) {
+            Log.w("VGActivate", "ACTION_CALL for CF failed: ${e.message}")
+            false
+        }
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private suspend fun trySilentUssd(code: String): Boolean =
+        suspendCancellableCoroutine { cont ->
             try {
                 val tm = context.getSystemService(android.telephony.TelephonyManager::class.java)
                 tm.sendUssdRequest(code, object : android.telephony.TelephonyManager.UssdResponseCallback() {
@@ -542,6 +641,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             } catch (e: Exception) {
                 if (cont.isActive) cont.resume(false)
             }
+        }
+
+    /** Enable call forwarding on its own — inline retry from the onboarding screen. */
+    fun enableCallForwarding() {
+        viewModelScope.launch {
+            if (enableForwardingNow()) setCallForwardingEnabled(true)
         }
     }
 

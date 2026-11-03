@@ -6,6 +6,8 @@ Endpoints:
                             returns {sip_extension, sip_password, did_number}
   POST /register-token    — update FCM token for an existing user
                             body: JSON {phone_number, fcm_token}
+  POST /verify-number/start — start CLI-capture number detection
+                            body: JSON {fcm_token} → {verify_number, code, ttl}
   POST /accept-call       — AMI bridge: {channel, caller, phone_number}
   POST /hangup            — AMI hangup: {channel, phone_number}
 """
@@ -111,6 +113,18 @@ def init_db():
             report_count   INTEGER DEFAULT 1,
             created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(phone_number)
+        )
+    """)
+    # Pending number-verification sessions: the onboarding "detect my number" flow.
+    # The app POSTs its fcm_token, we return a short numeric nonce; the app places a
+    # call to our DID and sends the nonce as DTMF. verify_number.py (run by Asterisk)
+    # reads this table to map nonce -> fcm_token, grabs the caller's ANI (the user's
+    # real number) and pushes it back. created_at is time.time() (REAL) for TTL purge.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS verify_sessions (
+            code         TEXT    PRIMARY KEY,
+            fcm_token    TEXT    NOT NULL,
+            created_at   REAL    NOT NULL
         )
     """)
     conn.commit()
@@ -219,6 +233,39 @@ def register_user(phone: str, fcm_token: str) -> dict:
         "did_number":    DID_NUMBER,
         **_trial_info(None),   # brand-new user → full trial starting now
     }
+
+
+VERIFY_TTL = 300  # seconds a number-verification nonce stays valid
+
+
+def create_verify_session(fcm_token: str) -> dict:
+    """Create a one-shot number-verification nonce bound to an FCM token.
+
+    Returns {verify_number, code, ttl}. The app dials verify_number and sends
+    `code` as DTMF; verify_number.py maps it back to this fcm_token and pushes
+    the caller's ANI (the device's real number) to the app. Purges expired
+    nonces on every call so the table can't grow unbounded."""
+    conn = db_connect()
+    try:
+        now = time.time()
+        conn.execute("DELETE FROM verify_sessions WHERE created_at < ?", (now - VERIFY_TTL,))
+        code = ""
+        for _ in range(10):
+            candidate = f"{secrets.randbelow(900000) + 100000}"  # 6 digits, no leading zero
+            if not conn.execute("SELECT 1 FROM verify_sessions WHERE code=?", (candidate,)).fetchone():
+                code = candidate
+                break
+        if not code:
+            raise RuntimeError("could not allocate a free verification code")
+        conn.execute(
+            "INSERT OR REPLACE INTO verify_sessions (code, fcm_token, created_at) VALUES (?, ?, ?)",
+            (code, fcm_token, now)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("Verify session created code=%s tail=%s", code, fcm_token[-10:])
+    return {"verify_number": DID_NUMBER, "code": code, "ttl": VERIFY_TTL}
 
 
 def update_fcm_token(phone: str, fcm_token: str) -> bool:
@@ -583,6 +630,19 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, result)
             except Exception as e:
                 log.error("register error: %s", e)
+                self._send(500, {"error": str(e)})
+
+        elif self.path == "/verify-number/start":
+            # Onboarding "detect my number": bind a nonce to the caller's fcm_token.
+            try:
+                data = self._read_json()
+                fcm  = data.get("fcm_token", "").strip()
+                if not fcm:
+                    self._send(400, {"error": "fcm_token required"})
+                    return
+                self._send(200, create_verify_session(fcm))
+            except Exception as e:
+                log.error("verify-number/start error: %s", e)
                 self._send(500, {"error": str(e)})
 
         elif self.path == "/register-token":
