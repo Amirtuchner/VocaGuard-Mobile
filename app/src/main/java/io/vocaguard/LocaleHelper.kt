@@ -22,6 +22,7 @@ object LocaleHelper {
         localeTag.startsWith("he", ignoreCase = true) ||
             localeTag.startsWith("iw", ignoreCase = true) -> "iw"   // Android's code for Hebrew
         localeTag.startsWith("ru", ignoreCase = true) -> "ru"
+        localeTag.startsWith("ar", ignoreCase = true) -> "ar"       // RTL, like Hebrew
         else -> "en"
     }
 

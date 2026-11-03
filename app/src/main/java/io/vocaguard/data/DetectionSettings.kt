@@ -170,18 +170,16 @@ class DetectionSettings private constructor(context: Context) {
         const val THEME_LIGHT  = "light"
 
         /** Supported locales shown in the Settings UI. */
+        // Languages the app actually supports for speech recognition + spoken alerts.
+        // Broader than the onboarding UI-language picker (EN/HE/RU) because the server
+        // scam engine also transcribes + detects Arabic (SCAM_KEYWORDS_AR, Whisper
+        // auto-detect) and Android TTS can speak Arabic alerts — even though the app
+        // UI itself isn't translated to Arabic.
         val SUPPORTED_LOCALES = listOf(
-            "en-US" to "English (US)",
-            "en-GB" to "English (UK)",
-            "es-ES" to "Spanish",
-            "fr-FR" to "French",
-            "de-DE" to "German",
-            "zh-CN" to "Chinese (Simplified)",
-            "ja-JP" to "Japanese",
+            "en-US" to "English",
             "he-IL" to "Hebrew",
             "ru-RU" to "Russian",
-            "ar-SA" to "Arabic",
-            "it-IT" to "Italian"
+            "ar-SA" to "Arabic"
         )
 
         @Volatile
