@@ -10,6 +10,13 @@
         <exclude domain="sharedpref" path="vocaguard_whitelist.xml"/>
         <!-- Exclude community sync state (last-sync timestamp + configurable URL) -->
         <exclude domain="sharedpref" path="vocaguard_community_sync.xml"/>
+        <!-- Exclude onboarding/registration state so a reinstall starts truly fresh.
+             onboarding_complete + counters live in vocaguard_settings.xml; SIP
+             registration lives in server_detection.xml. Restoring these skipped the
+             setup wizard and desynced the app from the carrier's call-forwarding
+             state (forwarding is carrier-side and not restorable on reinstall). -->
+        <exclude domain="sharedpref" path="vocaguard_settings.xml"/>
+        <exclude domain="sharedpref" path="server_detection.xml"/>
         <!-- Exclude Room database — contains transcripts and scam numbers -->
         <exclude domain="database" path="vocaguard.db"/>
     </cloud-backup>
@@ -20,6 +27,8 @@
         <exclude domain="sharedpref" path="vocaguard_network_scam_cache.xml"/>
         <exclude domain="sharedpref" path="vocaguard_whitelist.xml"/>
         <exclude domain="sharedpref" path="vocaguard_community_sync.xml"/>
+        <exclude domain="sharedpref" path="vocaguard_settings.xml"/>
+        <exclude domain="sharedpref" path="server_detection.xml"/>
         <exclude domain="database" path="vocaguard.db"/>
     </device-transfer>
 </data-extraction-rules>
