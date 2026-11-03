@@ -21,7 +21,7 @@ android {
         applicationId = "io.vocaguard"
         minSdk = 29
         targetSdk = 36
-        versionCode = 28
+        versionCode = 29
         versionName = "1.0.19"
 
         // ARM-only. x86/x86_64 are emulator-only (no real phones), and LiteRT's
