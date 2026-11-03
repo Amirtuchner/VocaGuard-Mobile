@@ -204,7 +204,9 @@ class IncomingCallActivity : ComponentActivity() {
                         // Asterisk, triggering a duplicate incoming-call notification.
                         // Forwarding is re-enabled in onDestroy() after the call ends.
                     }
-                    sipState == VocaGuardSipManager.CallState.ENDED && callActive -> {
+                    sipState == VocaGuardSipManager.CallState.ENDED && callActive && !demoMode -> {
+                        // (demo has no SIP call — a leftover ENDED state must not
+                        // close the demo screen the instant it opens)
                         getSystemService(NotificationManager::class.java)
                             .cancel(ActiveCallReceiver.NOTIFICATION_ID)
                         finish()
@@ -240,7 +242,7 @@ class IncomingCallActivity : ComponentActivity() {
             // so a stale value from a previous call can never match this one.
             LaunchedEffect(Unit) {
                 VocaGuardFcmService.callGoneFlow.collect { gone ->
-                    if (gone != null && (gone == asteriskChannel || gone == activeChannel)) {
+                    if (!demoMode && gone != null && (gone == asteriskChannel || gone == activeChannel)) {
                         VocaGuardFcmService.callGoneFlow.value = null
                         val state = VocaGuardSipManager.callState.value
                         if (state != VocaGuardSipManager.CallState.ACTIVE) {
