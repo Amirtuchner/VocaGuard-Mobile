@@ -28,6 +28,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 
 private const val TOTAL_STEPS = 7  // Terms · Welcome · Call Screening · Notification Access · Registration · Battery · Forwarding
 
@@ -78,6 +79,33 @@ fun OnboardingScreen(
     val callScreeningLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { callScreeningOk = permissionsManager.isCallScreeningEnabled() }
+
+    // One-tap activation: detect the user's number (silent → Hint picker → manual),
+    // then register + enable call forwarding in a single step.
+    val scope = rememberCoroutineScope()
+    val hintLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { res ->
+        val num = io.vocaguard.service.PhoneNumberHelper.parseHintResult(context, res.data)
+        if (num.isNotBlank()) viewModel.activateProtection(num) else viewModel.promptManualEntry()
+    }
+    val onActivate: () -> Unit = {
+        val existing = serverPhoneInput.ifBlank {
+            io.vocaguard.service.PhoneNumberHelper.readSimNumber(context)
+        }
+        if (existing.isNotBlank()) {
+            viewModel.activateProtection(existing)
+        } else {
+            scope.launch {
+                val sender = io.vocaguard.service.PhoneNumberHelper.phoneNumberHintIntent(context)
+                if (sender != null) {
+                    hintLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
+                } else {
+                    viewModel.promptManualEntry()
+                }
+            }
+        }
+    }
 
     // Carrier detection — hoisted so navigation buttons can also use these values
     val tm = context.getSystemService(TelephonyManager::class.java)
@@ -139,6 +167,7 @@ fun OnboardingScreen(
                     phoneInput      = serverPhoneInput,
                     onPhoneChange   = viewModel::updateServerPhoneInput,
                     onRegister      = viewModel::registerWithServer,
+                    onActivate      = onActivate,
                     onChangeNumber  = {
                         viewModel.unregisterFromServer()
                         viewModel.updateServerPhoneInput("")
@@ -446,42 +475,33 @@ private fun RegistrationStep(
     phoneInput: String,
     onPhoneChange: (String) -> Unit,
     onRegister: () -> Unit,
+    onActivate: () -> Unit,
     onChangeNumber: () -> Unit,
     isRegistering: Boolean,
     isRegistered: Boolean,
     status: String
 ) {
+    var showManual by remember { mutableStateOf(false) }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         StepIcon(icon = Icons.Default.CloudUpload, isDone = isRegistered)
         Text(
-            text = "Register Your Number",
+            text = "Activate Protection",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
         Text(
-            text = "Enter your phone number to enable server-side scam detection. Your calls will be routed through VocaGuard's analysis server.",
+            text = "One tap — VocaGuard sets up scam detection and turns on call forwarding automatically. No typing needed.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        OutlinedTextField(
-            value = phoneInput,
-            onValueChange = onPhoneChange,
-            label = { Text("Phone number with country code") },
-            placeholder = { Text("+1 (555) 123-4567") },
-            supportingText = {
-                Text("Include your country code. Examples:\nUS: +1 555 123 4567 · Israel: +972 50 123 4567")
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
+        // Primary one-tap CTA: auto-detect number → register → enable forwarding.
         Button(
-            onClick = onRegister,
+            onClick = onActivate,
             enabled = !isRegistering && !isRegistered,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -492,10 +512,34 @@ private fun RegistrationStep(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
             } else {
-                Text(if (isRegistered) "Registered ✓" else "Register")
+                Text(if (isRegistered) "Protected ✓" else "Activate protection")
             }
         }
-        if (isRegistered) {
+
+        if (!isRegistered) {
+            TextButton(onClick = { showManual = !showManual }) {
+                Text(if (showManual) "Hide manual entry" else "Enter number manually instead")
+            }
+            if (showManual) {
+                OutlinedTextField(
+                    value = phoneInput,
+                    onValueChange = onPhoneChange,
+                    label = { Text("Phone number with country code") },
+                    placeholder = { Text("+972 50 123 4567") },
+                    supportingText = {
+                        Text("Include your country code (e.g. Israel: +972 50 123 4567).")
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextButton(
+                    onClick = onRegister,
+                    enabled = !isRegistering,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Register this number") }
+            }
+        } else {
             TextButton(onClick = onChangeNumber, modifier = Modifier.fillMaxWidth()) {
                 Text("Change number")
             }

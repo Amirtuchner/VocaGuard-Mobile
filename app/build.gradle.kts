@@ -168,6 +168,9 @@ dependencies {
     // Google Play Install Referrer — lets Tenjin read which campaign/source a Play
     // install came from (attribution). Required for accurate Android attribution.
     implementation("com.android.installreferrer:installreferrer:2.2")
+    // Phone Number Hint API — one-tap SIM-number picker (no permission, no typing)
+    // for the simplified onboarding; falls back to manual entry.
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
     // Pinned to exact versions that ship 16 KB-page-aligned native libs
     // (required for targetSdk 35+; 5.3.x / 0.3.47 were 4 KB-aligned and Play
     // rejects them for production). See 16KB alignment check before bumping.

@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import org.json.JSONObject
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -465,6 +467,82 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 ErrorReporter.report(getApplication(), "FCM token error: ${e.message}")
                 _serverIsRegistering.value = false
             }
+    }
+
+    /** Shown when auto-detection + the Hint picker both yield no number. */
+    fun promptManualEntry() {
+        _serverRegStatus.value = "Couldn't detect your number — enter it manually below."
+    }
+
+    /**
+     * One-tap activation for the simplified onboarding: register with the server
+     * AND silently enable call forwarding (no dialer), in a single step. Falls back
+     * to the manual "dial this code" flow if the silent USSD fails on the carrier.
+     */
+    fun activateProtection(phoneNumber: String) {
+        if (_serverIsRegistering.value) return
+        val phone = phoneNumber.trim()
+        if (phone.isEmpty()) {
+            _serverRegStatus.value = "Pick or enter your phone number first"
+            return
+        }
+        updateServerPhoneInput(phone)
+        _serverIsRegistering.value = true
+        _serverRegStatus.value = "Activating protection…"
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { fcmToken ->
+                viewModelScope.launch {
+                    val result = sdm.register(phone, fcmToken)
+                    if (!result.success) {
+                        _serverRegStatus.value = "Activation failed: ${result.error}"
+                        ErrorReporter.report(getApplication(), "Activation failed: ${result.error}")
+                        _serverIsRegistering.value = false
+                        return@launch
+                    }
+                    _serverRegistered.value = true
+                    io.vocaguard.TenjinEvents.send(context, io.vocaguard.TenjinEvents.REGISTERED)
+                    _serverSipExtension.value = result.sipExtension
+                    _serverActivationCode.value = sdm.getActivationCode(getApplication())
+                    io.vocaguard.service.VocaGuardSipManager.reinitialize(getApplication())
+                    // Silently enable call forwarding (no dialer UI).
+                    if (enableForwardingSilentlyNow()) {
+                        setCallForwardingEnabled(true)
+                        _serverRegStatus.value = "Protection active ✓"
+                    } else {
+                        _serverRegStatus.value =
+                            "Registered. Tap “Enable call forwarding” to finish."
+                    }
+                    _serverIsRegistering.value = false
+                }
+            }
+            .addOnFailureListener { e ->
+                _serverRegStatus.value = "Could not get FCM token: ${e.message}"
+                ErrorReporter.report(getApplication(), "FCM token error: ${e.message}")
+                _serverIsRegistering.value = false
+            }
+    }
+
+    /** Enable call forwarding via a silent USSD request (no dialer). Returns true on
+     *  carrier acknowledgement. Same mechanism as ReEnableForwardingWorker. */
+    @android.annotation.SuppressLint("MissingPermission")
+    private suspend fun enableForwardingSilentlyNow(): Boolean {
+        val code = sdm.getActivationCode(getApplication())
+        if (code.isEmpty()) return false
+        return suspendCancellableCoroutine { cont ->
+            try {
+                val tm = context.getSystemService(android.telephony.TelephonyManager::class.java)
+                tm.sendUssdRequest(code, object : android.telephony.TelephonyManager.UssdResponseCallback() {
+                    override fun onReceiveUssdResponse(
+                        t: android.telephony.TelephonyManager, request: String, response: CharSequence
+                    ) { if (cont.isActive) cont.resume(true) }
+                    override fun onReceiveUssdResponseFailed(
+                        t: android.telephony.TelephonyManager, request: String, failureCode: Int
+                    ) { if (cont.isActive) cont.resume(false) }
+                }, android.os.Handler(android.os.Looper.getMainLooper()))
+            } catch (e: Exception) {
+                if (cont.isActive) cont.resume(false)
+            }
+        }
     }
 
     fun unregisterFromServer() {
