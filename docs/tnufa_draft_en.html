@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 <meta charset="utf-8">
 <title>VocaGuard — Tnufa Grant Application (Resubmission Draft)</title>
@@ -81,6 +82,16 @@ analyzed in real time. This capability is what differentiates VocaGuard from any
 <h3>3.3 Multilingual</h3>
 <p>Transcription auto-detects the language (Hebrew/Russian/Arabic/English/mixed) and locks it for the call — critical for the multilingual Israeli market.</p>
 
+<h3>3.4 The R&amp;D core: an audio-native, multilingual, paralinguistic fraud-detection model (deep-tech)</h3>
+<p>The central innovation funded by this grant is the development of a <strong>purpose-built AI model that detects fraud directly from the call's speech audio</strong> — not merely from a text transcript. No such model exists as an off-the-shelf product, and certainly not for Israel's multilingual market:</p>
+<ul>
+<li><strong>Paralinguistic analysis:</strong> the model learns <em>how</em> a scammer speaks, not only <em>what</em> they say — psychological-pressure patterns, speech rate, intonation, "scriptedness" (scripted cadence), and conversational dynamics (interruptions, urgency). These are strong fraud signals that no off-the-shelf <em>text</em> model captures, and they are far more <strong>robust to a scammer rephrasing</strong> their script to evade keyword detection.</li>
+<li><strong>Multilingual &amp; code-switching:</strong> fraud calls in Israel mix Hebrew / Russian / Arabic / English <strong>within a single call</strong>. Off-the-shelf transcription and classification models degrade sharply in this setting; our model is designed for code-switching robustness over a dedicated corpus.</li>
+<li><strong>Architecture:</strong> a speech encoder fused with a classification head and dedicated paralinguistic-signal heads, within a context path that incorporates call metadata. The current TFLite classifier (93.4% — §4) is the <strong>proof of feasibility</strong> and the baseline the audio-native model will improve upon.</li>
+<li><strong>Proprietary data asset (data moat):</strong> a labeled, multilingual Israeli fraud-audio corpus — the asset no competitor or off-the-shelf model holds. Its ongoing, <strong>consent-based</strong> collection through our existing call-routing infrastructure is itself part of the technological approach.</li>
+</ul>
+<div class="note">The off-the-shelf components (Whisper, TFLite) are <em>infrastructure</em>. The <strong>intellectual property and the innovation</strong> are the audio-native model, the paralinguistic feature engineering, and the proprietary fraud corpus — none of which is off-the-shelf.</div>
+
 <h2>4. Proof of feasibility — measured results</h2>
 <p class="small">Measurements taken on the live system (Appendix A). Tables 1–2 are based on a <strong>synthetic dataset</strong>
 (14,067 labeled examples) — evidence of feasibility, not a substitute for validation on real calls (see §7, risk R2).</p>
@@ -120,6 +131,7 @@ analyzed in real time. This capability is what differentiates VocaGuard from any
 <li>Two-party content analysis of a live cellular call on Android via <strong>network routing</strong> (conditional forwarding → SIP bridge → MixMonitor), bypassing the OS audio-capture block — a capability no on-device solution has (§3.2).</li>
 <li>A <strong>hybrid</strong> architecture (on-device ML + server knowledge confirmation) achieving broad coverage with 0% false positives (§3.1, §4).</li>
 <li><strong>In-call</strong> detection and alerting at a measured latency (§4).</li>
+<li><strong>Funded R&amp;D core:</strong> beyond the architecture, the grant funds a <strong>purpose-built audio-native, paralinguistic, multilingual fraud-detection model</strong> (§3.4) that does not exist off-the-shelf, carries clear technological risk (milestones M0–M1), and rests on a <strong>proprietary Israeli fraud corpus</strong> a competitor cannot replicate.</li>
 <li>The technological approach to each challenge is now presented explicitly (§7–§8). <span class="todo">[Strengthen with a patent-office prior-art result — §9.]</span></li>
 </ul>
 
@@ -139,12 +151,14 @@ analyzed in real time. This capability is what differentiates VocaGuard from any
 <h2>7. R&amp;D plan &amp; milestones (for the grant period)</h2>
 <table>
 <tr><th>#</th><th>Milestone</th><th>Measurable target</th><th>Risk it reduces</th></tr>
-<tr><td>M1</td><td>Validation on labeled real calls</td><td>recall/precision on <span class="todo">[N]</span> real calls</td><td>R2 (synthetic vs real)</td></tr>
-<tr><td>M2</td><td>Reduce detection latency</td><td>from ~16 s to <span class="todo">[&lt;5 s]</span> (GPU / quantization / streaming ASR)</td><td>R1 (latency/capacity)</td></tr>
-<tr><td>M3</td><td>Reduce ML false alarms</td><td>Legitimate-class accuracy from 75% to <span class="todo">[&gt;90%]</span></td><td>R3 (false positives)</td></tr>
-<tr><td>M4</td><td>Improve multilingual coverage</td><td>per-language accuracy (HE/RU/AR) <span class="todo">[target]</span></td><td>R4 (multilingual)</td></tr>
-<tr><td>M5</td><td><span class="todo">[product/market milestone]</span></td><td><span class="todo">[target]</span></td><td>—</td></tr>
+<tr><td>M0</td><td><strong>Build the proprietary fraud-audio corpus</strong></td><td><span class="todo">[N]</span> labeled real calls (HE/RU/AR/mixed), consent-based + augmentation</td><td>R2, R5</td></tr>
+<tr><td>M1</td><td><strong>Audio-native model prototype</strong> (fine-tune a speech encoder + paralinguistic head)</td><td>recall/precision improvement over the text baseline on real calls</td><td>R3, R4</td></tr>
+<tr><td>M2</td><td>Real-time (streaming) detection</td><td>cut latency from ~16 s to <span class="todo">[&lt;5 s]</span> (streaming ASR / quantization / GPU / distillation)</td><td>R1</td></tr>
+<tr><td>M3</td><td>Reduce false alarms</td><td>Legitimate-class accuracy from 75% to <span class="todo">[&gt;90%]</span>, keeping 0% FP at the confirmation layer</td><td>R3</td></tr>
+<tr><td>M4</td><td>Code-switching &amp; adversarial robustness</td><td>per-language accuracy (HE/RU/AR) <span class="todo">[target]</span> + resilience to rephrasing</td><td>R4, R6</td></tr>
+<tr><td>M5</td><td><span class="todo">[product/market milestone — user validation]</span></td><td><span class="todo">[target]</span></td><td>—</td></tr>
 </table>
+<p class="small"><strong>M0–M1 are the core technological risk that justifies an R&amp;D grant.</strong></p>
 <p class="small"><span class="todo">[Map budget, months, and headcount to each milestone per the form's requirements.]</span></p>
 
 <h2>8. Technical risks &amp; mitigations</h2>
@@ -152,7 +166,9 @@ analyzed in real time. This capability is what differentiates VocaGuard from any
 <li><strong>R1 — latency/capacity:</strong> transcription ~1× real-time on current hardware → GPU / int8 / streaming ASR (M2).</li>
 <li><strong>R2 — synthetic↔real gap:</strong> metrics on synthetic data may be optimistic → validation on real calls (M1).</li>
 <li><strong>R3 — false alarms:</strong> ML alone 75% on legitimate → confirmation layer (0% FP) + model improvement (M3).</li>
-<li><strong>R4 — multilingual:</strong> accuracy varies by language → dedicated measurement &amp; improvement (M4).</li>
+<li><strong>R4 — multilingual:</strong> accuracy varies by language → dedicated measurement &amp; improvement (M1, M4).</li>
+<li><strong>R5 — scarcity of real data:</strong> an audio-native model needs data → transfer-learning from a pretrained speech encoder (hundreds, not thousands, of calls) + augmentation + ongoing consent-based collection (M0).</li>
+<li><strong>R6 — adaptive evasion:</strong> scammers rephrase to bypass keywords → shifting to paralinguistic signals (pace / pressure / scriptedness) makes evasion much harder (M4).</li>
 </ul>
 
 <h2>9. Differentiation from existing solutions (novelty / patent angle)</h2>
@@ -162,6 +178,7 @@ analyzed in real time. This capability is what differentiates VocaGuard from any
 <li><strong>Hybrid architecture</strong> — on-device ML classifier + server-side knowledge confirmation, to reduce false alarms.</li>
 <li><strong>In-call alerting</strong> (not after the fact) at a latency of seconds.</li>
 <li>Real-time automatic multilingual language detection in an anti-scam context.</li>
+<li><strong>Audio-native paralinguistic fraud detection</strong> — classifying a call as fraudulent from <em>how</em> it is spoken (prosody, pressure, scripted cadence) across code-switched Hebrew/Russian/Arabic, trained on a proprietary corpus (§3.4).</li>
 </ol>
 
 <h2>10. Appendix A — measurement methodology (for transparency)</h2>
