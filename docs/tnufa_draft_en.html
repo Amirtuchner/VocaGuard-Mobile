@@ -136,10 +136,27 @@ analyzed in real time. This capability is what differentiates VocaGuard from any
 </ul>
 
 <p><strong>Reason 2 (quote):</strong> "The work plan's feasibility is lacking… does not address the expected technological challenges in depth… core components are expected to be performed by subcontractors not yet chosen."</p>
-<p><strong>Response:</strong> The core components are <strong>already developed and running in production — built in-house, not by subcontractors</strong>: a trained ML classifier, server infrastructure, SIP routing and call bridging, a real-time transcription pipeline, and a live app on Google Play. The subcontractor concern is <strong>no longer relevant</strong>. The work plan now addresses the challenges in depth with measurable milestones (§7) and risk analysis (§8).</p>
+<p><strong>Response:</strong> The core components are <strong>already developed and running in production — built in-house, not by subcontractors</strong>: a trained ML classifier, server infrastructure, SIP routing and call bridging, a real-time transcription pipeline, and a live app on Google Play. The subcontractor concern is therefore <strong>no longer relevant</strong> — there are no unchosen subcontractors for core work.</p>
+<p>The work plan now addresses each <strong>anticipated technological challenge in depth, with a concrete solution and a measurable milestone</strong> (the challenge → mitigation → milestone chain in §7–§8):</p>
+<table>
+<tr><th>Anticipated challenge</th><th>Technological approach</th><th>Milestone</th></tr>
+<tr><td>Detection latency / throughput (~16 s today)</td><td>Streaming ASR, int8 quantization, GPU, model distillation</td><td>M2 (R1)</td></tr>
+<tr><td>Synthetic-data ↔ real-call gap</td><td>Build a labeled real-call corpus; validate against it</td><td>M0, M1 (R2)</td></tr>
+<tr><td>False alarms on legitimate calls</td><td>Hybrid confirmation layer + audio-native model; raise legitimate-class accuracy</td><td>M3 (R3)</td></tr>
+<tr><td>Multilingual &amp; code-switching (HE/RU/AR/mixed)</td><td>Audio-native model trained for code-switching; per-language evaluation</td><td>M1, M4 (R4)</td></tr>
+<tr><td>Scarcity of real fraud audio</td><td>Transfer-learning from a pretrained speech encoder + augmentation + consent-based collection</td><td>M0 (R5)</td></tr>
+<tr><td>Adaptive evasion (scammers rephrase)</td><td>Shift from keywords to paralinguistic signals (pace / pressure / scriptedness)</td><td>M4 (R6)</td></tr>
+</table>
 
 <p><strong>Reason 3 (quote):</strong> "The team's capabilities are lacking. There is no experience in AI development or app development, and no suitable business mentorship on the team."</p>
-<p><strong>Response:</strong> The existence of a working production system (live app + self-trained 93.4% ML model + full server infrastructure) is <strong>proof in practice</strong> of the founder's AI and app-development capability — beyond a declaration. <span class="todo">[Action required from you: add business mentorship — a mentor/advisor, or affiliation with an incubator/accelerator — to directly answer the mentorship point. This is the one gap not closed by the technical achievements and requires active action.]</span></p>
+<p><strong>Response — technical capability:</strong> The existence of a working production system (a live Google Play app + a self-trained 93.4% ML model + full server/SIP/transcription infrastructure, all built in-house) is <strong>proof in practice</strong> — not a declaration — of the founder's AI-development and app-development capability. This directly rebuts "no experience in AI or app development."</p>
+<p><strong>Response — team &amp; business leadership:</strong> The team now includes a <strong>co-founder and CMO, Evgeny Zelmanovsky</strong>, responsible for marketing, go-to-market, and business development — closing the "no suitable business mentorship / business capability" gap. <span class="todo">[Add Evgeny's background: years &amp; domains of marketing/BD experience, notable companies/results, relevant market (elderly care / telecom / security / mobile), and any prior startup/growth track record. 2–4 sentences.]</span></p>
+<table>
+<tr><th>Role</th><th>Person</th><th>Responsibility</th></tr>
+<tr><td>Founder / CTO</td><td><span class="todo">[Founder name]</span></td><td>AI/ML, app &amp; server engineering — demonstrated by the live production system</td></tr>
+<tr><td>Co-founder / CMO</td><td>Evgeny Zelmanovsky</td><td>Marketing, go-to-market, business development <span class="todo">[+ 1-line credential]</span></td></tr>
+</table>
+<p class="small"><span class="todo">[Optional, to further strengthen: an external advisor/mentor or incubator/accelerator affiliation on top of the co-founder.]</span></p>
 
 <h2>6. Three material developments since the previous application</h2>
 <ol>
@@ -192,7 +209,7 @@ analyzed in real time. This capability is what differentiates VocaGuard from any
 
 <h2>What I still need from you to finalize</h2>
 <ol>
-<li><strong>Business mentorship</strong> — the one gap not closed by the technical achievements (Reason 3). Add a mentor/advisor or incubator/accelerator affiliation.</li>
+<li><strong>Co-founder bio</strong> — Evgeny Zelmanovsky (CMO) now closes the business/team gap (Reason 3); supply his background (marketing/BD experience, companies, results) for §5. Optionally add an external advisor/incubator on top.</li>
 <li>Founder/company details, budget, timeline, headcount — for the form.</li>
 <li>Market/damage figures and sources (§2).</li>
 <li>Patent-office prior-art search result (§9).</li>
