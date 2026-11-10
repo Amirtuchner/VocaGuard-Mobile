@@ -204,6 +204,32 @@ def _assign_dedicated_did(conn, phone: str) -> str | None:
     return did
 
 
+# Carriers CONFIRMED (from real forwarded-call traffic, 2026-11-10) to include the SIP
+# Diversion header, so shared-DID routing is safe for them. Matched as lowercase
+# substrings of Twilio Lookup's carrier_name. Everything NOT here (Partner/Orange,
+# Cellcom, Pelephone, unknown, or a failed lookup) is treated as unsafe → dedicated DID.
+# Add a carrier here only after verifying it sends Diversion.
+DIVERSION_SAFE_CARRIERS = ("hot", "019", "telzar")
+
+
+def _carrier_sends_diversion(phone: str) -> bool:
+    """True iff the number's carrier is a CONFIRMED Diversion-header sender (shared-DID
+    routing is safe). False for known/suspected strippers, unknown carriers, or on ANY
+    lookup failure — so the safe default is to give the user a dedicated DID."""
+    try:
+        from twilio.rest import Client
+        e164 = phone if phone.startswith("+") else "+" + phone
+        r = Client(TWILIO_SID, TWILIO_TOKEN).lookups.v2.phone_numbers(e164).fetch(
+            fields="line_type_intelligence")
+        name = ((r.line_type_intelligence or {}).get("carrier_name") or "").lower()
+        safe = any(k in name for k in DIVERSION_SAFE_CARRIERS)
+        log.info("Carrier lookup %s -> %r (diversion_safe=%s)", phone, name, safe)
+        return safe
+    except Exception as e:
+        log.warning("Carrier lookup failed for %s (%s) -> treating as NOT diversion-safe", phone, e)
+        return False
+
+
 def register_user(phone: str, fcm_token: str) -> dict:
     """Create user or update their FCM token. Returns SIP credentials + trial status.
 
@@ -227,8 +253,11 @@ def register_user(phone: str, fcm_token: str) -> dict:
             "UPDATE users SET fcm_token=? WHERE phone_number=?",
             (fcm_token, phone)
         )
-        # Keep an existing dedicated DID; otherwise try to migrate this user onto one.
-        did = existing[3] or _assign_dedicated_did(conn, phone)
+        # Keep an existing dedicated DID. Otherwise, only assign one if the carrier is
+        # NOT a confirmed Diversion sender (Diversion-safe carriers stay on shared DID).
+        did = existing[3]
+        if not did and not _carrier_sends_diversion(phone):
+            did = _assign_dedicated_did(conn, phone)
         conn.commit()
         conn.close()
         log.info("Updated FCM token for existing user %s (did=%s)", phone, did or "shared")
@@ -259,8 +288,9 @@ def register_user(phone: str, fcm_token: str) -> dict:
         "VALUES (?, ?, ?, ?)",
         (phone, fcm_token, sip_ext, sip_pass)
     )
-    # Claim a dedicated DID if the pool has one; else stay on the shared DID.
-    did = _assign_dedicated_did(conn, phone)
+    # Carrier-aware DID: Diversion-safe carriers (HOT/019) use the shared DID; everyone
+    # else (Partner/Cellcom/Pelephone/unknown) gets a dedicated DID when the pool has one.
+    did = None if _carrier_sends_diversion(phone) else _assign_dedicated_did(conn, phone)
     conn.commit()
     conn.close()
 
