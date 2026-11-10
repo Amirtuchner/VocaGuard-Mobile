@@ -354,6 +354,14 @@ object VocaGuardSipManager {
         c.outputAudioDevice = c.audioDevices.firstOrNull {
             it.type == if (on) AudioDevice.Type.Speaker else AudioDevice.Type.Earpiece
         } ?: c.outputAudioDevice
+        // Speaker echo tuning (2026-11-10): the speaker→mic echo path is far stronger
+        // than the earpiece, so the +3 dB playback boost made the echo canceller
+        // over-suppress the mic — the far party lost our voice for a few seconds during
+        // double-talk (reported on speaker). Drop the boost to unity on speaker so the
+        // echo is weaker and the AEC leaves the near-end mic alone; restore +3 dB on
+        // earpiece (where echo is negligible and loudness matters more). Iteration 1 —
+        // if double-talk cutouts persist on-device, lower further / force software AEC.
+        c.playbackGainDb = if (on) 0.0f else 3.0f
     }
 
     /** Send a DTMF tone on the active call (for navigating IVR menus, entering
