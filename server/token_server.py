@@ -127,6 +127,22 @@ def init_db():
             created_at   REAL    NOT NULL
         )
     """)
+    # Per-user dedicated DID (robust multi-tenant routing). A user with a dedicated
+    # DID is identified by the CALLED number (always present in the INVITE To:),
+    # instead of the SIP Diversion header — which some carriers strip entirely,
+    # breaking tenant routing (observed 2026-11-10: a forwarded call arrived with no
+    # Diversion/History-Info at all). did_number NULL = user is on the shared DID and
+    # routing falls back to Diversion (unchanged legacy behavior). did_pool holds spare
+    # dedicated DIDs (bought in DIDWW, pointed at the trunk) waiting to be assigned.
+    _cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "did_number" not in _cols:
+        conn.execute("ALTER TABLE users ADD COLUMN did_number TEXT")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS did_pool (
+            did_number  TEXT PRIMARY KEY,
+            assigned_to TEXT
+        )
+    """)
     conn.commit()
     conn.close()
     log.info("DB initialised at %s", DB_PATH)
@@ -173,8 +189,28 @@ def _trial_info(created_at) -> dict:
     }
 
 
+def _assign_dedicated_did(conn, phone: str) -> str | None:
+    """Claim a free dedicated DID from the pool for this phone and record it on the
+    user row. Returns the DID (digits, no '+') or None if the pool is empty."""
+    row = conn.execute(
+        "SELECT did_number FROM did_pool WHERE assigned_to IS NULL ORDER BY did_number LIMIT 1"
+    ).fetchone()
+    if not row:
+        return None
+    did = row[0]
+    conn.execute("UPDATE did_pool SET assigned_to=? WHERE did_number=?", (did, phone))
+    conn.execute("UPDATE users SET did_number=? WHERE phone_number=?", (did, phone))
+    log.info("Assigned dedicated DID %s to %s", did, phone)
+    return did
+
+
 def register_user(phone: str, fcm_token: str) -> dict:
-    """Create user or update their FCM token. Returns SIP credentials + trial status."""
+    """Create user or update their FCM token. Returns SIP credentials + trial status.
+
+    DID assignment: a user keeps any dedicated DID already on their row; otherwise we
+    try to claim one from did_pool (migrating existing users as DIDs become available);
+    if the pool is empty they stay on the shared DID_NUMBER (did_number NULL) and
+    routing falls back to the Diversion header."""
     # Store the canonical (normalized) phone so /delete, /register-token and the
     # incoming-call lookups all match. _normalize_phone strips the leading "+"
     # (PJSIP dials digits only); it is idempotent, so re-registration matches the
@@ -182,7 +218,7 @@ def register_user(phone: str, fcm_token: str) -> dict:
     phone = _normalize_phone(phone)
     conn = db_connect()
     existing = conn.execute(
-        "SELECT sip_extension, sip_password, created_at FROM users WHERE phone_number=?",
+        "SELECT sip_extension, sip_password, created_at, did_number FROM users WHERE phone_number=?",
         (phone,)
     ).fetchone()
 
@@ -191,13 +227,15 @@ def register_user(phone: str, fcm_token: str) -> dict:
             "UPDATE users SET fcm_token=? WHERE phone_number=?",
             (fcm_token, phone)
         )
+        # Keep an existing dedicated DID; otherwise try to migrate this user onto one.
+        did = existing[3] or _assign_dedicated_did(conn, phone)
         conn.commit()
         conn.close()
-        log.info("Updated FCM token for existing user %s", phone)
+        log.info("Updated FCM token for existing user %s (did=%s)", phone, did or "shared")
         return {
             "sip_extension": existing[0],
             "sip_password":  existing[1],
-            "did_number":    DID_NUMBER,
+            "did_number":    did or DID_NUMBER,
             **_trial_info(existing[2]),
         }
 
@@ -221,16 +259,18 @@ def register_user(phone: str, fcm_token: str) -> dict:
         "VALUES (?, ?, ?, ?)",
         (phone, fcm_token, sip_ext, sip_pass)
     )
+    # Claim a dedicated DID if the pool has one; else stay on the shared DID.
+    did = _assign_dedicated_did(conn, phone)
     conn.commit()
     conn.close()
 
     provision_pjsip_user(sip_ext, sip_pass)
-    log.info("Registered new user %s → extension %s", phone, sip_ext)
+    log.info("Registered new user %s → extension %s (did=%s)", phone, sip_ext, did or "shared")
 
     return {
         "sip_extension": sip_ext,
         "sip_password":  sip_pass,
-        "did_number":    DID_NUMBER,
+        "did_number":    did or DID_NUMBER,
         **_trial_info(None),   # brand-new user → full trial starting now
     }
 

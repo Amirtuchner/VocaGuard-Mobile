@@ -147,12 +147,36 @@ def _is_duplicate(caller: str) -> bool:
     return False
 
 
-def send_fcm(diversion_number: str, data: dict):
+def get_token_by_did(called_did: str) -> str:
+    """FCM token for the user whose DEDICATED DID was called ('+'/spaces/digits
+    normalized). Returns '' unless exactly one user owns that DID. This is the robust
+    multi-tenant key: the called number is always in the INVITE, unlike the Diversion
+    header which some carriers strip entirely (2026-11-10)."""
+    d = re.sub(r"[^0-9]", "", called_did or "")
+    if not d:
+        return ""
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        rows = conn.execute(
+            "SELECT fcm_token FROM users "
+            "WHERE replace(replace(did_number,'+',''),' ','') = ?", (d,)
+        ).fetchall()
+        conn.close()
+        if len(rows) == 1 and rows[0][0]:
+            _log(f"token source=DEDICATED_DID did={d} tail={rows[0][0][-10:]}")
+            return rows[0][0]
+    except Exception as e:
+        _log(f"did lookup error: {e}")
+    return ""
+
+
+def send_fcm(diversion_number: str, data: dict, called_did: str = ""):
     try:
         cred = credentials.Certificate(SERVICE_ACCOUNT)
         firebase_admin.initialize_app(cred)
 
-        token = get_fcm_token_for_number(diversion_number)
+        # Prefer the dedicated-DID tenant key; fall back to the Diversion header.
+        token = get_token_by_did(called_did) or get_fcm_token_for_number(diversion_number)
         if token:
             if diversion_number:
                 data["diversion_number"] = diversion_number
@@ -181,14 +205,17 @@ def main():
 
     # Read original called number (set in extensions.conf from REDIRECTING(from-num))
     diversion_number = agi_get_variable("ORIGINAL_CALLED")
-    _log(f"CALL mode='{mode}' caller='{caller}' channel='{channel}' ORIGINAL_CALLED='{diversion_number}'")
+    # The DID that was actually dialed (always present) — the robust tenant key for
+    # users on a dedicated DID. Falls back to the Diversion header for shared-DID users.
+    called_did = agi_vars.get("agi_extension", "")
+    _log(f"CALL mode='{mode}' caller='{caller}' channel='{channel}' called_did='{called_did}' ORIGINAL_CALLED='{diversion_number}'")
 
     if mode == "cancel":
         send_fcm(diversion_number, {
             "type":             "call_cancelled",
             "caller_number":    caller,
             "asterisk_channel": channel,
-        })
+        }, called_did=called_did)
         # Clear the dedup marker so the same caller ringing back within
         # DEDUP_TTL gets a fresh incoming_call FCM instead of silence.
         try:
@@ -209,7 +236,7 @@ def main():
         "type":             "incoming_call",
         "caller_number":    caller,
         "asterisk_channel": channel,
-    })
+    }, called_did=called_did)
 
 
 if __name__ == "__main__":

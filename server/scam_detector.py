@@ -13,7 +13,7 @@ Changes over v2:
     to the score, so a long legitimate call after an early false keyword
     cannot accumulate to a false positive
 """
-import sys, os, json, logging, audioop, math, time, re
+import sys, os, json, logging, audioop, math, time, re, sqlite3
 from collections import deque
 
 # Normalises text for whole-word keyword matching:
@@ -35,6 +35,7 @@ from firebase_admin import credentials, messaging
 MODEL_PATH_EN        = "/opt/vocaguard/model-en"
 SERVICE_ACCOUNT      = "/opt/vocaguard/service-account.json"
 FCM_TOKEN_FILE       = "/opt/vocaguard/fcm_token.txt"
+DB_PATH              = "/opt/vocaguard/users.db"
 SAMPLE_RATE          = 16000
 WHISPER_CHUNK_BYTES  = 16000 * 2 * 2   # 2-second chunks (was 3 s)
 # Raised 3 -> 5 and detect_scam now also requires >=2 DISTINCT keyword matches
@@ -690,13 +691,36 @@ try:
 except Exception as e:
     log.error(f"Firebase init error: {e}")
 
-def send_fcm_alert(keywords, transcript, scam_type, caller_number="", confidence=0.9):
+def _token_by_did(called_did):
+    """FCM token for the user whose DEDICATED DID was called (robust tenant key, since
+    the Diversion header is unreliable). '' unless exactly one user owns that DID."""
+    d = re.sub(r"[^0-9]", "", called_did or "")
+    if not d:
+        return ""
     try:
-        if not os.path.exists(FCM_TOKEN_FILE):
-            log.warning("No FCM token file found")
-            return
-        with open(FCM_TOKEN_FILE) as f:
-            token = f.read().strip()
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        rows = conn.execute(
+            "SELECT fcm_token FROM users "
+            "WHERE replace(replace(did_number,'+',''),' ','') = ?", (d,)
+        ).fetchall()
+        conn.close()
+        if len(rows) == 1 and rows[0][0]:
+            return rows[0][0]
+    except Exception as e:
+        log.warning(f"did token lookup failed: {e}")
+    return ""
+
+
+def send_fcm_alert(keywords, transcript, scam_type, caller_number="", confidence=0.9, called_did=""):
+    try:
+        # Dedicated-DID tenant routing first; fall back to the single-user token file.
+        token = _token_by_did(called_did)
+        if not token:
+            if not os.path.exists(FCM_TOKEN_FILE):
+                log.warning("No FCM token file found")
+                return
+            with open(FCM_TOKEN_FILE) as f:
+                token = f.read().strip()
         if not token:
             log.warning("FCM token is empty")
             return
@@ -743,7 +767,10 @@ def agi_init():
 def main():
     agi_vars = agi_init()
     caller_number = agi_vars.get("agi_callerid", "")
-    log.info(f"Call from: {caller_number}")
+    # The dialed DID — robust tenant key for dedicated-DID users (the EAGI path has no
+    # app-supplied phone number, so without this it falls back to the single-user file).
+    called_did = agi_vars.get("agi_extension", "")
+    log.info(f"Call from: {caller_number} called_did={called_did}")
     agi_send('VERBOSE "VocaGuard scam detector v3 started" 1')
 
     # English Vosk — real-time streaming
@@ -798,7 +825,7 @@ def main():
                 f"score={total_score} confidence={conf} signals={all_signals}"
             )
             send_fcm_alert(all_signals, transcript_disp.strip(),
-                           scam_type, caller_number, conf)
+                           scam_type, caller_number, conf, called_did=called_did)
             alerted = True
 
     log.info("Audio analysis started")
