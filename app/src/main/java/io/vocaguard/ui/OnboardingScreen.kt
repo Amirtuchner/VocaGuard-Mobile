@@ -100,11 +100,22 @@ fun OnboardingScreen(
         }
     }
 
-    // Carrier detection — hoisted so navigation buttons can also use these values
-    val tm = context.getSystemService(TelephonyManager::class.java)
-    val operatorName = tm?.networkOperatorName?.lowercase() ?: ""
-    val isVerizon    = operatorName.contains("verizon")
-    val simCountry   = tm?.simCountryIso?.lowercase() ?: ""
+    // Battery-optimization exemption prompt (a single system "Allow" dialog) — hoisted
+    // so the nav bar's soft-gate can trigger it too.
+    val enableBattery: () -> Unit = {
+        try {
+            context.startActivity(
+                Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    .setData(Uri.parse("package:" + context.packageName))
+            )
+        } catch (e: Exception) {
+            context.startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        }
+    }
+    // Soft-gate: if the user tries to move past the battery step without granting it,
+    // warn once that calls may be missed — but let them proceed (no hard block).
+    val BATTERY_STEP = 2
+    var showBatteryWarning by remember { mutableStateOf(false) }
 
     val totalSteps = TOTAL_STEPS
     val displayStep = step
@@ -142,18 +153,6 @@ fun OnboardingScreen(
 
         // ── Step content ─────────────────────────────────────────────────────
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            val enableBattery: () -> Unit = {
-                try {
-                    context.startActivity(
-                        Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                            .setData(Uri.parse("package:" + context.packageName))
-                    )
-                } catch (e: Exception) {
-                    context.startActivity(
-                        Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                    )
-                }
-            }
             when (step) {
                 0 -> TermsStep(
                     accepted       = termsAccepted,
@@ -202,15 +201,46 @@ fun OnboardingScreen(
                 Spacer(Modifier.width(64.dp))
             }
 
-            val lastStep = TOTAL_STEPS - 1  // step 2 (Done)
+            val lastStep = TOTAL_STEPS - 1  // step 3 (Done)
             Button(
-                onClick = { if (step < lastStep) nextStep() else onFinish() },
+                onClick = {
+                    when {
+                        // Soft-gate: skipping the battery step un-granted risks missed calls.
+                        step == BATTERY_STEP && !batteryUnrestricted -> showBatteryWarning = true
+                        step < lastStep -> nextStep()
+                        else -> onFinish()
+                    }
+                },
                 enabled = step != 0 || termsAccepted,
                 modifier = Modifier.defaultMinSize(minWidth = 120.dp)
             ) {
                 Text(if (step < lastStep) "Next" else "Get Started")
             }
         }
+    }
+
+    if (showBatteryWarning) {
+        AlertDialog(
+            onDismissRequest = { showBatteryWarning = false },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null) },
+            title = { Text("Keep VocaGuard working?") },
+            text = {
+                Text(
+                    "If you skip this, Android may put VocaGuard to sleep to save battery — " +
+                    "and it could miss scam calls. We strongly recommend allowing it."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showBatteryWarning = false; enableBattery() }) {
+                    Text("Allow")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatteryWarning = false; nextStep() }) {
+                    Text("Skip anyway")
+                }
+            }
+        )
     }
 }
 
