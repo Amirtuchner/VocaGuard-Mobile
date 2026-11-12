@@ -34,7 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 // listener for SMS scanning, battery optimization) is removed from the required flow —
 // the hardest friction for elderly users (pilot feedback 2026-11-12). Those are now
 // optional one-taps on the final screen / in Settings.
-private const val TOTAL_STEPS = 3  // Terms · Activate (register + forwarding) · Done
+private const val TOTAL_STEPS = 4  // Terms · Activate · Keep-running (battery) · Done
 
 /** True if the app is exempt from battery optimization (won't be frozen in the background). */
 private fun isBatteryUnrestricted(context: android.content.Context): Boolean {
@@ -176,12 +176,14 @@ fun OnboardingScreen(
                     forwardingEnabled = callForwardingEnabled,
                     onEnableForwarding = viewModel::enableCallForwarding
                 )
-                2 -> AllSetStep(
+                2 -> BatteryOptimizationStep(
+                    isDone   = batteryUnrestricted,
+                    onEnable = enableBattery
+                )
+                3 -> AllSetStep(
                     isRegistered         = serverRegistered,
                     callScreeningOk      = callScreeningOk,
-                    onEnableCallScreening = { callScreeningLauncher.launch(permissionsManager.createCallScreeningIntent()) },
-                    batteryUnrestricted  = batteryUnrestricted,
-                    onEnableBattery      = enableBattery
+                    onEnableCallScreening = { callScreeningLauncher.launch(permissionsManager.createCallScreeningIntent()) }
                 )
             }
         }
@@ -634,9 +636,7 @@ private fun CallForwardingStep(
 private fun AllSetStep(
     isRegistered: Boolean,
     callScreeningOk: Boolean,
-    onEnableCallScreening: () -> Unit,
-    batteryUnrestricted: Boolean,
-    onEnableBattery: () -> Unit
+    onEnableCallScreening: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -669,11 +669,6 @@ private fun AllSetStep(
             label = "Block known scam numbers",
             done = callScreeningOk,
             onEnable = onEnableCallScreening
-        )
-        OptionalExtra(
-            label = "Keep running in the background",
-            done = batteryUnrestricted,
-            onEnable = onEnableBattery
         )
         Text(
             text = "You can turn these on later in Settings.",
