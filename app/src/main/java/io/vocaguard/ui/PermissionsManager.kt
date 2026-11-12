@@ -31,6 +31,18 @@ class PermissionsManager(private val context: Context) {
         val OPTIONAL_PERMISSIONS = arrayOf(
             Manifest.permission.READ_CONTACTS
         )
+
+        /**
+         * Which keys from [checkAllPermissions] are REQUIRED for core protection and
+         * therefore drive the home-screen "Protection Active" / "Setup Required" badge.
+         * Everything else in that map — Contacts, Notification Access, Draw Overlay,
+         * Call Screening — is an optional enhancement and must NOT turn the badge red
+         * (pilot feedback 2026-11-12: contacts is opt-in, so an un-granted contacts
+         * permission was falsely reporting the whole app as broken).
+         */
+        val REQUIRED_PERMISSION_LABELS = setOf(
+            "Phone State", "Answer Calls", "Record Audio", "Notifications"
+        )
     }
 
     fun checkAllPermissions(): Map<String, Boolean> {

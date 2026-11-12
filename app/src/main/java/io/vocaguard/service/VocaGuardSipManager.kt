@@ -102,8 +102,13 @@ object VocaGuardSipManager {
             // No echo limiter — it was the main cause of choppy, half-duplex audio.
             c.isEchoLimiterEnabled = false
 
-            // Keep NAT pinhole open with CRLF keep-alives
-            c.isKeepAliveEnabled = true
+            // Battery: do NOT run 24/7 CRLF keep-alives. They fire every ~30s all day
+            // just to hold the NAT/TCP binding open while idle — a major background
+            // drain. We don't need them: the incoming_call FCM triggers
+            // refreshRegistrationNow() (a fresh REGISTER) seconds before the user can
+            // accept, which re-opens the binding on demand for each real call. The
+            // periodic re-register below (params.expires) is the only idle upkeep left.
+            c.isKeepAliveEnabled = false
 
             // Be lenient with the no-RTP timeout (default ~30s) so a transient RTP
             // gap during a cellular NAT rebind doesn't terminate an otherwise healthy
@@ -135,7 +140,13 @@ object VocaGuardSipManager {
             serverAddr?.transport = TransportType.Tcp
             params.serverAddress = serverAddr
             params.isRegisterEnabled = true
-            params.expires = 300  // re-register every 5min — sufficient for NAT keep-alive
+            // Battery: re-register every 15min instead of 5min. With CRLF keep-alives
+            // off, this periodic REGISTER is the only idle network activity; stretching
+            // it 3x cuts the idle wake-ups accordingly. It still keeps Asterisk's
+            // registration fresh (server qualify/expiry tolerate this), and the
+            // incoming_call push does an on-demand REGISTER right before each call
+            // anyway, so a slightly staler idle binding is harmless.
+            params.expires = 900  // re-register every 15min — on-demand refresh covers calls
 
             val account = c.createAccount(params)
             c.addAccount(account)

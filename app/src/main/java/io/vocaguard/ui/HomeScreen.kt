@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
@@ -121,7 +122,11 @@ fun HomeTab(
         }
     }
 
-    val allGranted = permissions.values.all { it }
+    // Badge reflects only REQUIRED permissions — optional ones (Contacts, Notification
+    // Access, Draw Overlay, Call Screening) being off must not report the app as broken.
+    val allGranted = permissions
+        .filterKeys { it in PermissionsManager.REQUIRED_PERMISSION_LABELS }
+        .values.all { it }
     var permissionsExpanded by remember { mutableStateOf(!allGranted) }
     val context = LocalContext.current
     val callForwardingEnabled by settingsViewModel.callForwardingEnabled.collectAsStateWithLifecycle()
@@ -745,9 +750,10 @@ private val permissionDefs = listOf(
     PermissionDef("Answer Calls",      "Manage Calls",         "Can silence or reject detected scam calls",          Icons.Default.Call),
     PermissionDef("Record Audio",      "Microphone",           "Analyzes call audio for scam patterns",              Icons.Default.Mic),
     PermissionDef("Notifications",     "Notifications",        "Sends instant scam alerts to your screen",           Icons.Default.Notifications),
-    PermissionDef("Call Screening",    "Call Screening",       "Screens calls before your phone rings",              Icons.Default.Shield),
-    PermissionDef("Draw Overlay",      "Screen Overlay",       "Shows a warning banner during scam calls",           Icons.Default.Layers),
-    PermissionDef("Notification Access","Message Scanning",   "Detects scams in SMS, WhatsApp, Telegram & Facebook Messenger messages", Icons.Default.Notifications, optional = true),
+    PermissionDef("Call Screening",    "Call Screening",       "Extra: blocks known scam numbers before your phone rings", Icons.Default.Shield, optional = true),
+    PermissionDef("Draw Overlay",      "Screen Overlay",       "Extra: shows a warning banner during scam calls",         Icons.Default.Layers, optional = true),
+    PermissionDef("Contacts",          "Caller Names",         "Extra: shows who's calling and trusts people you know — stays on your phone", Icons.Default.Person, optional = true),
+    PermissionDef("Notification Access","Message Scanning",   "Extra: detects scams in SMS, WhatsApp, Telegram & Facebook Messenger messages", Icons.Default.Notifications, optional = true),
 )
 
 @Composable
@@ -798,19 +804,37 @@ fun PermissionItem(name: String, granted: Boolean, onClick: (() -> Unit)? = null
                     }
                 }
                 Text(
-                    text = if (granted) description else "Tap to enable",
+                    text = when {
+                        granted       -> description
+                        optional      -> "Tap to turn on"
+                        else          -> "Tap to enable"
+                    },
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (granted) MaterialTheme.colorScheme.onSecondaryContainer
-                            else MaterialTheme.colorScheme.error
+                    // Only a missing REQUIRED permission is an error (red). An off
+                    // optional one is a neutral choice, not a fault.
+                    color = when {
+                        granted  -> MaterialTheme.colorScheme.onSecondaryContainer
+                        optional -> MaterialTheme.colorScheme.onSurfaceVariant
+                        else     -> MaterialTheme.colorScheme.error
+                    }
                 )
             }
-            Icon(
-                imageVector = if (granted) Icons.Default.CheckCircle else Icons.Default.Warning,
-                contentDescription = null,
-                tint = if (granted) MaterialTheme.colorScheme.secondary
-                       else MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(18.dp)
-            )
+            // Trailing status icon: check when on; red warning ONLY for a missing
+            // required permission; nothing alarming for an off optional one.
+            when {
+                granted -> Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(18.dp)
+                )
+                !optional -> Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }

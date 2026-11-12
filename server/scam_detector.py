@@ -478,6 +478,13 @@ _TYPE_SIGNALS = [
         "minimum deposit", "bitcoin", "crypto", "forex", "broker",
         "financial advisor", "portfolio", "roi", "returns",
         "eurotrade", "capital",
+        # Hallmark pitch phrases Vosk transcribes reliably even when it garbles the
+        # cleaner keywords above (e.g. it hears "forty percent per month / risk free /
+        # double your money" but misses "crypto investment fund / trading / guaranteed
+        # returns"). Without these the type fell through to UNKNOWN on early partials.
+        "risk free", "risk-free", "risk free profit", "double your money",
+        "per month", "percent per month", "wallet address",
+        "bitcoin wallet", "initial deposit", "passive income", "financial freedom",
         "השקעה", "מסחר", "בורסה", "הפקדה", "תשואה", "ברוקר",
         "תשואה מובטחת", "רווחים מובטחים", "הכפלת כסף", "פורקס",
         "מנהל חשבון", "רובוט מסחר", "משיכת רווחים", "הפקדה ראשונית",
