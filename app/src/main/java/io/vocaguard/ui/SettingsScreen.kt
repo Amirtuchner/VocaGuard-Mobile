@@ -53,6 +53,7 @@ fun SettingsTab(
     val enableSound    by viewModel.enableSound.collectAsStateWithLifecycle()
     val enableVibration by viewModel.enableVibration.collectAsStateWithLifecycle()
     val messageScanEnabled by viewModel.messageScanEnabled.collectAsStateWithLifecycle()
+    val showCallerNames by viewModel.showCallerNames.collectAsStateWithLifecycle()
     val alertTypeEnabled by viewModel.alertTypeEnabled.collectAsStateWithLifecycle()
     val themePreference  by viewModel.themePreference.collectAsStateWithLifecycle()
     val reportEndpointUrl by viewModel.reportEndpointUrl.collectAsStateWithLifecycle()
@@ -93,6 +94,12 @@ fun SettingsTab(
     var newContactPhone by remember { mutableStateOf("") }
     var seniorNameInput by remember(seniorName) { mutableStateOf(seniorName) }
     var seniorPhoneInput by remember(seniorPhoneNumber) { mutableStateOf(seniorPhoneNumber) }
+
+    // Opt-in contacts permission for the "Show caller names" toggle. Granting flips the
+    // pref on; denying leaves it off. The user is never asked for contacts anywhere else.
+    val contactsPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> viewModel.setShowCallerNames(granted) }
 
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -407,6 +414,22 @@ fun SettingsTab(
                         onCheckedChange = { enabled ->
                             viewModel.setMessageScanEnabled(enabled)
                             if (enabled) showMessengerTipDialog = true
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AlertToggleRow(
+                        label = "Show caller names",
+                        description = "Optional. Uses your contacts only to show who's calling — stays on your phone, never uploaded or shared.",
+                        checked = showCallerNames,
+                        onCheckedChange = { enabled ->
+                            when {
+                                !enabled -> viewModel.setShowCallerNames(false)
+                                androidx.core.content.ContextCompat.checkSelfPermission(
+                                    context, android.Manifest.permission.READ_CONTACTS
+                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED ->
+                                    viewModel.setShowCallerNames(true)
+                                else -> contactsPermLauncher.launch(android.Manifest.permission.READ_CONTACTS)
+                            }
                         }
                     )
                     if (!hasAccess) {

@@ -66,6 +66,16 @@ class DetectionSettings private constructor(context: Context) {
         get() = prefs.getBoolean(KEY_MESSAGE_SCAN, true)
         set(value) = prefs.edit().putBoolean(KEY_MESSAGE_SCAN, value).apply()
 
+    /**
+     * Opt-in: whether VocaGuard may use the device contacts — to show the caller's name
+     * and trust known callers. OFF by default for privacy (pilot feedback 2026-11-12: users
+     * didn't want to grant contacts). When off, ContactsHelper never reads contacts even if
+     * the OS permission happens to be granted.
+     */
+    var showCallerNames: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_CALLER_NAMES, false)
+        set(value) = prefs.edit().putBoolean(KEY_SHOW_CALLER_NAMES, value).apply()
+
     // ── Per-scam-type alert toggles ────────────────────────────────────────────
 
     /**
@@ -158,6 +168,7 @@ class DetectionSettings private constructor(context: Context) {
         private const val KEY_ENABLE_SOUND = "enable_sound"
         private const val KEY_ENABLE_VIBRATION = "enable_vibration"
         private const val KEY_MESSAGE_SCAN = "message_scan_enabled"
+        private const val KEY_SHOW_CALLER_NAMES = "show_caller_names"
         private const val KEY_REPORT_ENDPOINT = "report_endpoint_url"
         private const val KEY_THEME = "theme_preference"
         private const val KEY_CALL_FORWARDING = "call_forwarding_enabled"

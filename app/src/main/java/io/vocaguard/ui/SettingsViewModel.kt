@@ -56,6 +56,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _messageScanEnabled = MutableStateFlow(detectionSettings.messageScanEnabled)
     val messageScanEnabled: StateFlow<Boolean> = _messageScanEnabled.asStateFlow()
 
+    private val _showCallerNames = MutableStateFlow(detectionSettings.showCallerNames)
+    val showCallerNames: StateFlow<Boolean> = _showCallerNames.asStateFlow()
+
     private val _themePreference = MutableStateFlow(detectionSettings.themePreference)
     val themePreference: StateFlow<String> = _themePreference.asStateFlow()
 
@@ -168,6 +171,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setMessageScanEnabled(value: Boolean) {
         _messageScanEnabled.value = value
         detectionSettings.messageScanEnabled = value
+    }
+
+    /** Opt-in to using contacts for caller names (requires READ_CONTACTS). Turning it
+     *  off also stops contacts being read even if the OS permission is still granted. */
+    fun setShowCallerNames(value: Boolean) {
+        _showCallerNames.value = value
+        detectionSettings.showCallerNames = value
     }
 
     fun setThemePreference(theme: String) {

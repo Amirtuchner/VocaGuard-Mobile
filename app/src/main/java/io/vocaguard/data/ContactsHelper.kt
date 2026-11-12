@@ -26,6 +26,7 @@ object ContactsHelper {
      */
     fun isKnownContact(context: Context, phoneNumber: String): Boolean {
         if (phoneNumber.isBlank()) return false
+        if (!DetectionSettings.getInstance(context).showCallerNames) return false
         return try {
             val uri = ContactsContract.PhoneLookup.CONTENT_FILTER_URI
                 .buildUpon().appendPath(phoneNumber).build()
@@ -50,6 +51,7 @@ object ContactsHelper {
      */
     fun getContactName(context: Context, phoneNumber: String): String? {
         if (phoneNumber.isBlank()) return null
+        if (!DetectionSettings.getInstance(context).showCallerNames) return null
         return try {
             val uri = ContactsContract.PhoneLookup.CONTENT_FILTER_URI
                 .buildUpon().appendPath(phoneNumber).build()
@@ -81,6 +83,7 @@ object ContactsHelper {
      */
     fun isKnownContactByName(context: Context, displayName: String): Boolean {
         if (displayName.isBlank()) return false
+        if (!DetectionSettings.getInstance(context).showCallerNames) return false
         return try {
             context.contentResolver.query(
                 ContactsContract.Contacts.CONTENT_URI,
