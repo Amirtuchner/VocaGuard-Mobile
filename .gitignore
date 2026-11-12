@@ -29,3 +29,10 @@ google-services.json
 *.jks.old
 app/google-services.json
 apk-download/*.apk
+
+# Demo capture artifacts (local only)
+vg_demo*.mp4
+vg_frame_*.png
+vg_rectest.mp4
+ring.wav
+scammer_voice.wav

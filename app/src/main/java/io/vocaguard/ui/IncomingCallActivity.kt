@@ -155,8 +155,9 @@ class IncomingCallActivity : ComponentActivity() {
             }
         }
 
-        // Start looping ringtone (not in demo — demo jumps straight to the active call)
-        if (!demoMode) {
+        // Start looping ringtone. In demo it rings briefly then auto-answers (below),
+        // so the recorded clip shows the full incoming-call → answer → alert story.
+        run {
             val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             ringtone = RingtoneManager.getRingtone(this, uri)?.also {
                 it.isLooping = true
@@ -169,15 +170,20 @@ class IncomingCallActivity : ComponentActivity() {
         // notification + on-screen scam alert are visible on any device.
         if (demoMode) {
             activeChannel = "DEMO"
-            activeCallerNumber = callerNumber.ifBlank { "+1 555-0100" }
-            callActive = true
-            showActiveCallNotification(activeChannel, activeCallerNumber, contactName)
-            // Ensure the persistent specialUse foreground service is running so its
-            // user-visible notification ("VocaGuard — Scam protection active") appears
-            // during the demo — this is the foreground service the reviewer needs to see.
-            startForegroundService(Intent(this, PhoneMonitorService::class.java))
+            activeCallerNumber = callerNumber.ifBlank { "Unknown" }
+            // Phased demo (for the website/marketing clip AND the reviewer): ring →
+            // auto-answer → live scam alert, so the full story is on screen without a
+            // real call. callActive stays false during the ring so IncomingCallScreen
+            // shows; then we "answer" and raise the sample alert a few seconds later.
             lifecycleScope.launch {
-                delay(2500)
+                delay(5000)                                   // phase 1: ringing (generous for recording)
+                ringtone?.stop()
+                callActive = true                             // phase 2: answered
+                showActiveCallNotification(activeChannel, activeCallerNumber, contactName)
+                // Persistent specialUse FGS so its "Scam protection active" notification
+                // is visible during the demo (also what the Play reviewer needs to see).
+                startForegroundService(Intent(this@IncomingCallActivity, PhoneMonitorService::class.java))
+                delay(4000)                                   // phase 3: a few seconds into the call
                 VocaGuardFcmService.scamAlertFlow.value =
                     Pair(io.vocaguard.data.ScamType.INVESTMENT_SCAM, 0.92f)
             }
@@ -332,7 +338,8 @@ class IncomingCallActivity : ComponentActivity() {
                         // so a near-simultaneous second tap lands here and must no-op —
                         // otherwise it fires a second real AMI Originate on the same
                         // channel, ringing the user again right after they just answered.
-                        if (!callActive) {
+                        // In demo mode the flow auto-answers (no SIP/AMI), so ignore taps.
+                        if (!callActive && !demoMode) {
                             ringtone?.stop()
                             ringtone = null
                             getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
