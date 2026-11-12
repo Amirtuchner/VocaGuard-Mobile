@@ -29,7 +29,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-private const val TOTAL_STEPS = 6  // Terms · Welcome · Call Screening · Notification Access · Activate (register + forwarding) · Battery
+// Minimal, senior-friendly onboarding: just Terms → Activate → Done. Everything that
+// used to force the user into Android system settings (call screening, notification
+// listener for SMS scanning, battery optimization) is removed from the required flow —
+// the hardest friction for elderly users (pilot feedback 2026-11-12). Those are now
+// optional one-taps on the final screen / in Settings.
+private const val TOTAL_STEPS = 3  // Terms · Activate (register + forwarding) · Done
 
 /** True if the app is exempt from battery optimization (won't be frozen in the background). */
 private fun isBatteryUnrestricted(context: android.content.Context): Boolean {
@@ -137,21 +142,24 @@ fun OnboardingScreen(
 
         // ── Step content ─────────────────────────────────────────────────────
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            val enableBattery: () -> Unit = {
+                try {
+                    context.startActivity(
+                        Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                            .setData(Uri.parse("package:" + context.packageName))
+                    )
+                } catch (e: Exception) {
+                    context.startActivity(
+                        Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                    )
+                }
+            }
             when (step) {
                 0 -> TermsStep(
                     accepted       = termsAccepted,
                     onAcceptChange = { termsAccepted = it }
                 )
-                1 -> WelcomeStep()
-                2 -> CallScreeningStep(
-                    isDone   = callScreeningOk,
-                    onEnable = { callScreeningLauncher.launch(permissionsManager.createCallScreeningIntent()) }
-                )
-                3 -> NotificationListenerStep(
-                    isDone   = notificationListenerOk,
-                    onEnable = { permissionsManager.openNotificationListenerSettings() }
-                )
-                4 -> RegistrationStep(
+                1 -> RegistrationStep(
                     phoneInput      = serverPhoneInput,
                     onPhoneChange   = viewModel::updateServerPhoneInput,
                     // Manual "Register this number" also enables forwarding silently.
@@ -168,21 +176,12 @@ fun OnboardingScreen(
                     forwardingEnabled = callForwardingEnabled,
                     onEnableForwarding = viewModel::enableCallForwarding
                 )
-                5 -> BatteryOptimizationStep(
-                    isDone = batteryUnrestricted,
-                    onEnable = {
-                        try {
-                            context.startActivity(
-                                Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                                    .setData(Uri.parse("package:" + context.packageName))
-                            )
-                        } catch (e: Exception) {
-                            // Fallback: open the battery-optimization list if the direct dialog is unavailable
-                            context.startActivity(
-                                Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                            )
-                        }
-                    }
+                2 -> AllSetStep(
+                    isRegistered         = serverRegistered,
+                    callScreeningOk      = callScreeningOk,
+                    onEnableCallScreening = { callScreeningLauncher.launch(permissionsManager.createCallScreeningIntent()) },
+                    batteryUnrestricted  = batteryUnrestricted,
+                    onEnableBattery      = enableBattery
                 )
             }
         }
@@ -201,20 +200,13 @@ fun OnboardingScreen(
                 Spacer(Modifier.width(64.dp))
             }
 
-            val lastStep = TOTAL_STEPS - 1  // step 5 (Battery)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // No Skip on the Terms step — acceptance is required
-                if (step in 1 until lastStep) {
-                    TextButton(onClick = { nextStep() }) { Text("Skip") }
-                    Spacer(Modifier.width(8.dp))
-                }
-                Button(
-                    onClick = { if (step < lastStep) nextStep() else onFinish() },
-                    enabled = step != 0 || termsAccepted,
-                    modifier = Modifier.defaultMinSize(minWidth = 120.dp)
-                ) {
-                    Text(if (step < lastStep) "Next" else "Get Started")
-                }
+            val lastStep = TOTAL_STEPS - 1  // step 2 (Done)
+            Button(
+                onClick = { if (step < lastStep) nextStep() else onFinish() },
+                enabled = step != 0 || termsAccepted,
+                modifier = Modifier.defaultMinSize(minWidth = 120.dp)
+            ) {
+                Text(if (step < lastStep) "Next" else "Get Started")
             }
         }
     }
@@ -602,6 +594,83 @@ private fun CallForwardingStep(
                 text = "I've dialled the code and call forwarding is active",
                 style = MaterialTheme.typography.bodyMedium
             )
+        }
+    }
+}
+
+/**
+ * Final onboarding screen. Confirms protection is on, and offers the previously-forced
+ * permissions (call screening, battery) as CLEARLY OPTIONAL one-taps — a senior can just
+ * tap "Get Started", while a caregiver can switch on the extras. Nothing here blocks finishing.
+ */
+@Composable
+private fun AllSetStep(
+    isRegistered: Boolean,
+    callScreeningOk: Boolean,
+    onEnableCallScreening: () -> Unit,
+    batteryUnrestricted: Boolean,
+    onEnableBattery: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        StepIcon(icon = Icons.Default.CheckCircle, isDone = isRegistered)
+        Text(
+            text = if (isRegistered) "You're protected" else "Almost there",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = if (isRegistered)
+                "VocaGuard is now watching your calls for scams. You can just tap Get Started."
+            else
+                "Tap Back and press “Activate protection” to finish turning on your protection.",
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Optional — for even stronger protection:",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        OptionalExtra(
+            label = "Block known scam numbers",
+            done = callScreeningOk,
+            onEnable = onEnableCallScreening
+        )
+        OptionalExtra(
+            label = "Keep running in the background",
+            done = batteryUnrestricted,
+            onEnable = onEnableBattery
+        )
+        Text(
+            text = "You can turn these on later in Settings.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun OptionalExtra(label: String, done: Boolean, onEnable: () -> Unit) {
+    if (done) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Default.CheckCircle, contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+        }
+    } else {
+        OutlinedButton(onClick = onEnable, modifier = Modifier.fillMaxWidth(0.85f)) {
+            Text(label)
         }
     }
 }
