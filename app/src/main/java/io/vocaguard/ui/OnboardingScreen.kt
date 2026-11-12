@@ -258,6 +258,33 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
+        // Prominent, plain-language privacy promise — directly addresses users' top
+        // concern: that granting permissions gives the app "control of my contacts"
+        // (pilot feedback 2026-11-12). Shown before the legal text so it's not missed.
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Lock, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "Your privacy is protected. VocaGuard never uploads, sells, or shares your " +
+                    "contacts — they stay on your phone. We only ask for the permissions needed " +
+                    "to screen and connect your calls, and nothing more.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
         Surface(
             modifier = Modifier
                 .fillMaxWidth()

@@ -13,13 +13,23 @@ import io.vocaguard.service.MessagingScamDetectorService
 class PermissionsManager(private val context: Context) {
 
     companion object {
+        // Only what's genuinely needed to screen + connect calls. READ_CONTACTS is
+        // deliberately NOT here — it's optional (used only to show the caller's name and
+        // skip known contacts) and users found being forced to grant contacts invasive
+        // (pilot feedback 2026-11-12: "I don't want to give you control over my contacts").
+        // ContactsHelper degrades gracefully without it; request it only if the user opts
+        // into caller-names in Settings.
         val REQUIRED_PERMISSIONS = arrayOf(
             Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.ANSWER_PHONE_CALLS,
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.POST_NOTIFICATIONS,
-            Manifest.permission.READ_CONTACTS,
             Manifest.permission.CALL_PHONE
+        )
+
+        /** Optional, opt-in only — never requested during the required setup flow. */
+        val OPTIONAL_PERMISSIONS = arrayOf(
+            Manifest.permission.READ_CONTACTS
         )
     }
 
