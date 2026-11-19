@@ -610,7 +610,7 @@ private fun RegistrationStep(
             shape = MaterialTheme.shapes.medium
         ) {
             Text(
-                text = "Good to know: if you ever remove VocaGuard, first turn off call " +
+                text = "Important notice: if you ever remove VocaGuard, first turn off call " +
                     "forwarding (Settings → Call Forwarding → Disable, or dial $deactivationCode). " +
                     "Uninstalling alone doesn't cancel it.",
                 style = MaterialTheme.typography.bodySmall,
