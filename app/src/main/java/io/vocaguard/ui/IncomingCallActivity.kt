@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import io.vocaguard.service.InCallAudioService
 import io.vocaguard.service.PhoneMonitorService
 import io.vocaguard.service.VocaGuardSipManager
 import androidx.core.app.NotificationCompat
@@ -183,6 +184,10 @@ class IncomingCallActivity : ComponentActivity() {
                 // Persistent specialUse FGS so its "Scam protection active" notification
                 // is visible during the demo (also what the Play reviewer needs to see).
                 startForegroundService(Intent(this@IncomingCallActivity, PhoneMonitorService::class.java))
+                // Also show the in-call microphone FGS notification — this is the
+                // service the Play mic-FGS declaration video must demonstrate.
+                // demo=true skips its SIP-state watcher (there is no real call).
+                InCallAudioService.start(this@IncomingCallActivity, demo = true)
                 delay(4000)                                   // phase 3: a few seconds into the call
                 VocaGuardFcmService.scamAlertFlow.value =
                     Pair(io.vocaguard.data.ScamType.INVESTMENT_SCAM, 0.92f)
@@ -209,6 +214,12 @@ class IncomingCallActivity : ComponentActivity() {
                         // mid-call causes the carrier to re-forward the same call to
                         // Asterisk, triggering a duplicate incoming-call notification.
                         // Forwarding is re-enabled in onDestroy() after the call ends.
+                        // Start the microphone-type FGS NOW, while this activity is
+                        // foreground (while-in-use rule) — it keeps the far end hearing
+                        // the user if they navigate away mid-call. Idempotent: the
+                        // LaunchedEffect re-fires on activity recreation with the same
+                        // ACTIVE state, which just re-posts the same notification.
+                        InCallAudioService.start(this@IncomingCallActivity)
                     }
                     sipState == VocaGuardSipManager.CallState.ENDED && callActive && !demoMode -> {
                         // (demo has no SIP call — a leftover ENDED state must not
@@ -472,6 +483,12 @@ class IncomingCallActivity : ComponentActivity() {
         releaseProximityLock()
         ringtone?.stop()
         isShowing = false
+        // Stop the in-call mic FGS only when the call is really over (isFinishing).
+        // On a config-change recreation the service must survive — the new activity
+        // instance re-fires the ACTIVE branch and keeps it alive.
+        if (isFinishing) {
+            InCallAudioService.stop(this)
+        }
         // Save a clean-call record when the call ends, so "calls analyzed" counts every
         // server-monitored call. Skip if a scam record was already saved by VocaGuardFcmService.
         if (callActive && VocaGuardFcmService.scamAlertFlow.value == null) {

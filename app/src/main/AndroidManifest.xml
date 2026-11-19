@@ -8,10 +8,14 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <!-- Microphone FGS removed: scam detection runs server-side (SIP bridge), not via
-         on-device background mic capture. Strip it so the Linphone SDK can't merge it
-         back in — otherwise Play sees an undeclared/mismatched FGS permission. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" tools:node="remove" />
+    <!-- Microphone FGS: used ONLY while the user is in an active VoIP call
+         (InCallAudioService, started from the visible call screen). Android 11+
+         silences mic capture for backgrounded apps without a microphone-type FGS,
+         which made the far end hear nothing whenever the user left the call screen.
+         This is NOT background scam monitoring (that runs server-side on the SIP
+         bridge). Play FGS declaration use case: voice communication / VoIP call
+         continuity. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <!-- specialUse FGS removed too. The call-protection service now uses the
          "shortService" type, which Google exempts from the foreground-service
          declaration/review (per the FGS policy: systemExempted and shortService
@@ -123,6 +127,18 @@
         <service
             android:name=".service.PhoneMonitorService"
             android:foregroundServiceType="shortService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- In-call audio foreground service. Runs ONLY for the duration of an active
+             VoIP call, started from the visible call screen when the SIP bridge goes
+             ACTIVE and stopped when the call ends. The microphone type keeps two-way
+             audio alive when the user navigates away from the call screen — without
+             it Android 11+ feeds silence to the far end the moment the app leaves
+             the foreground. -->
+        <service
+            android:name=".service.InCallAudioService"
+            android:foregroundServiceType="microphone"
             android:enabled="true"
             android:exported="false" />
 
