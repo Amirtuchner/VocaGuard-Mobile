@@ -44,6 +44,13 @@ def agi_get_variable(name: str) -> str:
     return match.group(1) if match else ""
 
 
+def agi_set_variable(name: str, value: str):
+    """Set a channel variable via the AGI SET VARIABLE command."""
+    sys.stdout.write(f'SET VARIABLE {name} "{value}"\n')
+    sys.stdout.flush()
+    sys.stdin.readline()  # consume the AGI result line
+
+
 def get_fcm_token_for_number(phone_number: str) -> str:
     """Look up FCM token by original called number (suffix match).
     DIDWW strips the country code prefix, so we match on trailing digits.
@@ -170,29 +177,86 @@ def get_token_by_did(called_did: str) -> str:
     return ""
 
 
-def send_fcm(diversion_number: str, data: dict, called_did: str = ""):
+def _send_uninstall_sms(phone_digits: str):
+    """One-time Twilio SMS telling the user their forwarding may still be live.
+    Soft wording: an UNREGISTERED token USUALLY means uninstall, but can also be
+    a stale token on an installed app (the app re-registers on token rotation,
+    which clears the flag server-side)."""
+    try:
+        sid      = open("/opt/vocaguard/twilio_sid.txt").read().strip()
+        tok      = open("/opt/vocaguard/twilio_token.txt").read().strip()
+        from_num = open("/opt/vocaguard/twilio_number.txt").read().strip()
+        from twilio.rest import Client
+        body = ("VocaGuard: it looks like the app was removed from your phone, but "
+                "call forwarding may still be active. To cancel it, dial ##21# from "
+                "your phone. If you still use VocaGuard, just open the app.")
+        sms = Client(sid, tok).messages.create(to=f"+{phone_digits}", from_=from_num, body=body)
+        _log(f"uninstall SMS sent to +{phone_digits} sid={sms.sid}")
+    except Exception as e:
+        _log(f"uninstall SMS error: {e}")
+
+
+def _handle_dead_token(token: str):
+    """FCM bounced UNREGISTERED → the app was uninstalled (or its token revoked).
+    Mark the user (uninstalled_at) and SMS them ONCE about stale *21* forwarding.
+    /register and /register-token clear the flag, so a reinstall or an in-place
+    token rotation re-arms the notification for a future real uninstall."""
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "uninstalled_at" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN uninstalled_at REAL")
+            conn.commit()
+        row = conn.execute(
+            "SELECT phone_number, uninstalled_at FROM users WHERE fcm_token=?",
+            (token,)
+        ).fetchone()
+        if row and not row[1]:
+            conn.execute(
+                "UPDATE users SET uninstalled_at=? WHERE fcm_token=?",
+                (time.time(), token)
+            )
+            conn.commit()
+            conn.close()
+            _send_uninstall_sms(row[0])
+        else:
+            conn.close()
+    except Exception as e:
+        _log(f"dead-token handling error: {e}")
+
+
+def send_fcm(diversion_number: str, data: dict, called_did: str = "") -> str:
+    """Send the push. Returns 'sent', 'dead_token' (UNREGISTERED — app gone),
+    'no_token' or 'error' so main() can fail-fast the dialplan."""
     try:
         cred = credentials.Certificate(SERVICE_ACCOUNT)
         firebase_admin.initialize_app(cred)
 
         # Prefer the dedicated-DID tenant key; fall back to the Diversion header.
         token = get_token_by_did(called_did) or get_fcm_token_for_number(diversion_number)
-        if token:
-            if diversion_number:
-                data["diversion_number"] = diversion_number
-            msg = messaging.Message(
-                data=data,
-                android=messaging.AndroidConfig(priority="high"),
-                token=token,
-            )
+        if not token:
+            _log("FCM NOT sent: no token")
+            return "no_token"
+        if diversion_number:
+            data["diversion_number"] = diversion_number
+        msg = messaging.Message(
+            data=data,
+            android=messaging.AndroidConfig(priority="high"),
+            token=token,
+        )
+        try:
             r = messaging.send(msg)
             _log(f"FCM sent type={data.get('type')} tail={token[-10:]} id={r}")
-        else:
-            _log("FCM NOT sent: no token")
+            return "sent"
+        except messaging.UnregisteredError:
+            _log(f"FCM UNREGISTERED tail={token[-10:]} — app likely uninstalled")
+            _handle_dead_token(token)
+            return "dead_token"
     except Exception as e:
         sys.stdout.write(f'VERBOSE "FCM notify error: {e}" 1\n')
         sys.stdout.flush()
         _log(f"FCM send error: {e}")
+        return "error"
 
 
 def main():
@@ -232,11 +296,22 @@ def main():
 
     cleanup_stale_vocaguard_channels()
 
-    send_fcm(diversion_number, {
+    status = send_fcm(diversion_number, {
         "type":             "incoming_call",
         "caller_number":    caller,
         "asterisk_channel": channel,
     }, called_did=called_did)
+
+    if status == "dead_token":
+        # App is gone — nobody can ever accept. Tell the dialplan to fail fast
+        # (answer briefly + hang up) instead of fake-ringing the caller for 60s;
+        # the short answered call makes the carrier drop the stale *21* rule.
+        agi_set_variable("VG_DEAD_TOKEN", "1")
+        # Clear the dedup marker so retries/next calls re-detect and fail fast too.
+        try:
+            os.remove(_dedup_key(caller))
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":

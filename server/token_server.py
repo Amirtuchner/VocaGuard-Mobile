@@ -137,6 +137,12 @@ def init_db():
     _cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
     if "did_number" not in _cols:
         conn.execute("ALTER TABLE users ADD COLUMN did_number TEXT")
+    # Set (epoch) by notify_incoming.py when this user's FCM push bounces
+    # UNREGISTERED (app uninstalled) — gates the one-time "cancel your call
+    # forwarding" SMS. Cleared by /register and /register-token (reinstall or
+    # in-place token rotation).
+    if "uninstalled_at" not in _cols:
+        conn.execute("ALTER TABLE users ADD COLUMN uninstalled_at REAL")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS did_pool (
             did_number  TEXT PRIMARY KEY,
@@ -250,7 +256,7 @@ def register_user(phone: str, fcm_token: str) -> dict:
 
     if existing:
         conn.execute(
-            "UPDATE users SET fcm_token=? WHERE phone_number=?",
+            "UPDATE users SET fcm_token=?, uninstalled_at=NULL WHERE phone_number=?",
             (fcm_token, phone)
         )
         # Keep an existing dedicated DID. Otherwise, only assign one if the carrier is
@@ -343,7 +349,7 @@ def update_fcm_token(phone: str, fcm_token: str) -> bool:
     phone = _normalize_phone(phone)
     conn = db_connect()
     cur = conn.execute(
-        "UPDATE users SET fcm_token=? WHERE phone_number=?",
+        "UPDATE users SET fcm_token=?, uninstalled_at=NULL WHERE phone_number=?",
         (fcm_token, phone)
     )
     conn.commit()
