@@ -55,6 +55,11 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Telephony hardware is optional — app runs on tablets/ChromeOS without a SIM -->
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <!-- Wi-Fi hardware is optional too. The Linphone SDK merges ACCESS_WIFI_STATE /
+         CHANGE_WIFI_MULTICAST_STATE, which implicitly mark android.hardware.wifi as
+         REQUIRED and shrink Play availability (Play flagged this on 1.0.21).
+         Cellular-only devices work fine — SIP runs over any network. -->
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
 
     <application
         android:name=".VocaGuardApplication"
