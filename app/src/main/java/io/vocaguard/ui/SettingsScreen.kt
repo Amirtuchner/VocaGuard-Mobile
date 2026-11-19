@@ -28,6 +28,7 @@ import io.vocaguard.data.DetectionSettings
 import android.telephony.TelephonyManager
 import io.vocaguard.data.FamilyContact
 import io.vocaguard.data.ScamType
+import io.vocaguard.service.ServerDetectionManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,6 +101,14 @@ fun SettingsTab(
     val contactsPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> viewModel.setShowCallerNames(granted) }
+
+    // Call Screening is an optional role (blocks known scam numbers before the phone
+    // rings). It is enabled here on demand only — never auto-prompted. The OS role
+    // screen is the source of truth, so we re-read the real state when it returns.
+    var callScreeningOn by remember { mutableStateOf(permissionsManager.isCallScreeningEnabled()) }
+    val callScreeningLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { callScreeningOn = permissionsManager.isCallScreeningEnabled() }
 
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -464,6 +473,47 @@ fun SettingsTab(
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // ── Call Screening (optional) ───────────────────────────────────────────
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Call Screening",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Optional. Lets VocaGuard screen incoming calls and block numbers " +
+                            "reported as scams before your phone rings. Your call protection works " +
+                            "without this — it's an extra layer.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AlertToggleRow(
+                        label = "Block known scam numbers",
+                        description = "You'll be asked to set VocaGuard as your call-screening app.",
+                        checked = callScreeningOn,
+                        onCheckedChange = { enabled ->
+                            if (enabled) {
+                                // Launch the system role request to enable it.
+                                callScreeningLauncher.launch(permissionsManager.createCallScreeningIntent())
+                            } else {
+                                // The role can't be revoked from inside the app — open the
+                                // system default-apps settings so the user can change it.
+                                // Routed through the launcher so the toggle re-reads the real
+                                // state when they return.
+                                callScreeningLauncher.launch(
+                                    android.content.Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+                                )
+                            }
+                        }
+                    )
                 }
             }
         }
@@ -1194,6 +1244,8 @@ private fun CallForwardingCard(
     onDisabled: () -> Unit
 ) {
     val context = LocalContext.current
+    // Carrier-aware: ##21# on GSM carriers, *73 on Verizon.
+    val deactivationCode = remember { ServerDetectionManager.getDeactivationCode(context) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -1236,7 +1288,7 @@ private fun CallForwardingCard(
                 OutlinedButton(
                     onClick = {
                         context.startActivity(
-                            Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", "#21#", null))
+                            Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", deactivationCode, null))
                         )
                         onDisabled()
                     },

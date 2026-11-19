@@ -74,6 +74,22 @@ object ServerDetectionManager {
         return "*21*+$did#"
     }
 
+    /**
+     * Code the user dials to cancel call forwarding (e.g. before uninstalling).
+     * Verizon uses *73 (no suffix).
+     * All other carriers use the GSM MMI ##21#, which deactivates "forward all
+     * calls" AND erases the registered number — more thorough than #21#, which
+     * leaves the number registered at the carrier.
+     */
+    fun getDeactivationCode(context: Context? = null): String {
+        if (context != null) {
+            val tm = context.getSystemService(TelephonyManager::class.java)
+            val operatorName = tm?.networkOperatorName?.lowercase() ?: ""
+            if (operatorName.contains("verizon")) return "*73"
+        }
+        return "##21#"
+    }
+
     data class RegistrationResult(
         val success: Boolean,
         val sipExtension: String = "",

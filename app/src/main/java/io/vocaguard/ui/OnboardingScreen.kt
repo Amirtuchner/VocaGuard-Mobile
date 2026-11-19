@@ -28,6 +28,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.vocaguard.service.ServerDetectionManager
 
 // Minimal, senior-friendly onboarding: just Terms → Activate → Done. Everything that
 // used to force the user into Android system settings (call screening, notification
@@ -249,7 +250,14 @@ fun OnboardingScreen(
 @Composable
 private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
     val scrollState = rememberScrollState()
+    // The whole step scrolls: its content (privacy card + full terms + consent row +
+    // staff field) is taller than the fixed step area, and the parent Box centers an
+    // overflowing child, which clipped the consent checkbox off the bottom. Scrolling
+    // the whole column guarantees every element — including the checkbox — is reachable.
     Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -318,16 +326,12 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
             }
         }
         Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 300.dp),
+            modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surfaceVariant,
             shape = MaterialTheme.shapes.medium
         ) {
             Column(
-                modifier = Modifier
-                    .verticalScroll(scrollState)
-                    .padding(16.dp),
+                modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
@@ -508,6 +512,9 @@ private fun RegistrationStep(
 ) {
     val busy = isRegistering || isDetecting
     var showManual by remember { mutableStateOf(false) }
+    // Carrier-aware cancel code for the uninstall note: ##21# on GSM, *73 on Verizon.
+    val stepContext = LocalContext.current
+    val deactivationCode = remember { ServerDetectionManager.getDeactivationCode(stepContext) }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -593,6 +600,22 @@ private fun RegistrationStep(
                 else
                     MaterialTheme.colorScheme.error,
                 textAlign = TextAlign.Center
+            )
+        }
+        // Forwarding survives uninstall (it lives at the carrier, not on the phone),
+        // so users must be told to turn it off BEFORE removing the app.
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Text(
+                text = "Good to know: if you ever remove VocaGuard, first turn off call " +
+                    "forwarding (Settings → Call Forwarding → Disable, or dial $deactivationCode). " +
+                    "Uninstalling alone doesn't cancel it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(12.dp)
             )
         }
     }

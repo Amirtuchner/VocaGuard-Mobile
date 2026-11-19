@@ -82,15 +82,11 @@ fun HomeTab(
         permissions = permissionsManager.checkAllPermissions()
     }
 
-    // After reinstall, runtime permissions persist but the Call Screening role is reset.
-    // runtimePermLauncher never fires in that case, so auto-prompt here on first composition.
-    LaunchedEffect(Unit) {
-        if (permissions["Call Screening"] == false) {
-            pendingSystemPerms = listOf("Call Screening")
-            showSystemGuide = true
-        }
-    }
-
+    // Call Screening is an OPTIONAL enhancement (block known scam numbers before the
+    // phone rings) — it must NOT auto-prompt on landing after onboarding. Users enable
+    // it deliberately by tapping the "Call Screening" row in the permissions list below
+    // (or the optional button on the "You're protected" step). Earlier an auto-prompt
+    // here fired the system "default call screening app" dialog unbidden.
     if (showSystemGuide && pendingSystemPerms.isNotEmpty()) {
         val currentPerm = pendingSystemPerms.first()
         if (currentPerm == "Call Screening") {
