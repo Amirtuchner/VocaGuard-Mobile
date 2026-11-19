@@ -628,7 +628,8 @@ class CallMonitoringService : Service() {
                 scamType = detectionResult.scamType,
                 transcript = text,
                 confidence = detectionResult.confidence,
-                phoneNumber = activePhoneNumber
+                phoneNumber = activePhoneNumber,
+                placeCaregiverCall = false // dialled below, after endScamCall()
             )
             overlayManager.show(detectionResult.scamType, detectionResult.confidence)
             updateNotification("⚠️ SCAM ALERT: ${detectionResult.scamType}")
@@ -670,7 +671,8 @@ class CallMonitoringService : Service() {
                 scamType    = result.scamType,
                 transcript  = transcript,
                 confidence  = result.confidence,
-                phoneNumber = activePhoneNumber
+                phoneNumber = activePhoneNumber,
+                placeCaregiverCall = false // dialled below, after endScamCall()
             )
             overlayManager.show(result.scamType, result.confidence)
             updateNotification("⚠️ SCAM ALERT: ${result.scamType}")

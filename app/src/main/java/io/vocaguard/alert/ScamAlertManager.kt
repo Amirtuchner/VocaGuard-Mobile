@@ -88,7 +88,8 @@ class ScamAlertManager(private val context: Context) {
         scamType: ScamType,
         transcript: String,
         confidence: Float,
-        phoneNumber: String = ""
+        phoneNumber: String = "",
+        placeCaregiverCall: Boolean = true
     ) {
         val settings = DetectionSettings.getInstance(context)
 
@@ -106,16 +107,20 @@ class ScamAlertManager(private val context: Context) {
         showAlertNotification(scamType, transcript, confidence, phoneNumber)
 
         // Notify family members / caregivers via SMS + phone call (fire-and-forget).
+        // Callers that dial the caregiver themselves after ending the scam call
+        // (CallMonitoringService) pass placeCaregiverCall = false to avoid double-calling.
         alertScope.launch {
             familyAlertSender.sendAlert(
                 scamType = scamType,
                 confidence = confidence,
                 callerNumber = phoneNumber
             )
-            familyAlertSender.makeCallAlert(
-                scamType = scamType,
-                confidence = confidence
-            )
+            if (placeCaregiverCall) {
+                familyAlertSender.makeCallAlert(
+                    scamType = scamType,
+                    confidence = confidence
+                )
+            }
         }
     }
 
