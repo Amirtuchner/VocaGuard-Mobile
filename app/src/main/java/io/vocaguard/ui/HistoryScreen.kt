@@ -1,8 +1,13 @@
 package io.vocaguard.ui
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.media.MediaPlayer
+import android.provider.ContactsContract
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +22,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -387,12 +393,60 @@ fun TranscriptCard(
 
     val context = LocalContext.current
     var contactName by remember(transcript.phoneNumber) { mutableStateOf<String?>(null) }
-    LaunchedEffect(transcript.phoneNumber) {
+    // Bumped when the user returns from the "add contact" screen so the name
+    // lookup re-runs and the card switches from the bare number to the name.
+    var contactRefresh by remember { mutableIntStateOf(0) }
+    LaunchedEffect(transcript.phoneNumber, contactRefresh) {
         if (transcript.phoneNumber.isNotEmpty()) {
             contactName = withContext(Dispatchers.IO) {
                 ContactsHelper.getContactName(context, transcript.phoneNumber)
             }
         }
+    }
+    val addContactLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { contactRefresh++ }
+
+    fun placeCall() {
+        val tel = Uri.fromParts("tel", transcript.phoneNumber, null)
+        try {
+            context.startActivity(
+                Intent(Intent.ACTION_CALL, tel).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (e: SecurityException) {
+            // CALL_PHONE not granted — open the dialer instead
+            context.startActivity(
+                Intent(Intent.ACTION_DIAL, tel).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+    }
+
+    var showScamCallConfirm by remember { mutableStateOf(false) }
+    if (showScamCallConfirm) {
+        AlertDialog(
+            onDismissRequest = { showScamCallConfirm = false },
+            icon = {
+                Icon(Icons.Default.Shield, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+            },
+            title = { Text("Call a suspected scammer?") },
+            text = {
+                Text(
+                    "VocaGuard flagged this call as a possible scam. Calling back can confirm " +
+                    "your number is active and expose you to more pressure. If you think it was " +
+                    "really your bank or a company, call the official number from their website " +
+                    "or your card instead."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showScamCallConfirm = false }) { Text("Don't call") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showScamCallConfirm = false; placeCall() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Call anyway") }
+            }
+        )
     }
 
     Card(
@@ -517,29 +571,52 @@ fun TranscriptCard(
                         )
                     }
                 }
-                if (transcript.direction == CallDirection.MISSED && transcript.phoneNumber.isNotEmpty()) {
+                if (transcript.phoneNumber.isNotEmpty() && contactName == null) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         IconButton(onClick = {
-                            val tel = Uri.fromParts("tel", transcript.phoneNumber, null)
+                            // System "new contact" editor, pre-filled with the number.
+                            // Needs no WRITE_CONTACTS permission — the Contacts app saves it.
+                            val intent = Intent(ContactsContract.Intents.Insert.ACTION).apply {
+                                type = ContactsContract.RawContacts.CONTENT_TYPE
+                                putExtra(ContactsContract.Intents.Insert.PHONE, transcript.phoneNumber)
+                                // Return to VocaGuard after Save instead of staying in Contacts
+                                putExtra("finishActivityOnSaveCompleted", true)
+                            }
                             try {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_CALL, tel).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                )
-                            } catch (e: SecurityException) {
-                                // CALL_PHONE not granted — open the dialer instead
-                                context.startActivity(
-                                    Intent(Intent.ACTION_DIAL, tel).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                )
+                                addContactLauncher.launch(intent)
+                            } catch (e: ActivityNotFoundException) {
+                                Toast.makeText(context, "No contacts app found", Toast.LENGTH_SHORT).show()
                             }
                         }) {
                             Icon(
+                                imageVector = Icons.Default.PersonAdd,
+                                contentDescription = "Add to contacts",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = "Add",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                if (transcript.phoneNumber.isNotEmpty()) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        IconButton(onClick = {
+                            // Calling back a flagged scammer is exactly what they want —
+                            // make the user confirm unless they marked the call safe.
+                            if (isScam && !markedFalsePositive) showScamCallConfirm = true
+                            else placeCall()
+                        }) {
+                            Icon(
                                 imageVector = Icons.Default.Phone,
-                                contentDescription = "Dial back",
+                                contentDescription = "Call back",
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
                         Text(
-                            text = "Dial Back",
+                            text = "Call",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
