@@ -11,7 +11,7 @@ from firebase_admin import credentials, messaging
 
 SERVICE_ACCOUNT = "/opt/vocaguard/service-account.json"
 FCM_TOKEN_FILE  = "/opt/vocaguard/fcm_token.txt"   # single-user fallback
-DB_PATH         = "/opt/vocaguard/users.db"
+DB_PATH         = "/opt/vocaguard/data/users.db"   # root:asterisk 0660 in a 2770 dir so AGI helpers (asterisk user) can write
 NOTIFY_LOG      = "/var/log/vocaguard_notify.log"
 
 
@@ -164,14 +164,39 @@ def get_token_by_did(called_did: str) -> str:
         return ""
     try:
         conn = sqlite3.connect(DB_PATH, timeout=30)
+        # Claimants = current owner(s) + anyone just moved OFF this DID whose handset
+        # may still forward here (prev_did). Route only when there is exactly one.
         rows = conn.execute(
-            "SELECT fcm_token FROM users "
-            "WHERE replace(replace(did_number,'+',''),' ','') = ?", (d,)
+            "SELECT phone_number, fcm_token, "
+            "replace(replace(did_number,'+',''),' ','') = ?, COALESCE(did_acked,'') = ? FROM users "
+            "WHERE replace(replace(did_number,'+',''),' ','') = ? "
+            "OR replace(replace(prev_did,'+',''),' ','') = ?", (d, d, d, d)
         ).fetchall()
+        token, clear_prev_for = "", None
+        if len(rows) == 1 and rows[0][1]:
+            phone, token, is_current, app_knows = rows[0]
+            if is_current and app_knows:
+                # A call arrived on their NEW DID (handset re-forwarded) AND their app
+                # has the new DID (so it won't re-dial *21* to the old one) → the old
+                # DID no longer needs to count them as a claimant.
+                clear_prev_for = phone
+            _log(f"token source=DEDICATED_DID did={d} tail={token[-10:]}")
+        elif len(rows) > 1:
+            _log(f"did={d} has {len(rows)} claimants -> Diversion fallback")
+        # Bookkeeping writes are best-effort and must never cost us the routing
+        # result above (e.g. DB not writable by the asterisk user).
+        try:
+            # Activity stamp: a released DID is only re-assigned after a quiet
+            # period, so stale forwarding can't reach a new owner.
+            conn.execute("UPDATE did_pool SET last_call_at=? WHERE did_number=?", (time.time(), d))
+            if clear_prev_for:
+                conn.execute("UPDATE users SET prev_did=NULL WHERE phone_number=? AND prev_did IS NOT NULL",
+                             (clear_prev_for,))
+            conn.commit()
+        except Exception as e:
+            _log(f"did bookkeeping write failed: {e}")
         conn.close()
-        if len(rows) == 1 and rows[0][0]:
-            _log(f"token source=DEDICATED_DID did={d} tail={rows[0][0][-10:]}")
-            return rows[0][0]
+        return token
     except Exception as e:
         _log(f"did lookup error: {e}")
     return ""

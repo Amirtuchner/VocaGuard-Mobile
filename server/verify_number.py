@@ -17,7 +17,7 @@ import firebase_admin
 from firebase_admin import credentials, messaging
 
 SERVICE_ACCOUNT = "/opt/vocaguard/service-account.json"
-DB_PATH         = "/opt/vocaguard/users.db"
+DB_PATH         = "/opt/vocaguard/data/users.db"   # root:asterisk 0660 in a 2770 dir so AGI helpers (asterisk user) can write
 LOG             = "/var/log/vocaguard_notify.log"
 VERIFY_TTL      = 300
 _DID_CC         = "972"

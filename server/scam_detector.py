@@ -35,7 +35,7 @@ from firebase_admin import credentials, messaging
 MODEL_PATH_EN        = "/opt/vocaguard/model-en"
 SERVICE_ACCOUNT      = "/opt/vocaguard/service-account.json"
 FCM_TOKEN_FILE       = "/opt/vocaguard/fcm_token.txt"
-DB_PATH              = "/opt/vocaguard/users.db"
+DB_PATH              = "/opt/vocaguard/data/users.db"   # root:asterisk 0660 in a 2770 dir so AGI helpers (asterisk user) can write
 SAMPLE_RATE          = 16000
 WHISPER_CHUNK_BYTES  = 16000 * 2 * 2   # 2-second chunks (was 3 s)
 # Raised 3 -> 5 and detect_scam now also requires >=2 DISTINCT keyword matches
@@ -706,9 +706,12 @@ def _token_by_did(called_did):
         return ""
     try:
         conn = sqlite3.connect(DB_PATH, timeout=30)
+        # Same claimant rule as notify_incoming.get_token_by_did: a user moved off
+        # this DID (prev_did) still counts until a call reaches their new DID.
         rows = conn.execute(
             "SELECT fcm_token FROM users "
-            "WHERE replace(replace(did_number,'+',''),' ','') = ?", (d,)
+            "WHERE replace(replace(did_number,'+',''),' ','') = ? "
+            "OR replace(replace(prev_did,'+',''),' ','') = ?", (d, d)
         ).fetchall()
         conn.close()
         if len(rows) == 1 and rows[0][0]:

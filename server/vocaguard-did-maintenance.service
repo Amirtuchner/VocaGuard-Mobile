@@ -1,0 +1,6 @@
+[Unit]
+Description=VocaGuard daily DID pool maintenance (dead tokens, reclaim, low-pool alert)
+
+[Service]
+Type=oneshot
+ExecStart=/opt/vocaguard-venv/bin/python3 /opt/vocaguard/did_maintenance.py

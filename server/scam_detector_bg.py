@@ -28,7 +28,7 @@ score_to_confidence  = _sd.score_to_confidence
 classify_scam_type   = _sd.classify_scam_type
 send_fcm_alert       = _sd.send_fcm_alert
 
-DB_PATH        = "/opt/vocaguard/users.db"
+DB_PATH        = "/opt/vocaguard/data/users.db"   # root:asterisk 0660 in a 2770 dir so AGI helpers (asterisk user) can write
 FCM_TOKEN_FILE = "/opt/vocaguard/fcm_token.txt"
 
 

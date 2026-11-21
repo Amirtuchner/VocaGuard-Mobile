@@ -1,0 +1,10 @@
+[Unit]
+Description=Run VocaGuard DID maintenance daily
+
+[Timer]
+# 07:00 UTC = 09:00/10:00 Israel — alert SMS arrives in the morning.
+OnCalendar=*-*-* 07:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

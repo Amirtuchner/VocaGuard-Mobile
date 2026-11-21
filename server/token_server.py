@@ -29,7 +29,7 @@ API_DOMAIN       = "api.vocaguard.com"
 LE_CERT_FILE     = "/etc/letsencrypt/live/api.vocaguard.com/fullchain.pem"
 LE_KEY_FILE      = "/etc/letsencrypt/live/api.vocaguard.com/privkey.pem"
 TOKEN_FILE       = "/opt/vocaguard/fcm_token.txt"  # single-user fallback
-DB_PATH          = "/opt/vocaguard/users.db"
+DB_PATH          = "/opt/vocaguard/data/users.db"   # root:asterisk 0660 in a 2770 dir so AGI helpers (asterisk user) can write
 PJSIP_USERS_FILE = "/etc/asterisk/pjsip_users.conf"
 DID_NUMBER       = "+97233741493"
 _DID_CC = "972"
@@ -143,12 +143,39 @@ def init_db():
     # in-place token rotation).
     if "uninstalled_at" not in _cols:
         conn.execute("ALTER TABLE users ADD COLUMN uninstalled_at REAL")
+    # DID the user was moved OFF. Their handset may still forward there until it
+    # re-dials *21* to the new DID, so routing treats them as a claimant of BOTH
+    # (ambiguous → Diversion fallback) instead of handing those calls to whoever
+    # else owns the old DID. Cleared when a call arrives on the new DID.
+    if "prev_did" not in _cols:
+        conn.execute("ALTER TABLE users ADD COLUMN prev_did TEXT")
+    # Set by did_maintenance.py's daily FCM dry-run when the token is dead. Separate
+    # from uninstalled_at so it doesn't suppress the call-time uninstall SMS.
+    if "token_dead_at" not in _cols:
+        conn.execute("ALTER TABLE users ADD COLUMN token_dead_at REAL")
+    # Cached Twilio carrier lookup: 1 = sends Diversion (shared DID ok), 0 = not.
+    # The app re-registers daily, so uncached lookups would cost per user per day.
+    if "carrier_safe" not in _cols:
+        conn.execute("ALTER TABLE users ADD COLUMN carrier_safe INTEGER")
+    # DID (digits) the APP last received from /register. A user moved server-side
+    # (e.g. by SMS) still runs an app that stores — and may re-dial *21* to — the old
+    # DID, so prev_did is only cleared once did_acked == did_number.
+    if "did_acked" not in _cols:
+        conn.execute("ALTER TABLE users ADD COLUMN did_acked TEXT")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS did_pool (
             did_number  TEXT PRIMARY KEY,
             assigned_to TEXT
         )
     """)
+    _pcols = [r[1] for r in conn.execute("PRAGMA table_info(did_pool)").fetchall()]
+    # Last time a forwarded call arrived on this DID (set by notify_incoming.py).
+    # A free DID is only re-assigned after DID_QUARANTINE_DAYS of silence, so a
+    # former owner's stale forwarding can't ring a new owner's phone.
+    if "last_call_at" not in _pcols:
+        conn.execute("ALTER TABLE did_pool ADD COLUMN last_call_at REAL")
+    if "released_at" not in _pcols:
+        conn.execute("ALTER TABLE did_pool ADD COLUMN released_at REAL")
     conn.commit()
     conn.close()
     log.info("DB initialised at %s", DB_PATH)
@@ -198,16 +225,54 @@ def _trial_info(created_at) -> dict:
 def _assign_dedicated_did(conn, phone: str) -> str | None:
     """Claim a free dedicated DID from the pool for this phone and record it on the
     user row. Returns the DID (digits, no '+') or None if the pool is empty."""
+    quiet_since = time.time() - DID_QUARANTINE_DAYS * 86400
+    # Never-called DIDs first, then the longest-silent released ones.
     row = conn.execute(
-        "SELECT did_number FROM did_pool WHERE assigned_to IS NULL ORDER BY did_number LIMIT 1"
+        "SELECT did_number FROM did_pool WHERE assigned_to IS NULL "
+        "AND (last_call_at IS NULL OR last_call_at < ?) "
+        "ORDER BY last_call_at IS NOT NULL, last_call_at, did_number LIMIT 1",
+        (quiet_since,)
     ).fetchone()
     if not row:
+        log.warning("DID pool exhausted — %s stays on the shared DID", phone)
         return None
     did = row[0]
-    conn.execute("UPDATE did_pool SET assigned_to=? WHERE did_number=?", (did, phone))
-    conn.execute("UPDATE users SET did_number=? WHERE phone_number=?", (did, phone))
-    log.info("Assigned dedicated DID %s to %s", did, phone)
+    old = conn.execute("SELECT did_number FROM users WHERE phone_number=?", (phone,)).fetchone()
+    old_did = old[0] if old else None
+    # NB: (phone, did) — the params were once swapped, so the pool row never got
+    # marked and every user was handed the same "dedicated" DID (2026-11-21).
+    conn.execute("UPDATE did_pool SET assigned_to=?, released_at=NULL WHERE did_number=?", (phone, did))
+    conn.execute("UPDATE users SET did_number=?, prev_did=? WHERE phone_number=?",
+                 (did, old_did if old_did and old_did != did else None, phone))
+    log.info("Assigned dedicated DID %s to %s (prev=%s)", did, phone, old_did)
     return did
+
+
+def _diversion_safe(conn, phone: str) -> bool:
+    """_carrier_sends_diversion with the result cached on the user row, so the daily
+    app re-register doesn't pay for a Twilio lookup every time. Lookup failures are
+    not cached (treated unsafe this time, retried next time)."""
+    row = conn.execute("SELECT carrier_safe FROM users WHERE phone_number=?", (phone,)).fetchone()
+    if row and row[0] is not None:
+        return bool(row[0])
+    safe, ok = _carrier_lookup(phone)
+    if ok:
+        conn.execute("UPDATE users SET carrier_safe=? WHERE phone_number=?", (int(safe), phone))
+    return safe
+
+
+def _ack_did(conn, phone: str, did: str):
+    """Record the DID being returned to the app (see users.did_acked)."""
+    conn.execute("UPDATE users SET did_acked=? WHERE phone_number=?",
+                 (re.sub(r"[^0-9]", "", did or ""), phone))
+
+
+def _did_owned_by_other(conn, did: str, phone: str) -> bool:
+    """True if `did` is on this user's row but the pool says it belongs to someone
+    else (or nobody). Left over from the swapped-params bug, which gave many users
+    the same DID; such users must move to a DID of their own."""
+    row = conn.execute("SELECT assigned_to FROM did_pool WHERE did_number=?", (did,)).fetchone()
+    return row is not None and row[0] != phone
 
 
 # Carriers CONFIRMED (from real forwarded-call traffic, 2026-11-10) to include the SIP
@@ -217,11 +282,16 @@ def _assign_dedicated_did(conn, phone: str) -> str | None:
 # Add a carrier here only after verifying it sends Diversion.
 DIVERSION_SAFE_CARRIERS = ("hot", "019", "telzar")
 
+# A released DID must see no forwarded calls for this long before it goes to a new
+# owner — otherwise a former owner's still-active *21* would ring the new owner.
+DID_QUARANTINE_DAYS = 30
 
-def _carrier_sends_diversion(phone: str) -> bool:
-    """True iff the number's carrier is a CONFIRMED Diversion-header sender (shared-DID
-    routing is safe). False for known/suspected strippers, unknown carriers, or on ANY
-    lookup failure — so the safe default is to give the user a dedicated DID."""
+
+def _carrier_lookup(phone: str) -> tuple[bool, bool]:
+    """(safe, lookup_ok). safe is True iff the number's carrier is a CONFIRMED
+    Diversion-header sender (shared-DID routing is safe). False for known/suspected
+    strippers, unknown carriers, or on ANY lookup failure — so the safe default is to
+    give the user a dedicated DID."""
     try:
         from twilio.rest import Client
         e164 = phone if phone.startswith("+") else "+" + phone
@@ -230,10 +300,10 @@ def _carrier_sends_diversion(phone: str) -> bool:
         name = ((r.line_type_intelligence or {}).get("carrier_name") or "").lower()
         safe = any(k in name for k in DIVERSION_SAFE_CARRIERS)
         log.info("Carrier lookup %s -> %r (diversion_safe=%s)", phone, name, safe)
-        return safe
+        return safe, True
     except Exception as e:
         log.warning("Carrier lookup failed for %s (%s) -> treating as NOT diversion-safe", phone, e)
-        return False
+        return False, False
 
 
 def register_user(phone: str, fcm_token: str) -> dict:
@@ -256,14 +326,23 @@ def register_user(phone: str, fcm_token: str) -> dict:
 
     if existing:
         conn.execute(
-            "UPDATE users SET fcm_token=?, uninstalled_at=NULL WHERE phone_number=?",
+            "UPDATE users SET fcm_token=?, uninstalled_at=NULL, token_dead_at=NULL WHERE phone_number=?",
             (fcm_token, phone)
         )
         # Keep an existing dedicated DID. Otherwise, only assign one if the carrier is
         # NOT a confirmed Diversion sender (Diversion-safe carriers stay on shared DID).
         did = existing[3]
-        if not did and not _carrier_sends_diversion(phone):
+        if did and _did_owned_by_other(conn, did, phone):
+            # Shares a DID with other users (swapped-params bug). Move to a free one;
+            # if the pool is empty, keep the shared DID for now — clearing it would
+            # not change where the handset forwards, only break routing further.
+            new_did = _assign_dedicated_did(conn, phone)
+            if new_did:
+                log.info("Moved %s off shared DID %s -> %s", phone, did, new_did)
+                did = new_did
+        if not did and not _diversion_safe(conn, phone):
             did = _assign_dedicated_did(conn, phone)
+        _ack_did(conn, phone, did or DID_NUMBER)
         conn.commit()
         conn.close()
         log.info("Updated FCM token for existing user %s (did=%s)", phone, did or "shared")
@@ -296,7 +375,8 @@ def register_user(phone: str, fcm_token: str) -> dict:
     )
     # Carrier-aware DID: Diversion-safe carriers (HOT/019) use the shared DID; everyone
     # else (Partner/Cellcom/Pelephone/unknown) gets a dedicated DID when the pool has one.
-    did = None if _carrier_sends_diversion(phone) else _assign_dedicated_did(conn, phone)
+    did = None if _diversion_safe(conn, phone) else _assign_dedicated_did(conn, phone)
+    _ack_did(conn, phone, did or DID_NUMBER)
     conn.commit()
     conn.close()
 
@@ -349,7 +429,7 @@ def update_fcm_token(phone: str, fcm_token: str) -> bool:
     phone = _normalize_phone(phone)
     conn = db_connect()
     cur = conn.execute(
-        "UPDATE users SET fcm_token=?, uninstalled_at=NULL WHERE phone_number=?",
+        "UPDATE users SET fcm_token=?, uninstalled_at=NULL, token_dead_at=NULL WHERE phone_number=?",
         (fcm_token, phone)
     )
     conn.commit()
@@ -372,6 +452,10 @@ def delete_user(phone: str) -> bool:
             return False
         ext = row[0]
         conn.execute("DELETE FROM users WHERE phone_number=?", (phone,))
+        # Return their dedicated DID to the pool. It is only re-assigned after
+        # DID_QUARANTINE_DAYS without calls (stale forwarding protection).
+        conn.execute("UPDATE did_pool SET assigned_to=NULL, released_at=? WHERE assigned_to=?",
+                     (time.time(), phone))
         conn.commit()
     finally:
         conn.close()
