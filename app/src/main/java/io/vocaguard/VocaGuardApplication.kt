@@ -21,6 +21,10 @@ class VocaGuardApplication : Application() {
         ServerDetectionManager.init(this)
         // Keep SIP endpoint registered so Asterisk can reach us immediately when a call is accepted
         VocaGuardSipManager.initialize(this)
+        // Daily server check-in that follows DID changes. Scheduled on every process
+        // start (incoming-call push, boot, update), not only when the UI opens.
+        // KEEP policy → no-op if already scheduled.
+        io.vocaguard.service.DidSyncWorker.schedule(this)
 
         // Tenjin attribution core events. connect() sends the Install event (first
         // ever call) and an App Open event (each call). Calling it from

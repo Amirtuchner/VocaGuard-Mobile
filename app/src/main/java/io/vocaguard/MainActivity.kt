@@ -153,6 +153,34 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private var forwardingDialog: android.app.AlertDialog? = null
+
+    /** The server moved this user to a new protection number and the silent re-forward
+     *  failed ([io.vocaguard.service.DidSyncWorker]). Until the handset forwards to the
+     *  new number, calls aren't protected — ask for one tap to dial the code. */
+    private fun maybePromptForwardingUpdate() {
+        if (forwardingDialog?.isShowing == true) return
+        if (!io.vocaguard.service.DidSyncWorker.isForwardingUpdatePending(this)) return
+        val code = io.vocaguard.service.ServerDetectionManager.getActivationCode(this)
+        if (code.isEmpty()) { io.vocaguard.service.DidSyncWorker.clearForwardingUpdatePending(this); return }
+        forwardingDialog = android.app.AlertDialog.Builder(this)
+            .setTitle("Update call forwarding")
+            .setMessage("VocaGuard moved you to a new protection number. Tap Update so your " +
+                "calls keep being checked for scams. Your phone will briefly show the dialer.")
+            .setCancelable(false)
+            .setPositiveButton("Update") { _, _ ->
+                val tel = android.net.Uri.fromParts("tel", code, null)
+                try {
+                    startActivity(Intent(Intent.ACTION_CALL, tel))
+                } catch (e: SecurityException) {
+                    startActivity(Intent(Intent.ACTION_DIAL, tel))
+                }
+                io.vocaguard.service.DidSyncWorker.clearForwardingUpdatePending(this)
+            }
+            .setNegativeButton("Later", null)
+            .show()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         applyIntentTab(intent)
@@ -177,6 +205,7 @@ class MainActivity : ComponentActivity() {
         if (missing.isNotEmpty()) requestPermissionsLauncher.launch(missing)
 
         VocaGuardSipManager.ensureRegistered()
+        maybePromptForwardingUpdate()
 
         val manager = AppWidgetManager.getInstance(this)
         val ids = manager.getAppWidgetIds(ComponentName(this, VocaGuardWidget::class.java))
