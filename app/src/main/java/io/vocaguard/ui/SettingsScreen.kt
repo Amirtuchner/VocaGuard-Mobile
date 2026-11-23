@@ -55,6 +55,7 @@ fun SettingsTab(
     val enableVibration by viewModel.enableVibration.collectAsStateWithLifecycle()
     val messageScanEnabled by viewModel.messageScanEnabled.collectAsStateWithLifecycle()
     val showCallerNames by viewModel.showCallerNames.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { viewModel.reloadShowCallerNames() }
     val alertTypeEnabled by viewModel.alertTypeEnabled.collectAsStateWithLifecycle()
     val themePreference  by viewModel.themePreference.collectAsStateWithLifecycle()
     val reportEndpointUrl by viewModel.reportEndpointUrl.collectAsStateWithLifecycle()

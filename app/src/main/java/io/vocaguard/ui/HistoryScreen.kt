@@ -1,7 +1,9 @@
 package io.vocaguard.ui
 
+import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.media.MediaPlayer
 import android.provider.ContactsContract
@@ -36,15 +38,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
 import io.vocaguard.data.CallDirection
 import io.vocaguard.data.CallTranscript
 import io.vocaguard.data.ContactsHelper
+import io.vocaguard.data.DetectionSettings
 import io.vocaguard.data.ScamType
 import java.io.File
 import java.text.SimpleDateFormat
@@ -58,6 +66,19 @@ fun HistoryTab(viewModel: HistoryViewModel = viewModel()) {
     val filter       by viewModel.filter.collectAsStateWithLifecycle()
     val hasMore      by viewModel.hasMore.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
+
+    // Bumped on every resume (e.g. back from the Contacts app after "Add") so EVERY
+    // card re-runs its contact-name lookup — not just the one whose Add was tapped —
+    // and all rows for that number switch from the bare number to the name.
+    var contactsVersion by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) contactsVersion++
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
 
     var reportingTranscript by remember { mutableStateOf<CallTranscript?>(null) }
     var transcriptToDelete  by remember { mutableStateOf<CallTranscript?>(null) }
@@ -349,6 +370,7 @@ fun HistoryTab(viewModel: HistoryViewModel = viewModel()) {
         items(displayed, key = { it.id }) { transcript ->
             TranscriptCard(
                 transcript = transcript,
+                contactsVersion = contactsVersion,
                 onDelete = { transcriptToDelete = transcript },
                 onReport = { reportingTranscript = transcript },
                 onWhitelist = {
@@ -382,6 +404,7 @@ fun HistoryTab(viewModel: HistoryViewModel = viewModel()) {
 @Composable
 fun TranscriptCard(
     transcript: CallTranscript,
+    contactsVersion: Int = 0,
     onDelete: () -> Unit,
     onReport: () -> Unit,
     onWhitelist: () -> Unit
@@ -396,16 +419,85 @@ fun TranscriptCard(
     // Bumped when the user returns from the "add contact" screen so the name
     // lookup re-runs and the card switches from the bare number to the name.
     var contactRefresh by remember { mutableIntStateOf(0) }
-    LaunchedEffect(transcript.phoneNumber, contactRefresh) {
+    LaunchedEffect(transcript.phoneNumber, contactRefresh, contactsVersion) {
         if (transcript.phoneNumber.isNotEmpty()) {
             contactName = withContext(Dispatchers.IO) {
                 ContactsHelper.getContactName(context, transcript.phoneNumber)
+            }
+            // Right after Save, the contacts provider may not have aggregated the
+            // new contact yet, so PhoneLookup can miss it — retry briefly.
+            var tries = 0
+            while (contactName == null && contactRefresh > 0 && tries++ < 3) {
+                delay(700)
+                contactName = withContext(Dispatchers.IO) {
+                    ContactsHelper.getContactName(context, transcript.phoneNumber)
+                }
             }
         }
     }
     val addContactLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { contactRefresh++ }
+
+    fun openAddContact() {
+        // System "new contact" editor, pre-filled with the number.
+        // Needs no WRITE_CONTACTS permission — the Contacts app saves it.
+        val intent = Intent(ContactsContract.Intents.Insert.ACTION).apply {
+            type = ContactsContract.RawContacts.CONTENT_TYPE
+            putExtra(ContactsContract.Intents.Insert.PHONE, transcript.phoneNumber)
+            // Return to VocaGuard after Save instead of staying in Contacts
+            putExtra("finishActivityOnSaveCompleted", true)
+        }
+        try {
+            addContactLauncher.launch(intent)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(context, "No contacts app found", Toast.LENGTH_SHORT).show()
+        }
+    }
+    // Names need BOTH the "Show caller names" opt-in (off by default, for privacy) and
+    // READ_CONTACTS — without either, the lookup returns null and the card could never
+    // switch to the new name. So when Add is tapped while names are off, ASK (never flip
+    // the opt-in silently); on "Turn on" get the permission, enable the setting, then
+    // open the editor. On "Not now" the editor still opens — the contact is just saved.
+    val detectionSettings = remember { DetectionSettings.getInstance(context) }
+    val contactsPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) detectionSettings.showCallerNames = true
+        openAddContact()
+    }
+    var showNamesOptIn by remember { mutableStateOf(false) }
+    if (showNamesOptIn) {
+        AlertDialog(
+            onDismissRequest = { showNamesOptIn = false },
+            icon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
+            title = { Text("Show names from your contacts?") },
+            text = {
+                Text(
+                    "To show this contact's name instead of the number, VocaGuard needs to " +
+                    "use your contacts. They stay on your phone — never uploaded or shared. " +
+                    "You can turn this off anytime in Settings → Show caller names."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showNamesOptIn = false
+                    val hasContacts = ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.READ_CONTACTS
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (hasContacts) {
+                        detectionSettings.showCallerNames = true
+                        openAddContact()
+                    } else {
+                        contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                    }
+                }) { Text("Turn on") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNamesOptIn = false; openAddContact() }) { Text("Not now") }
+            }
+        )
+    }
 
     fun placeCall() {
         val tel = Uri.fromParts("tel", transcript.phoneNumber, null)
@@ -574,19 +666,11 @@ fun TranscriptCard(
                 if (transcript.phoneNumber.isNotEmpty() && contactName == null) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         IconButton(onClick = {
-                            // System "new contact" editor, pre-filled with the number.
-                            // Needs no WRITE_CONTACTS permission — the Contacts app saves it.
-                            val intent = Intent(ContactsContract.Intents.Insert.ACTION).apply {
-                                type = ContactsContract.RawContacts.CONTENT_TYPE
-                                putExtra(ContactsContract.Intents.Insert.PHONE, transcript.phoneNumber)
-                                // Return to VocaGuard after Save instead of staying in Contacts
-                                putExtra("finishActivityOnSaveCompleted", true)
-                            }
-                            try {
-                                addContactLauncher.launch(intent)
-                            } catch (e: ActivityNotFoundException) {
-                                Toast.makeText(context, "No contacts app found", Toast.LENGTH_SHORT).show()
-                            }
+                            val hasContacts = ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.READ_CONTACTS
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (hasContacts && detectionSettings.showCallerNames) openAddContact()
+                            else showNamesOptIn = true
                         }) {
                             Icon(
                                 imageVector = Icons.Default.PersonAdd,

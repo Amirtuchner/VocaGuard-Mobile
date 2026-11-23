@@ -180,6 +180,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         detectionSettings.showCallerNames = value
     }
 
+    /** Re-read the opt-in — History's "Add contact" flow can turn it on directly. */
+    fun reloadShowCallerNames() {
+        _showCallerNames.value = detectionSettings.showCallerNames
+    }
+
     fun setThemePreference(theme: String) {
         _themePreference.value = theme
         detectionSettings.themePreference = theme
