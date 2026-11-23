@@ -207,33 +207,6 @@ object ServerDetectionManager {
     }
 
     /**
-     * Reports the billing plan ("paid" | "trial" | "comp" | "expired") and the Play
-     * purchases behind it, so the server knows who is a paying customer. Returns true
-     * on success; false if not registered, the server doesn't know the user, or the
-     * network failed (caller retries on the next refresh).
-     */
-    suspend fun reportSubscription(plan: String, purchases: org.json.JSONArray): Boolean =
-        withContext(Dispatchers.IO) {
-            val phone = getPhoneNumber()
-            if (phone.isEmpty()) return@withContext false
-            try {
-                val body = JSONObject().apply {
-                    put("phone_number", phone)
-                    put("plan", plan)
-                    put("purchases", purchases)
-                }.toString()
-                val request = Request.Builder()
-                    .url("https://${BuildConfig.TOKEN_SERVER_HOST}/subscription")
-                    .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
-                    .post(body.toRequestBody("application/json".toMediaType()))
-                    .build()
-                buildHttpClient().newCall(request).execute().use { it.isSuccessful }
-            } catch (e: Exception) {
-                false
-            }
-        }
-
-    /**
      * Asks the server to delete all data associated with this phone number.
      * Returns true on success or if the user was never registered on the server.
      */

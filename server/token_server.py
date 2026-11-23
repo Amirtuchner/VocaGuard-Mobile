@@ -178,28 +178,6 @@ def init_db():
     # DID, so prev_did is only cleared once did_acked == did_number.
     if "did_acked" not in _cols:
         conn.execute("ALTER TABLE users ADD COLUMN did_acked TEXT")
-    # Billing plan as last reported by the app (/subscription): paid | trial | comp
-    # (reviewer/admin code) | expired. App-reported, NOT verified with Google Play —
-    # good for counting customers; Play Console remains the source of truth.
-    if "plan" not in _cols:
-        conn.execute("ALTER TABLE users ADD COLUMN plan TEXT")
-    if "plan_updated_at" not in _cols:
-        conn.execute("ALTER TABLE users ADD COLUMN plan_updated_at REAL")
-    # One row per Play subscription (purchase_token is stable across renewals;
-    # order_id gets a ..0, ..1 suffix per renewal).
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS subscriptions (
-            purchase_token TEXT PRIMARY KEY,
-            phone_number   TEXT,
-            product_id     TEXT,
-            order_id       TEXT,
-            purchase_time  REAL,
-            state          TEXT,
-            auto_renewing  INTEGER,
-            first_seen     REAL,
-            last_seen      REAL
-        )
-    """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS did_pool (
             did_number  TEXT PRIMARY KEY,
@@ -217,41 +195,6 @@ def init_db():
     conn.commit()
     conn.close()
     log.info("DB initialised at %s", DB_PATH)
-
-
-_PLANS = ("paid", "trial", "comp", "expired")
-
-def record_subscription(phone: str, plan: str, purchases: list) -> bool:
-    """Store the app-reported billing state. Returns False if the user is unknown."""
-    phone = _normalize_phone(phone)
-    if plan not in _PLANS:
-        raise ValueError(f"bad plan {plan!r}")
-    now = time.time()
-    conn = db_connect()
-    try:
-        if not conn.execute("SELECT 1 FROM users WHERE phone_number=?", (phone,)).fetchone():
-            return False
-        conn.execute("UPDATE users SET plan=?, plan_updated_at=? WHERE phone_number=?",
-                     (plan, now, phone))
-        for p in purchases[:10]:
-            token = str(p.get("purchase_token", ""))[:512]
-            if not token:
-                continue
-            ptime = p.get("purchase_time_ms")
-            conn.execute(
-                "INSERT INTO subscriptions (purchase_token, phone_number, product_id, order_id, "
-                "purchase_time, state, auto_renewing, first_seen, last_seen) "
-                "VALUES (?,?,?,?,?,?,?,?,?) "
-                "ON CONFLICT(purchase_token) DO UPDATE SET phone_number=excluded.phone_number, "
-                "order_id=excluded.order_id, state=excluded.state, "
-                "auto_renewing=excluded.auto_renewing, last_seen=excluded.last_seen",
-                (token, phone, str(p.get("product_id", ""))[:64], str(p.get("order_id", ""))[:64],
-                 float(ptime) / 1000 if ptime else None, str(p.get("state", ""))[:16],
-                 1 if p.get("auto_renewing") else 0, now, now))
-        conn.commit()
-        return True
-    finally:
-        conn.close()
 
 
 def get_user_by_phone(phone: str) -> dict | None:
@@ -529,7 +472,6 @@ def delete_user(phone: str) -> bool:
             return False
         ext = row[0]
         conn.execute("DELETE FROM users WHERE phone_number=?", (phone,))
-        conn.execute("DELETE FROM subscriptions WHERE phone_number=?", (phone,))
         # Return their dedicated DID to the pool. It is only re-assigned after
         # DID_QUARANTINE_DAYS without calls (stale forwarding protection).
         conn.execute("UPDATE did_pool SET assigned_to=NULL, released_at=? WHERE assigned_to=?",
@@ -868,25 +810,6 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, result)
             except Exception as e:
                 log.error("register error: %s", e)
-                self._send(500, {"error": str(e)})
-
-        elif self.path == "/subscription":
-            # App-reported billing state: {phone_number, plan, purchases:[...]}
-            try:
-                data  = self._read_json()
-                phone = str(data.get("phone_number", "")).strip()
-                plan  = str(data.get("plan", "")).strip()
-                purchases = data.get("purchases") or []
-                if not phone or plan not in _PLANS or not isinstance(purchases, list):
-                    self._send(400, {"error": "phone_number and valid plan required"})
-                    return
-                if record_subscription(phone, plan, purchases):
-                    log.info("Subscription report %s plan=%s purchases=%d", phone, plan, len(purchases))
-                    self._send(200, {"status": "ok"})
-                else:
-                    self._send(404, {"error": "unknown user"})
-            except Exception as e:
-                log.error("subscription error: %s", e)
                 self._send(500, {"error": str(e)})
 
         elif self.path == "/verify-number/start":

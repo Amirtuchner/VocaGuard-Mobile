@@ -133,7 +133,6 @@ class BillingManager private constructor(private val context: Context) :
         if (isReviewerUnlocked()) {
             _status.value = SubscriptionStatus.Active
             queryProductDetails()?.let { _priceLine.value = formatPriceLine(it) }
-            reportPlan("comp", emptyList())
             return
         }
         // Debug builds can't purchase (Play only sells to Play-installed builds),
@@ -167,51 +166,11 @@ class BillingManager private constructor(private val context: Context) :
             details?.let { _priceLine.value = formatPriceLine(it) }
             _status.value = if (details != null) SubscriptionStatus.Expired else SubscriptionStatus.Unknown
         }
-        reportPlan(
-            when {
-                active        -> "paid"
-                trialActive() -> "trial"
-                else          -> "expired"
-            },
-            result.purchasesList
-        )
 
         // Acknowledge any unacknowledged purchases so Play doesn't revoke them
         result.purchasesList
             .filter { !it.isAcknowledged && it.purchaseState == Purchase.PurchaseState.PURCHASED }
             .forEach { acknowledge(it) }
-    }
-
-    /**
-     * Sends the plan + Play purchases to the server (/subscription) so it can count
-     * paying customers. refreshStatus runs on every resume, so this only sends when
-     * the state changed or once a day — the daily resend also lets the server see
-     * lapsed/cancelled subscriptions. Failures retry on the next refresh.
-     */
-    private suspend fun reportPlan(plan: String, purchases: List<Purchase>, force: Boolean = false) {
-        val arr = org.json.JSONArray()
-        purchases.filter { it.products.contains(PRODUCT_ID) }.forEach { p ->
-            arr.put(org.json.JSONObject().apply {
-                put("purchase_token", p.purchaseToken)
-                put("order_id", p.orderId ?: "")
-                put("product_id", PRODUCT_ID)
-                put("purchase_time_ms", p.purchaseTime)
-                put("state", when (p.purchaseState) {
-                    Purchase.PurchaseState.PURCHASED -> "purchased"
-                    Purchase.PurchaseState.PENDING   -> "pending"
-                    else                             -> "unspecified"
-                })
-                put("auto_renewing", p.isAutoRenewing)
-            })
-        }
-        val sig = (plan + "|" + arr.toString()).hashCode().toString()
-        val now = System.currentTimeMillis()
-        val unchanged = prefs.getString("sub_report_sig", null) == sig &&
-            now - prefs.getLong("sub_report_at", 0L) < 24 * 3600 * 1000L
-        if (!force && unchanged) return
-        if (io.vocaguard.service.ServerDetectionManager.reportSubscription(plan, arr)) {
-            prefs.edit().putString("sub_report_sig", sig).putLong("sub_report_at", now).apply()
-        }
     }
 
     private suspend fun acknowledge(purchase: Purchase) {
@@ -237,8 +196,6 @@ class BillingManager private constructor(private val context: Context) :
                 purchases
                     .filter { !it.isAcknowledged && it.purchaseState == Purchase.PurchaseState.PURCHASED }
                     .forEach { acknowledge(it) }
-                // Tell the server right away (not throttled) — a new paying customer.
-                if (active && !io.vocaguard.BuildConfig.DEBUG) reportPlan("paid", purchases, force = true)
                 // Report verified revenue to Tenjin (ROAS) with the real price + receipt.
                 val price = queryProductDetails()?.let { paidPrice(it) }
                 if (price != null) {
