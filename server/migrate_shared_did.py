@@ -1,6 +1,7 @@
 #!/opt/vocaguard-venv/bin/python3
 """One-off: move users who share a "dedicated" DID (swapped-params bug, 2026-11-21)
 to DIDs of their own, and SMS each one the forwarding code for their new DID.
+(Run with /opt/vocaguard-venv/bin/python3 — system python3 has no twilio module.)
 
 Safe for users who ignore the SMS: _assign_dedicated_did records the old DID in
 prev_did, so the old DID stays ambiguous (Diversion fallback, as before) instead of
@@ -8,7 +9,7 @@ routing their calls to its remaining owner. prev_did is only cleared once a call
 arrives on the new DID AND their app has fetched the new DID (users.did_acked).
 
 Usage (as root):
-  migrate_shared_did.py                 # dry run: who would move where, the SMS text
+  /opt/vocaguard-venv/bin/python3 migrate_shared_did.py                 # dry run: who would move where, the SMS text
   migrate_shared_did.py --send          # assign + SMS
   migrate_shared_did.py --send --limit 1 [--only <phone>]   # try on one user first
 """
