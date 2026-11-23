@@ -55,6 +55,7 @@ fun SettingsTab(
     val enableVibration by viewModel.enableVibration.collectAsStateWithLifecycle()
     val messageScanEnabled by viewModel.messageScanEnabled.collectAsStateWithLifecycle()
     val showCallerNames by viewModel.showCallerNames.collectAsStateWithLifecycle()
+    val phoneWarning by viewModel.phoneWarning.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.reloadShowCallerNames() }
     val alertTypeEnabled by viewModel.alertTypeEnabled.collectAsStateWithLifecycle()
     val themePreference  by viewModel.themePreference.collectAsStateWithLifecycle()
@@ -187,6 +188,8 @@ fun SettingsTab(
                 status         = serverRegStatus,
                 isRegistering  = serverIsRegistering,
                 onRegister     = { viewModel.registerWithServer() },
+                phoneWarning   = phoneWarning,
+                onRegisterAnyway = { viewModel.registerWithServer(force = true) },
                 onUnregister   = { viewModel.unregisterFromServer() },
                 isUS           = isUS
             )
@@ -1324,6 +1327,8 @@ private fun ServerDetectionCard(
     status: String,
     isRegistering: Boolean,
     onRegister: () -> Unit,
+    phoneWarning: String? = null,
+    onRegisterAnyway: () -> Unit = {},
     onUnregister: () -> Unit,
     isUS: Boolean = false
 ) {
@@ -1356,23 +1361,30 @@ private fun ServerDetectionCard(
                     onValueChange = onPhoneChange,
                     label = { Text("Your Phone Number") },
                     placeholder = { Text(if (isUS) "+12025551234" else "+972501234567") },
+                    isError = phoneWarning != null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
-                    text = if (isUS) "Include the country code (e.g. +12025551234)."
+                    text = phoneWarning
+                        ?: if (isUS) "Include the country code (e.g. +12025551234)."
                            else "Include the country code (e.g. +972501234567).",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (phoneWarning != null) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
-                    onClick = onRegister,
+                    onClick = if (phoneWarning != null) onRegisterAnyway else onRegister,
                     enabled = !isRegistering && phoneField.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(if (isRegistering) "Registering…" else "Register with Server")
+                    Text(when {
+                        isRegistering        -> "Registering…"
+                        phoneWarning != null -> "Use this number anyway"
+                        else                 -> "Register with Server"
+                    })
                 }
             } else {
                 Text(

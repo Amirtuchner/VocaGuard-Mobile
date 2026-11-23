@@ -78,6 +78,7 @@ fun OnboardingScreen(
     val serverRegStatus     by viewModel.serverRegStatus.collectAsStateWithLifecycle()
     val serverIsRegistering by viewModel.serverIsRegistering.collectAsStateWithLifecycle()
     val serverPhoneInput    by viewModel.serverPhoneInput.collectAsStateWithLifecycle()
+    val phoneWarning        by viewModel.phoneWarning.collectAsStateWithLifecycle()
     val activationCode      by viewModel.serverActivationCode.collectAsStateWithLifecycle()
     val callForwardingEnabled by viewModel.callForwardingEnabled.collectAsStateWithLifecycle()
     val awaitingNumberVerify by viewModel.awaitingNumberVerify.collectAsStateWithLifecycle()
@@ -91,13 +92,13 @@ fun OnboardingScreen(
     // verification call (reveals the number on carriers that hide it, e.g. Israeli
     // SIMs) → manual entry. Server registration + forwarding follow automatically.
     val onActivate: () -> Unit = {
-        val existing = serverPhoneInput.ifBlank {
-            io.vocaguard.service.PhoneNumberHelper.readSimNumber(context)
-        }
-        if (existing.isNotBlank()) {
-            viewModel.activateProtection(existing)
-        } else {
-            viewModel.verifyNumberThenActivate()
+        // A typed number is sanity-checked (warning + "use anyway"); a SIM-read one is trusted.
+        val sim = if (serverPhoneInput.isBlank())
+            io.vocaguard.service.PhoneNumberHelper.readSimNumber(context) else ""
+        when {
+            serverPhoneInput.isNotBlank() -> viewModel.activateProtection(serverPhoneInput)
+            sim.isNotBlank()              -> viewModel.activateProtection(sim, force = true)
+            else                          -> viewModel.verifyNumberThenActivate()
         }
     }
 
@@ -164,6 +165,8 @@ fun OnboardingScreen(
                     onPhoneChange   = viewModel::updateServerPhoneInput,
                     // Manual "Register this number" also enables forwarding silently.
                     onRegister      = { viewModel.activateProtection(serverPhoneInput) },
+                    phoneWarning    = phoneWarning,
+                    onRegisterAnyway = { viewModel.activateProtection(serverPhoneInput, force = true) },
                     onActivate      = onActivate,
                     onChangeNumber  = {
                         viewModel.unregisterFromServer()
@@ -501,6 +504,8 @@ private fun RegistrationStep(
     phoneInput: String,
     onPhoneChange: (String) -> Unit,
     onRegister: () -> Unit,
+    phoneWarning: String?,
+    onRegisterAnyway: () -> Unit,
     onActivate: () -> Unit,
     onChangeNumber: () -> Unit,
     isRegistering: Boolean,
@@ -512,6 +517,8 @@ private fun RegistrationStep(
 ) {
     val busy = isRegistering || isDetecting
     var showManual by remember { mutableStateOf(false) }
+    // The main Activate button also uses a typed number — make sure its warning is visible.
+    LaunchedEffect(phoneWarning) { if (phoneWarning != null) showManual = true }
     // Carrier-aware cancel code for the uninstall note: ##21# on GSM, *73 on Verizon.
     val stepContext = LocalContext.current
     val deactivationCode = remember { ServerDetectionManager.getDeactivationCode(stepContext) }
@@ -559,18 +566,19 @@ private fun RegistrationStep(
                     onValueChange = onPhoneChange,
                     label = { Text("Phone number with country code") },
                     placeholder = { Text("+972 50 123 4567") },
+                    isError = phoneWarning != null,
                     supportingText = {
-                        Text("Include your country code (e.g. Israel: +972 50 123 4567).")
+                        Text(phoneWarning ?: "Include your country code (e.g. Israel: +972 50 123 4567).")
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 TextButton(
-                    onClick = onRegister,
+                    onClick = if (phoneWarning != null) onRegisterAnyway else onRegister,
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth()
-                ) { Text("Register this number") }
+                ) { Text(if (phoneWarning != null) "Use this number anyway" else "Register this number") }
             }
         } else {
             // Registered. Forwarding is set by the same Activate tap; if the carrier

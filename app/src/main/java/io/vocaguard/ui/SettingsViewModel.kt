@@ -457,6 +457,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _awaitingNumberVerify = MutableStateFlow(false)
     val awaitingNumberVerify: StateFlow<Boolean> = _awaitingNumberVerify.asStateFlow()
 
+    /** Set when a TYPED number fails [io.vocaguard.service.PhoneValidation]; the UI shows
+     *  it under the field and turns the button into "Use this number anyway". */
+    private val _phoneWarning = MutableStateFlow<String?>(null)
+    val phoneWarning: StateFlow<String?> = _phoneWarning.asStateFlow()
+
     init {
         // When the server pushes back the device's own number (CLI-capture onboarding),
         // auto-fill it and continue straight into registration + call forwarding.
@@ -467,24 +472,38 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     io.vocaguard.service.VocaGuardFcmService.numberVerifiedFlow.value = null
                     updateServerPhoneInput(num)
                     _serverRegStatus.value = "Number detected: $num"
-                    activateProtection(num)
+                    activateProtection(num, force = true)   // from the network — trusted
                 }
             }
         }
     }
 
     fun updateServerPhoneInput(phone: String) {
+        if (phone != _serverPhoneInput.value) _phoneWarning.value = null   // edited → re-check
         _serverPhoneInput.value = phone
     }
 
-    fun registerWithServer() {
+    /** The number to register, or null when it looks wrong and the user hasn't
+     *  confirmed yet (warning shown). [force] = "use anyway" / trusted source. */
+    private fun checkedPhone(raw: String, force: Boolean): String? {
+        val r = io.vocaguard.service.PhoneValidation.check(context, raw)
+        return when {
+            r.valid -> { _phoneWarning.value = null; r.normalized }
+            force   -> { _phoneWarning.value = null; raw.trim() }
+            else    -> { _phoneWarning.value = r.message; null }
+        }
+    }
+
+    fun registerWithServer(force: Boolean = false) {
         if (_serverIsRegistering.value) return
+        val phone = checkedPhone(_serverPhoneInput.value, force) ?: return
+        _serverPhoneInput.value = phone
         _serverIsRegistering.value = true
         _serverRegStatus.value = "Registering…"
         com.google.firebase.messaging.FirebaseMessaging.getInstance().token
             .addOnSuccessListener { fcmToken ->
                 viewModelScope.launch {
-                    val result = sdm.register(_serverPhoneInput.value.trim(), fcmToken)
+                    val result = sdm.register(phone, fcmToken)
                     if (result.success) {
                         _serverRegistered.value = true
                         io.vocaguard.TenjinEvents.send(context, io.vocaguard.TenjinEvents.REGISTERED)
@@ -573,14 +592,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
      * AND silently enable call forwarding (no dialer), in a single step. Falls back
      * to the manual "dial this code" flow if the silent USSD fails on the carrier.
      */
-    fun activateProtection(phoneNumber: String) {
+    fun activateProtection(phoneNumber: String, force: Boolean = false) {
         if (_serverIsRegistering.value) return
-        val phone = phoneNumber.trim()
-        if (phone.isEmpty()) {
+        if (phoneNumber.isBlank()) {
             _serverRegStatus.value = "Pick or enter your phone number first"
             return
         }
-        updateServerPhoneInput(phone)
+        val phone = checkedPhone(phoneNumber, force) ?: return
+        _serverPhoneInput.value = phone
         _serverIsRegistering.value = true
         _serverRegStatus.value = "Activating protection…"
         com.google.firebase.messaging.FirebaseMessaging.getInstance().token
