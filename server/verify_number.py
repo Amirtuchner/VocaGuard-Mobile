@@ -54,6 +54,8 @@ def _e164(num: str) -> str:
         n = n[2:]
     if n.startswith("0"):
         n = _DID_CC + n[1:]
+    if n.startswith(_DID_CC + "0"):      # 9720XXXXXXXXX → 972XXXXXXXXX
+        n = _DID_CC + n[len(_DID_CC) + 1:]
     return "+" + n
 
 

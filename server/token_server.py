@@ -35,13 +35,29 @@ DID_NUMBER       = "+97233741493"
 _DID_CC = "972"
 
 def _normalize_phone(number: str) -> str:
-    n = number.strip().replace(" ", "").replace("-", "")
-    n = n.lstrip("+")
+    # Digits only: also drops "(", ")", "." and invisible bidi marks that Hebrew
+    # keyboards/RTL text fields can insert.
+    n = re.sub(r"[^0-9]", "", number or "")
     if n.startswith("00"):
         n = n[2:]
     if n.startswith("0") and not n.startswith(_DID_CC):
         n = _DID_CC + n[1:]
+    # "+972 052…" — users follow the "include your country code" hint but keep the
+    # trunk 0, which produced rows like 9720523624141 that match no forwarded call.
+    if n.startswith(_DID_CC + "0"):
+        n = _DID_CC + n[len(_DID_CC) + 1:]
     return n
+
+
+_IL_MOBILE_RE = re.compile(r"^9725\d{8}$")
+
+def _is_il_mobile(phone: str) -> bool:
+    """True for a well-formed Israeli mobile (972 5X XXX XXXX). Dedicated DIDs are
+    Israeli and only Israeli carriers forward to them, so anything else — mistyped
+    numbers, foreign numbers, and the junk Google Play's pre-launch robots type into
+    the phone field after every upload — stays on the shared DID instead of using
+    up the pool (and skips the paid Twilio carrier lookup)."""
+    return bool(_IL_MOBILE_RE.match(phone))
 
 AMI_HOST = "127.0.0.1"
 AMI_PORT = 5038
@@ -332,7 +348,7 @@ def register_user(phone: str, fcm_token: str) -> dict:
         # Keep an existing dedicated DID. Otherwise, only assign one if the carrier is
         # NOT a confirmed Diversion sender (Diversion-safe carriers stay on shared DID).
         did = existing[3]
-        if did and _did_owned_by_other(conn, did, phone):
+        if did and _is_il_mobile(phone) and _did_owned_by_other(conn, did, phone):
             # Shares a DID with other users (swapped-params bug). Move to a free one;
             # if the pool is empty, keep the shared DID for now — clearing it would
             # not change where the handset forwards, only break routing further.
@@ -340,7 +356,7 @@ def register_user(phone: str, fcm_token: str) -> dict:
             if new_did:
                 log.info("Moved %s off shared DID %s -> %s", phone, did, new_did)
                 did = new_did
-        if not did and not _diversion_safe(conn, phone):
+        if not did and _is_il_mobile(phone) and not _diversion_safe(conn, phone):
             did = _assign_dedicated_did(conn, phone)
         _ack_did(conn, phone, did or DID_NUMBER)
         conn.commit()
@@ -375,7 +391,11 @@ def register_user(phone: str, fcm_token: str) -> dict:
     )
     # Carrier-aware DID: Diversion-safe carriers (HOT/019) use the shared DID; everyone
     # else (Partner/Cellcom/Pelephone/unknown) gets a dedicated DID when the pool has one.
-    did = None if _diversion_safe(conn, phone) else _assign_dedicated_did(conn, phone)
+    # Non-Israeli-mobile numbers (typos, foreign, Play pre-launch robots) stay shared.
+    if not _is_il_mobile(phone) or _diversion_safe(conn, phone):
+        did = None
+    else:
+        did = _assign_dedicated_did(conn, phone)
     _ack_did(conn, phone, did or DID_NUMBER)
     conn.commit()
     conn.close()
