@@ -114,7 +114,9 @@ def main():
         return
     conn.commit()
     conn.close()
-    if st["available"] < LOW_POOL_THRESHOLD or st["waiting"] > 0:
+    # Waiting users with free DIDs just need their app to re-register (DidSyncWorker)
+    # — not a reason to buy more. Alert only when the pool is low or can't cover them.
+    if st["available"] < LOW_POOL_THRESHOLD or st["waiting"] > st["available"]:
         send_admin_sms(
             f"VocaGuard DIDs: {st['available']} free, {st['waiting']} user(s) waiting for "
             f"a DID, {st['quarantined']} in quarantine, {st['assigned']}/{st['total']} assigned. "
