@@ -538,6 +538,12 @@ def delete_user(phone: str) -> bool:
         # DID_QUARANTINE_DAYS without calls (stale forwarding protection).
         conn.execute("UPDATE did_pool SET assigned_to=NULL, released_at=? WHERE assigned_to=?",
                      (time.time(), phone))
+        # Their scam reports stay on the community blocklist, but no longer name
+        # them (privacy policy §5). reported_by is stored as the app sent it
+        # ("+972…" or digits), so compare digits only.
+        conn.execute(
+            "UPDATE community_blocklist SET reported_by='' "
+            "WHERE replace(replace(reported_by,'+',''),' ','') = ?", (phone,))
         conn.commit()
     finally:
         conn.close()

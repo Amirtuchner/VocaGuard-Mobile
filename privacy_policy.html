@@ -17,134 +17,190 @@
 <body>
 
 <h1>VocaGuard Privacy Policy</h1>
-<p><em>Last updated: 2026-07-04</em></p>
+<p><em>Last updated: 2026-11-24</em></p>
 
-<p>VocaGuard ("we", "our", or "the app") is a real-time scam call detection service.
-This policy explains what data we collect, how we use it, and your rights.</p>
+<p>VocaGuard ("we", "our", or "the app") is a real-time scam call and message detection
+service. This policy explains what data we process, why, how long we keep it, who we
+share it with, and your rights. It covers both <strong>VocaGuard users</strong> and
+<strong>people who call a VocaGuard user</strong> (see Section 9).</p>
 
 <h2>1. How VocaGuard Works</h2>
-<p>VocaGuard detects scam calls by routing incoming calls through a secure private server
-hosted on Hetzner (Germany). When you enable call forwarding, your carrier
-forwards incoming calls to the VocaGuard server, which transcribes the audio using
-speech recognition and runs scam detection. If a scam is detected, a push notification
-is sent to your phone in real time.</p>
-<p>No call audio is recorded for storage. Audio is transcribed in memory and discarded
-immediately after analysis.</p>
-<p><strong>Call monitoring notice:</strong> When call forwarding is active, the audio of
-incoming calls is processed by the VocaGuard server for scam detection. The calling
-party is not notified of this analysis. By enabling call forwarding to VocaGuard, you
-accept sole responsibility for compliance with any applicable call recording or
-monitoring laws in your jurisdiction.</p>
+<p>When you enable call forwarding, your mobile carrier forwards incoming calls to a
+VocaGuard phone number provided by our telephony carrier (DIDWW). The call then reaches
+the VocaGuard server, hosted by Hetzner in Germany. The server alerts your phone, and
+when you answer in the app the call is connected to you. While the call is in progress
+the server converts the caller's speech to text and checks it for scam patterns. If a
+scam is detected, an alert is sent to your phone in real time.</p>
+<p><strong>No call audio is stored.</strong> Audio is converted to text in memory and
+discarded immediately. The text is not stored on our server either: it is sent to your
+phone (see Section 2) and then discarded.</p>
+<p><strong>Call monitoring notice:</strong> The calling party hears a short recorded
+notice before the call connects: "This call may be recorded and monitored for fraud
+protection. By staying on the line, you consent to this." The notice plays when the
+VocaGuard number your calls forward to is outside Israel (for example, our US number)
+and whenever the caller has a US or Canadian (+1) number. Calls between Israeli numbers
+do not play it, because Israel requires only one party's consent. If your own number is
+outside Israel, you also hear the notice when you answer. By enabling call forwarding to
+VocaGuard, you accept sole responsibility for compliance with any applicable call
+recording or monitoring laws in your jurisdiction.</p>
 
-<h2>2. Data We Collect</h2>
+<h2>2. Data We Process</h2>
+<p><strong>On our server</strong></p>
 <ul>
-  <li><strong>Call audio (server-side)</strong> — When call forwarding is active, the
-  audio stream passes through the VocaGuard server for real-time transcription and
-  scam analysis. Audio is processed in memory only and is <em>never</em> stored or
-  retained after the call ends.</li>
-  <li><strong>Call transcripts (on-device)</strong> — A text transcript of calls flagged
-  as suspicious is stored locally on your device. The 50 most recent transcripts are
-  kept; older ones are deleted automatically. Transcripts are never uploaded to our
-  servers.</li>
-  <li><strong>Your phone number (server-side)</strong> — When you register with VocaGuard,
-  your phone number is stored on our server alongside your FCM token and a private SIP
-  extension. This is used to route scam alerts to the correct device and to bridge
-  incoming calls to your VocaGuard session. You can request deletion at any time (see
-  Section 6).</li>
-  <li><strong>Caller phone numbers</strong> — The phone number of incoming callers
-  flagged as potential scams is stored locally on your device as part of the call
-  history. This is the <em>caller's</em> number, never your own. Numbers are checked
-  against a local scam database and optionally against the NumVerify API (if you
-  configure an API key).</li>
-  <li><strong>FCM device token (server-side)</strong> — A Firebase Cloud Messaging token
-  is registered with the VocaGuard server to deliver real-time scam alerts to your
-  device. The token identifies your device to the notification service but contains no
-  personal information. It is stored on our server linked to your phone number.</li>
-  <li><strong>App settings</strong> — Sensitivity level, language preference, theme, and
-  other preferences are stored locally in SharedPreferences on your device and are
-  never transmitted to our servers.</li>
-  <li><strong>Crash reports</strong> — If the app crashes, an anonymous crash report is
-  sent to Firebase Crashlytics. Reports contain device model, Android version, and a
-  stack trace. They do not contain call audio, transcripts, or phone numbers.</li>
+  <li><strong>Your account</strong> — your phone number, a push-notification (FCM)
+  token for your device, a private call extension and its password, the VocaGuard
+  forwarding number assigned to you, the date you first registered (used for your free
+  trial), and technical status flags (for example, whether the app appears to have been
+  uninstalled, and whether your mobile carrier passes on the information needed to route
+  forwarded calls to you).</li>
+  <li><strong>Call audio</strong> — processed in memory during the call only, never
+  stored.</li>
+  <li><strong>Call transcripts</strong> — created in memory during the call, delivered to
+  your device through Firebase Cloud Messaging, and not stored on the server.</li>
+  <li><strong>Server logs</strong> — for operation, security and troubleshooting, the
+  server logs call metadata: the caller's phone number, your number, call times, the
+  detected language, the length of the transcript, and, for calls flagged as scams, the
+  scam type, score and the scam keywords that matched. Logs do not contain what was said.
+  They are deleted automatically after at most 30 days.</li>
+  <li><strong>Scam reports</strong> — if you report a number as a scam, we store that
+  number, the scam type and your phone number (so that only you can withdraw your
+  report). Reported numbers and their scam type, without your number, are shared with
+  all VocaGuard users as a community blocklist.</li>
+  <li><strong>Family Guard alerts</strong> — when a scam is detected and Family Guard is
+  on, your family contact's phone number and the alert text are sent to our server and
+  passed to Twilio to deliver the SMS or alert call. They are not stored on our server
+  beyond the server logs described above.</li>
+</ul>
+<p><strong>On your device only</strong></p>
+<ul>
+  <li><strong>Call history and transcripts</strong> — the caller's number, call times and
+  the transcript of each analysed call. The 50 most recent transcripts are kept; older
+  ones are deleted automatically.</li>
+  <li><strong>Message scanning</strong> — if enabled, the text of incoming WhatsApp,
+  Telegram, Messenger, Instagram and SMS notifications from senders who are not in your
+  contacts is checked on your device. Message text is never sent to our server or
+  stored.</li>
+  <li><strong>Contacts</strong> — used on your device to skip known contacts and show
+  caller names. Your contact list is never sent to our server.</li>
+  <li><strong>Settings and Family Guard contacts</strong> — stored on your device.</li>
 </ul>
 
-<h2>3. Data Shared With Third Parties</h2>
+<h2>3. Third Parties</h2>
 <ul>
-  <li><strong>Firebase Cloud Messaging (Google)</strong> — Used to deliver scam alert
-  push notifications. Governed by Google's Privacy Policy.</li>
-  <li><strong>Firebase Crashlytics (Google)</strong> — Used for anonymous crash
-  reporting to improve app stability. Governed by Google's Privacy Policy.</li>
-  <li><strong>Twilio</strong> — Used to provide the US phone number that receives
-  forwarded calls. Twilio processes the SIP audio stream in transit to our server.
-  Governed by Twilio's Privacy Policy.</li>
-  <li><strong>NumVerify</strong> (optional) — If you enter an API key, caller phone
-  numbers are sent to numverify.com for reputation lookup over HTTPS. You control
-  whether this key is configured.</li>
-  <li><strong>Community blocklist</strong> (optional) — If you tap "Sync Now", your
-  device downloads a list of known scam numbers from a public URL. No data is uploaded.</li>
+  <li><strong>DIDWW</strong> — our telephony carrier. Provides the phone numbers that
+  receive your forwarded calls and carries the call audio to our server.</li>
+  <li><strong>Hetzner</strong> — hosts our server in Germany.</li>
+  <li><strong>Google Firebase</strong> — Cloud Messaging delivers alerts, call
+  notifications and transcripts to your device; Crashlytics receives crash reports
+  (device model, Android version and technical error details, without call audio,
+  transcripts or phone numbers).</li>
+  <li><strong>Twilio</strong> — sends Family Guard SMS messages and alert calls. When
+  you register, we also send your phone number to Twilio's lookup service once to
+  identify your mobile carrier, so calls can be routed to you correctly.</li>
+  <li><strong>Tenjin</strong> — measures which advertising campaigns led to app installs,
+  and records app events such as starting a trial or subscribing. Tenjin receives your
+  device's advertising ID and basic device information. You can reset or delete your
+  advertising ID in Android Settings → Privacy → Ads.</li>
+  <li><strong>Google Play</strong> — handles subscriptions and payments. We do not
+  receive your payment details.</li>
+  <li><strong>NumVerify</strong> (optional) — only if you enter your own API key, caller
+  numbers are sent to numverify.com for a reputation lookup.</li>
 </ul>
-<p>We do not sell, rent, or share your personal data with any other third parties.
-We do not use advertising networks or profiling services.</p>
+<p>We do not sell your personal data, and we do not use it for advertising profiles.
+These providers act on our behalf and may only use the data to provide their service to
+us.</p>
 
 <h2>4. Permissions Used</h2>
 <ul>
-  <li><strong>READ_PHONE_STATE, ANSWER_PHONE_CALLS</strong> — Identify
-  the caller and detect call state changes.</li>
-  <li><strong>RECORD_AUDIO</strong> — Used for on-device speech recognition as a
-  supplementary detection method on devices where call forwarding is not active.</li>
-  <li><strong>CALL_PHONE, SEND_SMS</strong> — Used by Family Guard Mode to alert
-  designated family contacts when a scam is detected.</li>
-  <li><strong>POST_NOTIFICATIONS</strong> — Display real-time scam alert notifications.</li>
-  <li><strong>INTERNET</strong> — Communicate with the VocaGuard server, deliver
-  FCM notifications, and perform optional NumVerify lookups.</li>
-  <li><strong>NOTIFICATION LISTENER SERVICE</strong> — Read notification content from
-  WhatsApp, Telegram, Facebook Messenger, and SMS apps to detect scam messages in
-  real time. Only the text of incoming messages from unknown senders is analysed;
-  messages from saved contacts are never scanned. No message content is stored or
-  transmitted to our servers.</li>
-  <li><strong>SYSTEM_ALERT_WINDOW</strong> (optional) — Display an on-screen warning
-  overlay during a detected scam call. Requires manual grant.</li>
-  <li><strong>RECEIVE_BOOT_COMPLETED</strong> — Restart background services after
-  device reboot so protection is always active.</li>
-  <li><strong>READ_CONTACTS</strong> — Identify known contacts so they can be
-  excluded from scam screening. Contact data is never transmitted to our servers.</li>
+  <li><strong>READ_PHONE_STATE, ANSWER_PHONE_CALLS, CALL_PHONE</strong> — detect call
+  state, handle calls, dial the carrier codes that turn call forwarding on and off, and
+  let you call back from your history.</li>
+  <li><strong>RECORD_AUDIO</strong> — carries your voice on calls you answer through
+  VocaGuard.</li>
+  <li><strong>POST_NOTIFICATIONS, USE_FULL_SCREEN_INTENT</strong> — show incoming-call
+  screens and scam alerts.</li>
+  <li><strong>NOTIFICATION LISTENER</strong> (optional) — scan incoming message
+  notifications for scams on your device, as described in Section 2.</li>
+  <li><strong>READ_CONTACTS</strong> (optional) — skip known contacts and show caller
+  names.</li>
+  <li><strong>SYSTEM_ALERT_WINDOW</strong> (optional) — show a warning on top of other
+  apps when a scam is detected.</li>
+  <li><strong>INTERNET, RECEIVE_BOOT_COMPLETED, foreground services</strong> — connect to
+  the VocaGuard server and keep protection running.</li>
+  <li><strong>Advertising ID</strong> — used only by Tenjin for install attribution (see
+  Section 3).</li>
 </ul>
 
-<h2>5. Family Guard Mode</h2>
-<p>If Family Guard Mode is enabled, the names and phone numbers of designated family
-contacts are stored locally on the device. When a scam is detected, VocaGuard sends
-an SMS alert and optionally places a phone call to those contacts. Contact information
-is never transmitted to our servers.</p>
+<h2>5. Data Retention &amp; Deletion</h2>
+<ul>
+  <li><strong>Call audio and transcripts</strong> — not stored on our server.</li>
+  <li><strong>Server logs</strong> — deleted automatically after at most 30 days.</li>
+  <li><strong>Your account data</strong> — kept while you use VocaGuard. To delete it,
+  use <em>Delete all my data</em> in the app's Settings, or email
+  <strong>support@vocaguard.com</strong>. We delete it within 7 days.</li>
+  <li><strong>Scam reports</strong> — kept while the number remains on the community
+  blocklist. Deleting your account also deletes your phone number from your reports.</li>
+  <li><strong>On-device data</strong> — you can delete individual history records in the
+  app; uninstalling VocaGuard removes all data stored on your device.</li>
+</ul>
 
-<h2>6. Data Retention &amp; Deletion</h2>
-<p><strong>On-device data</strong> (transcripts, settings, call history) is stored
-exclusively on your device. You can delete individual call records from the History
-tab at any time. Uninstalling VocaGuard permanently removes all locally stored data.</p>
-<p><strong>Server-side data</strong> (your phone number and FCM token): call audio is
-processed in memory and never written to disk. To delete your phone number and FCM
-token from our server, use the <em>Delete My Data</em> option inside the app, or send
-a deletion request to <strong>support@vocaguard.com</strong>. Your data will be removed
-within 7 days.</p>
+<h2>6. Data Security</h2>
+<p>Communication between the app and our server (registration, alerts, settings) uses
+HTTPS. Call audio travels over the phone network and standard internet telephony
+protocols to our server and from our server to the app; like a regular phone call, it is
+not end-to-end encrypted. Our server is protected by a firewall, key-only administrator
+access and automatic blocking of repeated failed login attempts.</p>
 
-<h2>7. Data Security</h2>
-<p>Call audio is transmitted to our server over an encrypted TLS connection.
-On-device data is stored in a local database on your device.
-FCM tokens and phone numbers are transmitted and stored over HTTPS.
-Our server is hosted on Hetzner (Germany) with access restricted by
-firewall rules and SSH key authentication.</p>
+<h2>7. Legal Bases (EU / UK GDPR)</h2>
+<p>Where the EU or UK General Data Protection Regulation applies, we rely on these legal
+bases:</p>
+<ul>
+  <li><strong>Providing the service to you</strong> (contract) — your account data,
+  call routing, alerts, transcripts and Family Guard alerts you set up.</li>
+  <li><strong>Legitimate interests</strong> — analysing calls made to VocaGuard users in
+  order to protect them from fraud; keeping server logs for security and
+  troubleshooting; crash reporting; measuring the effectiveness of our advertising. We
+  keep this processing to what is necessary: no audio or transcript is stored, logs
+  contain no call content and are deleted within 30 days.</li>
+  <li><strong>Legal obligations</strong> — where we must keep or disclose data by
+  law.</li>
+</ul>
 
-<h2>8. Children's Privacy</h2>
+<h2>8. International Transfers</h2>
+<p>Our server is in Germany (EU). Some providers listed in Section 3 (for example
+Google, Twilio and Tenjin) may process data in the United States or other countries.
+Where data leaves the EU, we rely on the provider's safeguards approved under GDPR, such
+as the EU–US Data Privacy Framework or Standard Contractual Clauses. Israel is
+recognised by the European Commission as providing adequate protection.</p>
+
+<h2>9. If You Called a VocaGuard User</h2>
+<p>If you called someone who uses VocaGuard, your call was forwarded to our server by
+their choice. Your speech was converted to text in memory to check it for scam patterns;
+the audio was not stored, and the text was delivered only to the VocaGuard user's phone.
+Our server logs keep your phone number and the call time for up to 30 days. You can ask
+us about this processing, ask us to delete your number from our logs, or object to it,
+by emailing <strong>support@vocaguard.com</strong> with your phone number.</p>
+
+<h2>10. Your Rights</h2>
+<p>Depending on where you live (for example, under GDPR, the Israeli Privacy Protection
+Law or California privacy law), you may have the right to access the personal data we
+hold about you, correct it, delete it, restrict or object to its processing, and receive
+a copy of it. To use these rights, email <strong>support@vocaguard.com</strong>. We
+reply within 30 days and will not treat you differently for using them. If you are in
+the EU or UK, you can also complain to your local data protection authority.</p>
+
+<h2>11. Children's Privacy</h2>
 <p>VocaGuard is available to users of all ages. Users under 13 should use the app
 only with parental or guardian consent. We do not knowingly collect personal
 information from children for purposes other than providing the service.</p>
 
-<h2>9. Changes to This Policy</h2>
+<h2>12. Changes to This Policy</h2>
 <p>Material changes to this policy will be reflected with a revised "Last updated"
 date at the top of this page. Continued use of the app after changes constitutes
 acceptance of the updated policy.</p>
 
-<h2>10. Contact</h2>
-<p>For privacy questions or data deletion requests, contact us at:
+<h2>13. Contact</h2>
+<p>For privacy questions, data requests or deletion requests, contact us at:
 <strong>support@vocaguard.com</strong></p>
 
 </body>

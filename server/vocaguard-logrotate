@@ -2,6 +2,8 @@
 /var/log/vocaguard_bg.log
 /var/log/vocaguard_token.log
 /var/log/vocaguard_debug.log
+/var/log/vocaguard_notify.log
+/var/log/vocaguard_did_maintenance.log
 {
     daily
     rotate 14

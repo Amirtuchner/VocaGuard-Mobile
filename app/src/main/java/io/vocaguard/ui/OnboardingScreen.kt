@@ -349,7 +349,8 @@ private fun TermsStep(accepted: Boolean, onAcceptChange: (Boolean) -> Unit) {
                 TermsBullet("No call audio is stored. Audio is processed in memory and discarded immediately after the call.")
                 TermsBullet("VocaGuard does not guarantee 100% scam detection. Some scam calls may not be identified.")
                 TermsBullet("By using this app you release VocaGuard from any claims or liability for undetected scam calls or resulting financial loss.")
-                TermsBullet("By enabling call forwarding you accept sole responsibility for compliance with call monitoring laws in your jurisdiction. The calling party is not notified of the analysis.")
+                TermsBullet("Where the law requires it (for example, calls involving US or Canadian numbers), callers hear a short notice before the call connects: \"This call may be recorded and monitored for fraud protection. By staying on the line, you consent to this.\" Calls between Israeli numbers do not play it.")
+                TermsBullet("By enabling call forwarding you consent to this analysis and accept sole responsibility for compliance with call monitoring laws in your jurisdiction.")
                 TermsBullet("Subscription billing is handled through Google Play.")
 
                 Spacer(Modifier.height(8.dp))

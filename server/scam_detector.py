@@ -814,7 +814,8 @@ def main():
         nonlocal transcript_disp
         transcript_win.append((time.monotonic(), text))
         transcript_disp += " " + text
-        log.info(f"STT-{label}: {text}")
+        # No call text in server logs (privacy policy: transcripts never stored on the server). Metadata only.
+        log.info(f"STT-{label}: {len(text)} chars")
 
     def get_window_text() -> str:
         now = time.monotonic()
@@ -908,7 +909,7 @@ def main():
             log.warning(f"Whisper final error: {e}")
 
     check_and_alert("final")
-    log.info(f"Call ended. transcript={transcript_disp.strip()!r}")
+    log.info(f"Call ended. transcript_chars={len(transcript_disp.strip())}")
 
 
 if __name__ == "__main__":

@@ -227,7 +227,8 @@ def main():
         transcript_disp += " " + text
         if source == "whisper":
             whisper_transcript += " " + text
-        log.info(f"BG STT-{label}: {text}")
+        # No call text in server logs (privacy policy: transcripts never stored on the server). Metadata only.
+        log.info(f"BG STT-{label}: {len(text)} chars")
 
     def get_window_text():
         now = time.monotonic()
@@ -380,8 +381,8 @@ def main():
     # Send the Whisper-only transcript to the app for accurate history display.
     # Vosk is kept for real-time scam detection but excluded from user-facing text.
     final_transcript = whisper_transcript.strip() or transcript_disp.strip()
-    log.info(f"BG call ended. whisper={whisper_transcript.strip()!r}")
-    log.info(f"BG call ended. full={transcript_disp.strip()!r}")
+    log.info(f"BG call ended. whisper_chars={len(whisper_transcript.strip())} "
+             f"full_chars={len(transcript_disp.strip())}")
     if final_transcript and fcm_token:
         try:
             from firebase_admin import messaging as fcm_msg
