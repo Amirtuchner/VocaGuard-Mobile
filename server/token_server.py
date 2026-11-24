@@ -32,6 +32,9 @@ TOKEN_FILE       = "/opt/vocaguard/fcm_token.txt"  # single-user fallback
 DB_PATH          = "/opt/vocaguard/data/users.db"   # root:asterisk 0660 in a 2770 dir so AGI helpers (asterisk user) can write
 PJSIP_USERS_FILE = "/etc/asterisk/pjsip_users.conf"
 DID_NUMBER       = "+97233741493"
+# Shared DIDWW number for US/Canada (+1) users: forwarding to the Israeli DID is
+# an international forward, which most US carriers block or bill (2026-11-24).
+US_DID_NUMBER    = "+13373828491"
 _DID_CC = "972"
 
 def _normalize_phone(number: str) -> str:
@@ -46,7 +49,22 @@ def _normalize_phone(number: str) -> str:
     # trunk 0, which produced rows like 9720523624141 that match no forwarded call.
     if n.startswith(_DID_CC + "0"):
         n = _DID_CC + n[len(_DID_CC) + 1:]
+    # US/Canada number typed without the country code, e.g. "(555) 123-4567". The
+    # carrier's Diversion header carries the leading 1, so without it incoming
+    # calls never match the user. NANP area codes and exchanges start with 2-9.
+    if _NANP10_RE.match(n):
+        n = "1" + n
     return n
+
+
+_NANP10_RE = re.compile(r"^[2-9]\d{2}[2-9]\d{6}$")
+_NANP_RE   = re.compile(r"^1[2-9]\d{2}[2-9]\d{6}$")
+
+
+def _shared_did_for(phone: str) -> str:
+    """Shared forwarding DID for a normalized phone: the US number for +1 users,
+    the Israeli one for everyone else."""
+    return US_DID_NUMBER if _NANP_RE.match(phone) else DID_NUMBER
 
 
 _IL_MOBILE_RE = re.compile(r"^9725\d{8}$")
@@ -402,14 +420,14 @@ def register_user(phone: str, fcm_token: str) -> dict:
                 did = new_did
         if not did and _is_il_mobile(phone) and not _diversion_safe(conn, phone):
             did = _assign_dedicated_did(conn, phone)
-        _ack_did(conn, phone, did or DID_NUMBER)
+        _ack_did(conn, phone, did or _shared_did_for(phone))
         conn.commit()
         conn.close()
         log.info("Updated FCM token for existing user %s (did=%s)", phone, did or "shared")
         return {
             "sip_extension": existing[0],
             "sip_password":  existing[1],
-            "did_number":    did or DID_NUMBER,
+            "did_number":    did or _shared_did_for(phone),
             **_trial_info(existing[2]),
         }
 
@@ -440,7 +458,7 @@ def register_user(phone: str, fcm_token: str) -> dict:
         did = None
     else:
         did = _assign_dedicated_did(conn, phone)
-    _ack_did(conn, phone, did or DID_NUMBER)
+    _ack_did(conn, phone, did or _shared_did_for(phone))
     conn.commit()
     conn.close()
 
@@ -450,7 +468,7 @@ def register_user(phone: str, fcm_token: str) -> dict:
     return {
         "sip_extension": sip_ext,
         "sip_password":  sip_pass,
-        "did_number":    did or DID_NUMBER,
+        "did_number":    did or _shared_did_for(phone),
         **_trial_info(None),   # brand-new user → full trial starting now
     }
 

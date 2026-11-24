@@ -56,6 +56,12 @@ def get_fcm_token_for_number(phone_number: str) -> str:
     DIDWW strips the country code prefix, so we match on trailing digits.
     Falls back to single-user token file.
     """
+    # Digits only: a "+1..." or "tel:" style Diversion number would otherwise never
+    # suffix-match the stored digits-only phone. Require 8+ digits so a short or
+    # garbled value can't LIKE-match some other user's number.
+    phone_number = re.sub(r"[^0-9]", "", phone_number or "")
+    if len(phone_number) < 8:
+        phone_number = ""
     if phone_number:
         try:
             conn = sqlite3.connect(DB_PATH, timeout=30)
