@@ -71,7 +71,51 @@ logging.basicConfig(
 )
 log = logging.getLogger("token_server")
 
-_CHANNEL_RE = re.compile(r"^PJSIP/[\w\-]{1,80}$")
+# \Z, not $: "$" also matches before a trailing "\n", which would let a newline
+# through into the AMI text protocol.
+_CHANNEL_RE = re.compile(r"^PJSIP/[A-Za-z0-9_\-]{1,80}\Z")
+
+
+def _safe_callerid(value) -> str:
+    """Caller/phone values that end up in AMI action text, in the dialplan, and in
+    a System() shell command. Keep only [0-9A-Za-z+] (numbers, "+", and words like
+    "anonymous"), so CRLF/AMI-header injection and shell metacharacters can't get
+    through (security audit 2026-11-23, finding 2)."""
+    return re.sub(r"[^0-9A-Za-z+]", "", str(value or ""))[:32]
+
+
+# Caregiver SMS/call alerts go out from VocaGuard's own Twilio number and cost
+# money per message, so they're capped per destination and globally (audit
+# finding 4). Real use is a handful per month.
+_ALERT_PER_DEST_LIMIT = 3       # per destination number per hour
+_ALERT_GLOBAL_LIMIT   = 40      # across all numbers per day
+_alert_log: list[tuple[float, str]] = []   # (time.time(), "sms:<dest>" / "call:<dest>")
+_alert_lock = threading.Lock()
+
+
+def _alert_allowed(kind: str, dest: str) -> bool:
+    now = time.time()
+    key = f"{kind}:{dest}"
+    with _alert_lock:
+        _alert_log[:] = [(t, k) for t, k in _alert_log if now - t < 86400]
+        if len(_alert_log) >= _ALERT_GLOBAL_LIMIT:
+            return False
+        if sum(1 for t, k in _alert_log if k == key and now - t < 3600) >= _ALERT_PER_DEST_LIMIT:
+            return False
+        _alert_log.append((now, key))
+        return True
+
+
+def _caregiver_dest(raw: str) -> str | None:
+    """E.164 destination for a caregiver alert, or None if it isn't a plausible
+    phone number (8–15 digits, not a short code / premium-looking garbage)."""
+    n = _normalize_phone(raw)
+    if not re.fullmatch(r"[1-9]\d{7,14}", n):
+        return None
+    return "+" + n
+
+
+_URL_RE = re.compile(r"(https?:|www\.|://|\b[a-z0-9-]+\.(com|net|org|io|ly|me|co|info|xyz|link|app)\b)", re.I)
 
 with open(SECRET_FILE) as f:
     EXPECTED_SECRET = f.read().strip()
@@ -578,6 +622,12 @@ def _ami_recv(s: socket.socket) -> str:
 
 def ami_originate(orig_channel: str, orig_caller: str, sip_extension: str, user_phone: str):
     """Originate a call to the user's SIP extension and bridge with waiting channel."""
+    # Sanitize at the sink too: these values come from the app request body.
+    if not _CHANNEL_RE.match(orig_channel):
+        raise ValueError("invalid channel")
+    orig_caller   = _safe_callerid(orig_caller) or "anonymous"
+    user_phone    = _safe_callerid(user_phone)
+    sip_extension = re.sub(r"[^A-Za-z0-9_]", "", sip_extension)
     s = socket.create_connection((AMI_HOST, AMI_PORT), timeout=15)
     try:
         s.recv(1024)
@@ -775,6 +825,10 @@ _accepted_channels_lock = threading.Lock()
 
 class Handler(BaseHTTPRequestHandler):
 
+    # Don't advertise the Python/BaseHTTP version in the Server header (audit finding 10).
+    server_version = "VocaGuard"
+    sys_version = ""
+
     def _auth_ok(self) -> bool:
         return self.headers.get("Authorization", "") == f"Bearer {EXPECTED_SECRET}"
 
@@ -810,7 +864,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, result)
             except Exception as e:
                 log.error("register error: %s", e)
-                self._send(500, {"error": str(e)})
+                self._send(500, {"error": "internal error"})
 
         elif self.path == "/verify-number/start":
             # Onboarding "detect my number": bind a nonce to the caller's fcm_token.
@@ -823,7 +877,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, create_verify_session(fcm))
             except Exception as e:
                 log.error("verify-number/start error: %s", e)
-                self._send(500, {"error": str(e)})
+                self._send(500, {"error": "internal error"})
 
         elif self.path == "/register-token":
             # Accepts JSON {phone_number, fcm_token} or legacy raw token string
@@ -834,22 +888,18 @@ class Handler(BaseHTTPRequestHandler):
                     data  = json.loads(raw.decode())
                     phone = data.get("phone_number", "").strip()
                     fcm   = data.get("fcm_token", "").strip()
+                    # The single-user fallback file (TOKEN_FILE) receives alerts for
+                    # every call that matches no user, so requests may no longer
+                    # overwrite it (audit finding 3). Only registered users' tokens
+                    # get updated; none of these fallback writes happened in the
+                    # 30 days before this change.
                     if phone and fcm:
                         if not update_fcm_token(phone, fcm):
-                            # Phone not registered yet — save to file as fallback
-                            log.warning("register-token: unknown phone %s, saving to file", phone)
-                            with open(TOKEN_FILE, "w") as f:
-                                f.write(fcm)
+                            log.warning("register-token: unknown phone %s, ignored", _safe_callerid(phone))
                     elif fcm:
-                        with open(TOKEN_FILE, "w") as f:
-                            f.write(fcm)
+                        log.warning("register-token: token without phone, ignored")
                 except (json.JSONDecodeError, AttributeError):
-                    # Legacy: raw token string
-                    token = raw.decode().strip()
-                    if token:
-                        with open(TOKEN_FILE, "w") as f:
-                            f.write(token)
-                        log.info("Legacy token saved: %s...", token[:20])
+                    log.warning("register-token: legacy raw-token request, ignored")
                 self._send(200)
             except Exception as e:
                 log.error("register-token error: %s", e)
@@ -940,11 +990,24 @@ class Handler(BaseHTTPRequestHandler):
                 scam_type  = data.get("scam_type", "Suspicious Call").strip()
                 confidence = int(data.get("confidence_pct", 0))
                 senior     = data.get("senior_name", "your family member").strip() or "your family member"
-                if not caregiver:
-                    self._send(400, {"error": "caregiver_number required"})
+                to_number = _caregiver_dest(caregiver)
+                if not to_number:
+                    self._send(400, {"error": "valid caregiver_number required"})
                     return
-                caller_id = data.get("senior_number", "").strip() or TWILIO_NUMBER
-                log.info("call_caregiver: senior_number=%r caller_id=%s", data.get("senior_number"), caller_id)
+                if not _alert_allowed("call", to_number):
+                    log.warning("call_caregiver: rate limit hit for %s", to_number)
+                    self._send(429, {"error": "rate limited"})
+                    return
+                # Always our own Twilio number: the caller ID used to come from the
+                # request body (spoofable). Text fields are length-capped and
+                # XML-escaped before going into TwiML, so they can't inject verbs
+                # like <Dial> (audit finding 4).
+                from xml.sax.saxutils import escape as _xml_escape
+                caller_id  = TWILIO_NUMBER
+                senior     = _xml_escape(senior[:40])
+                scam_type  = _xml_escape(scam_type[:40])
+                confidence = max(0, min(100, confidence))
+                log.info("call_caregiver: to=%s", to_number)
                 def _do_call():
                     try:
                         from twilio.rest import Client
@@ -961,9 +1024,6 @@ class Handler(BaseHTTPRequestHandler):
                             f"<Say voice=\"alice\">{msg}</Say>"+
                             "</Response>"
                         )
-                        to_number = _normalize_phone(caregiver)
-                        if not to_number.startswith("+"):
-                            to_number = "+" + to_number
                         call = Client(TWILIO_SID, TWILIO_TOKEN).calls.create(
                             to=to_number,
                             from_=caller_id,
@@ -976,7 +1036,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"status": "calling"})
             except Exception as e:
                 log.error("call_caregiver error: %s", e)
-                self._send(500, {"error": str(e)})
+                self._send(500, {"error": "internal error"})
 
         elif self.path == "/alert_caregiver":
             # Send a scam-alert SMS to the caregiver via Twilio. Replaces the
@@ -988,17 +1048,26 @@ class Handler(BaseHTTPRequestHandler):
                 data      = self._read_json()
                 caregiver = data.get("caregiver_number", "").strip()
                 message   = data.get("message", "").strip()
-                if not caregiver or not message:
-                    self._send(400, {"error": "caregiver_number and message required"})
+                to_number = _caregiver_dest(caregiver)
+                if not to_number or not message:
+                    self._send(400, {"error": "valid caregiver_number and message required"})
+                    return
+                # Only VocaGuard alerts, and no links: this relay used to send any
+                # text to any number from our Twilio number (audit finding 4).
+                # The app always prefixes its alerts with "[VocaGuard]".
+                if not message.startswith("[VocaGuard]") or _URL_RE.search(message):
+                    log.warning("alert_caregiver: rejected message to %s", to_number)
+                    self._send(400, {"error": "message not allowed"})
+                    return
+                if not _alert_allowed("sms", to_number):
+                    log.warning("alert_caregiver: rate limit hit for %s", to_number)
+                    self._send(429, {"error": "rate limited"})
                     return
                 def _do_sms():
                     try:
                         from twilio.rest import Client
-                        to_number = _normalize_phone(caregiver)
-                        if not to_number.startswith("+"):
-                            to_number = "+" + to_number
                         sms = Client(TWILIO_SID, TWILIO_TOKEN).messages.create(
-                            to=to_number, from_=TWILIO_NUMBER, body=message[:480]
+                            to=to_number, from_=TWILIO_NUMBER, body=message[:320]
                         )
                         log.info("Twilio SMS SID %s to %s", sms.sid, to_number)
                     except Exception as ex:
@@ -1007,7 +1076,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"status": "sms_queued"})
             except Exception as e:
                 log.error("alert_caregiver error: %s", e)
-                self._send(500, {"error": str(e)})
+                self._send(500, {"error": "internal error"})
 
         elif self.path == "/report-scam":
             try:
@@ -1033,7 +1102,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"status": "reported", "total": count})
             except Exception as e:
                 log.error("report-scam error: %s", e)
-                self._send(500, {"error": str(e)})
+                self._send(500, {"error": "internal error"})
 
         elif self.path == "/remove-scam":
             try:
@@ -1044,18 +1113,22 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, {"error": "number required"})
                     return
                 conn = db_connect()
-                conn.execute(
-                    "DELETE FROM community_blocklist WHERE phone_number = ?",
-                    (number,)
+                # A user can only withdraw their own report; this used to delete
+                # any number for anyone (audit finding 5). Same response either
+                # way, so the app's behavior is unchanged.
+                cur = conn.execute(
+                    "DELETE FROM community_blocklist WHERE phone_number = ? "
+                    "AND reported_by = ? AND reported_by != ''",
+                    (number, reporter)
                 )
                 conn.commit()
-                changes = conn.total_changes
+                removed = cur.rowcount
                 conn.close()
-                log.info("Scam removed: %s by=%s", number, reporter)
+                log.info("Scam removal: %s by=%s removed=%d", number, reporter, removed)
                 self._send(200, {"status": "removed", "number": number})
             except Exception as e:
                 log.error("remove-scam error: %s", e)
-                self._send(500, {"error": str(e)})
+                self._send(500, {"error": "internal error"})
 
         elif self.path == "/blocklist":
             try:
@@ -1068,7 +1141,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, result)
             except Exception as e:
                 log.error("blocklist error: %s", e)
-                self._send(500, {"error": str(e)})
+                self._send(500, {"error": "internal error"})
 
         else:
             self._send(404)
@@ -1085,7 +1158,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, result)
             except Exception as e:
                 log.error("blocklist error: %s", e)
-                self._send(500, {"error": str(e)})
+                self._send(500, {"error": "internal error"})
         else:
             self._send(404)
 
@@ -1109,7 +1182,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(404, {"error": "user not found"})
             except Exception as e:
                 log.error("delete error: %s", e)
-                self._send(500, {"error": str(e)})
+                self._send(500, {"error": "internal error"})
         else:
             self._send(404)
 
