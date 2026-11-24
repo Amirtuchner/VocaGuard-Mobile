@@ -14,6 +14,9 @@ class PackageReplacedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             DidSyncWorker.schedule(context)
+            // Re-register right away so the server learns this build's capabilities
+            // (e.g. SRTP → encrypted call audio) now instead of at the next daily sync.
+            DidSyncWorker.runOnce(context)
         }
     }
 }

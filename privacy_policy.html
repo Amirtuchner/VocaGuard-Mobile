@@ -146,10 +146,14 @@ us.</p>
 
 <h2>6. Data Security</h2>
 <p>Communication between the app and our server (registration, alerts, settings) uses
-HTTPS. Call audio travels over the phone network and standard internet telephony
-protocols to our server and from our server to the app; like a regular phone call, it is
-not end-to-end encrypted. Our server is protected by a firewall, key-only administrator
-access and automatic blocking of repeated failed login attempts.</p>
+HTTPS. Calls are encrypted from the point they leave the public phone network: our
+telephony carrier sends them to our server over TLS with encrypted audio (SRTP), and
+current versions of the app connect to our server over TLS with encrypted audio as
+well. The part of a call that travels over the public phone network, before it reaches
+our carrier, is a regular phone call and is not encrypted; and because our server must
+analyse the audio, calls are not end-to-end encrypted. Our server is protected by a
+firewall, key-only administrator access and automatic blocking of repeated failed login
+attempts.</p>
 
 <h2>7. Legal Bases (EU / UK GDPR)</h2>
 <p>Where the EU or UK General Data Protection Regulation applies, we rely on these legal

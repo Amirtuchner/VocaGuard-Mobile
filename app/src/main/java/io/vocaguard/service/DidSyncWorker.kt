@@ -15,7 +15,9 @@ import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -56,6 +58,15 @@ class DidSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
                 .build()
             WorkManager.getInstance(context)
                 .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+        }
+
+        /** Run one sync now (e.g. right after an app update), in addition to the daily one. */
+        fun runOnce(context: Context) {
+            val request = OneTimeWorkRequestBuilder<DidSyncWorker>()
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .build()
+            WorkManager.getInstance(context)
+                .enqueueUniqueWork("$WORK_NAME-once", ExistingWorkPolicy.REPLACE, request)
         }
 
         fun isForwardingUpdatePending(context: Context): Boolean =

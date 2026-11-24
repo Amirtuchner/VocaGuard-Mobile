@@ -108,6 +108,10 @@ object ServerDetectionManager {
                 val body = JSONObject().apply {
                     put("phone_number", phoneNumber)
                     put("fcm_token", fcmToken)
+                    // This build connects over TLS and supports SRTP: the server then
+                    // switches this user's endpoint to strict SRTP (RTP/SAVP offers).
+                    // Older builds omit it and keep optimistic (plain-audio) offers.
+                    put("srtp", true)
                 }.toString()
 
                 val client = buildHttpClient()

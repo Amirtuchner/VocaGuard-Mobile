@@ -384,7 +384,7 @@ def _carrier_lookup(phone: str) -> tuple[bool, bool]:
         return False, False
 
 
-def register_user(phone: str, fcm_token: str) -> dict:
+def register_user(phone: str, fcm_token: str, srtp: bool = False) -> dict:
     """Create user or update their FCM token. Returns SIP credentials + trial status.
 
     DID assignment: a user keeps any dedicated DID already on their row; otherwise we
@@ -424,6 +424,8 @@ def register_user(phone: str, fcm_token: str) -> dict:
         conn.commit()
         conn.close()
         log.info("Updated FCM token for existing user %s (did=%s)", phone, did or "shared")
+        if srtp:
+            set_endpoint_srtp_strict(existing[0])
         return {
             "sip_extension": existing[0],
             "sip_password":  existing[1],
@@ -463,6 +465,8 @@ def register_user(phone: str, fcm_token: str) -> dict:
     conn.close()
 
     provision_pjsip_user(sip_ext, sip_pass)
+    if srtp:
+        set_endpoint_srtp_strict(sip_ext)
     log.info("Registered new user %s → extension %s (did=%s)", phone, sip_ext, did or "shared")
 
     return {
@@ -577,6 +581,48 @@ def delete_user(phone: str) -> bool:
 # Dynamic PJSIP provisioning
 # ---------------------------------------------------------------------------
 
+_pjsip_users_lock = threading.Lock()
+
+
+def set_endpoint_srtp_strict(ext: str):
+    """Switch a user's endpoint to strict SRTP-SDES (offers RTP/SAVP).
+
+    Endpoints default to *optimistic* SDES, which offers RTP/AVP + a=crypto so app
+    builds without SRTP keep working — but Linphone only encrypts when offered
+    RTP/SAVP, so on optimistic endpoints even SRTP-capable builds get plain audio.
+    App builds that connect over TLS send "srtp": true on /register, and only then
+    do we make that user's endpoint strict (2026-11-24). Idempotent; reloads PJSIP
+    only when the file actually changes (reload is safe: no transport allow_reload).
+    """
+    ext = re.sub(r"[^A-Za-z0-9_]", "", ext)
+    if not ext:
+        return
+    with _pjsip_users_lock:
+        with open(PJSIP_USERS_FILE) as f:
+            text = f.read()
+        # Edit only this user's endpoint block: the one whose header is "[ext]" and
+        # whose first line is "type=endpoint" (the auth/aor blocks are separate).
+        blocks = re.split(r"(?m)^(?=\[)", text)
+        n = 0
+        for i, blk in enumerate(blocks):
+            if (blk.startswith(f"[{ext}]\ntype=endpoint\n")
+                    and "media_encryption_optimistic=yes\n" in blk):
+                blocks[i] = blk.replace("media_encryption_optimistic=yes\n",
+                                        "media_encryption_optimistic=no\n", 1)
+                n = 1
+                break
+        new = "".join(blocks)
+        if n == 0:
+            return   # already strict, or endpoint not found
+        with open(PJSIP_USERS_FILE, "w") as f:
+            f.write(new)
+    result = subprocess.run(
+        ["asterisk", "-rx", "module reload res_pjsip.so"],
+        capture_output=True, text=True, timeout=10
+    )
+    log.info("SRTP strict for %s: %s", ext, (result.stdout + result.stderr).strip())
+
+
 def provision_pjsip_user(ext: str, password: str):
     """Append a PJSIP endpoint/auth/aor block and reload res_pjsip."""
     # AOR name MUST match the extension username (To-header in REGISTER).
@@ -589,6 +635,10 @@ def provision_pjsip_user(ext: str, password: str):
     block = (
         f"\n[{ext}]\n"
         f"type=endpoint\n"
+        # SRTP-SDES for app builds that connect over TLS (2026-11-24); optimistic so
+        # older builds on plain TCP still get (unencrypted) audio.
+        f"media_encryption=sdes\n"
+        f"media_encryption_optimistic=yes\n"
         f"context=vocaguard-user\n"
         f"auth=auth_{ext}\n"
         f"aors={ext}\n"
@@ -621,8 +671,9 @@ def provision_pjsip_user(ext: str, password: str):
         # it mid-session. 10s tolerates normal mobile radio latency without flapping.
         f"qualify_timeout=10\n"
     )
-    with open(PJSIP_USERS_FILE, "a") as f:
-        f.write(block)
+    with _pjsip_users_lock:
+        with open(PJSIP_USERS_FILE, "a") as f:
+            f.write(block)
 
     result = subprocess.run(
         ["asterisk", "-rx", "module reload res_pjsip.so"],
@@ -884,7 +935,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not phone or not fcm:
                     self._send(400, {"error": "phone_number and fcm_token required"})
                     return
-                result = register_user(phone, fcm)
+                result = register_user(phone, fcm, srtp=data.get("srtp") is True)
                 self._send(200, result)
             except Exception as e:
                 log.error("register error: %s", e)

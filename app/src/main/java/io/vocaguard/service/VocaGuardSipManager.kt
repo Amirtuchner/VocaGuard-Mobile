@@ -25,6 +25,9 @@ object VocaGuardSipManager {
 
     private const val TAG           = "VocaGuardSIP"
     private const val SIP_REALM     = "asterisk"
+    private const val SIP_TLS_PORT  = 5061
+    /** Root CA bundle shipped inside the Linphone SDK AAR (assets). */
+    private const val ROOT_CA_ASSET = "org.linphone.core/share/linphone/rootca.pem"
     private const val FALLBACK_USER = "vocaguard"
 
     enum class CallState { IDLE, INCOMING, ACTIVE, ENDED }
@@ -46,6 +49,32 @@ object VocaGuardSipManager {
 
     /** Set to true when user taps Accept — SDK will auto-answer the next incoming INVITE. */
     @Volatile var pendingAccept = false
+
+    /**
+     * Make sure Linphone has a root CA bundle to verify the server's TLS certificate.
+     * The SDK normally points [Core.rootCa] at its own extracted copy; if that path is
+     * missing, copy the bundle out of the APK assets and use it. Without a bundle,
+     * certificate verification would fail and the app could not register.
+     */
+    private fun ensureRootCa(c: Core, context: Context) {
+        val current = c.rootCa
+        if (!current.isNullOrEmpty() && java.io.File(current).isFile) {
+            Log.i(TAG, "TLS root CA bundle: $current")
+            return
+        }
+        try {
+            val out = java.io.File(context.filesDir, "rootca.pem")
+            if (!out.isFile || out.length() == 0L) {
+                context.assets.open(ROOT_CA_ASSET).use { input ->
+                    out.outputStream().use { input.copyTo(it) }
+                }
+            }
+            c.rootCa = out.absolutePath
+            Log.i(TAG, "TLS root CA bundle copied to ${out.absolutePath} (was '$current')")
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not install TLS root CA bundle", e)
+        }
+    }
 
     fun initialize(context: Context) {
         if (core != null) return
@@ -115,6 +144,23 @@ object VocaGuardSipManager {
             // call. 90s is plenty for the path to re-learn.
             c.config?.setInt("rtp", "nortp_timeout", 90)
 
+            // Encryption (2026-11-24): signalling over TLS (see serverAddr below) and
+            // audio over SRTP-SDES, whose keys travel inside that TLS connection.
+            // NOT "mandatory": Asterisk's user endpoints run SDES in *optimistic* mode
+            // (so older app builds without SRTP keep working), which offers the audio
+            // as RTP/AVP with an a=crypto key. Mandatory mode rejects anything that
+            // isn't RTP/SAVP with "488 Not acceptable here" — every call stuck on
+            // "Connecting". Non-mandatory SRTP accepts the AVP offer and uses its key,
+            // so the audio is still encrypted; the server always includes a key.
+            // logMediaEncryption() records what each call actually negotiated.
+            c.mediaEncryption = MediaEncryption.SRTP
+            c.isMediaEncryptionMandatory = false
+            // Verify the server's certificate (Let's Encrypt, api.vocaguard.com)
+            // against the root CAs bundled with the Linphone SDK — never trust-all.
+            c.verifyServerCertificates(true)
+            c.verifyServerCn(true)
+            ensureRootCa(c, context)
+
             // Use per-user SIP credentials if registered, otherwise fall back to legacy
             val serverIp = BuildConfig.TOKEN_SERVER_HOST
             val sipUser  = if (ServerDetectionManager.isRegistered()) ServerDetectionManager.getSipExtension() else FALLBACK_USER
@@ -129,15 +175,17 @@ object VocaGuardSipManager {
             // SIP account
             val params = c.createAccountParams()
             params.identityAddress = factory.createAddress("sip:$sipUser@$serverIp")
-            val serverAddr = factory.createAddress("sip:$serverIp")
+            val serverAddr = factory.createAddress("sip:$serverIp:$SIP_TLS_PORT")
             // TCP, not UDP. On cellular CGNAT the accept-bridge INVITE (~1459 bytes,
             // bloated by the FCM push-param contact + SDP) exceeded the path MTU, was
             // fragmented, and the carrier dropped the fragments — so the app never got
             // the INVITE and the call stuck on "Connecting" (diagnosed 2026-10-04:
             // REGISTER/OPTIONS <1400B worked, only the 1459B INVITE failed). TCP
             // segments properly (no fragmentation) and keeps the NAT connection open,
-            // which also removes the pinhole-expiry problem. Server listens on tcp:5060.
-            serverAddr?.transport = TransportType.Tcp
+            // which also removes the pinhole-expiry problem. TLS (2026-11-24) is TCP
+            // underneath, so all of that still holds; the server listens on tls:5061.
+            // Older app builds keep using tcp:5060 unencrypted.
+            serverAddr?.transport = TransportType.Tls
             params.serverAddress = serverAddr
             params.isRegisterEnabled = true
             // Battery: re-register every 15min instead of 5min. With CRLF keep-alives
@@ -167,6 +215,13 @@ object VocaGuardSipManager {
                         }
                         Call.State.StreamsRunning, Call.State.Connected -> {
                             _callState.value = CallState.ACTIVE
+                            if (state == Call.State.StreamsRunning) {
+                                // What this call actually negotiated — SRTP expected
+                                // (TLS + SDES); "None" would mean a plain-RTP downgrade.
+                                val enc = call.currentParams.mediaEncryption
+                                if (enc == MediaEncryption.SRTP) Log.i(TAG, "Media encryption: $enc")
+                                else Log.w(TAG, "Media encryption: $enc — call audio is NOT encrypted")
+                            }
                         }
                         Call.State.End, Call.State.Released, Call.State.Error -> {
                             // DIAGNOSTIC: log exactly why the call ended (reason + SIP
