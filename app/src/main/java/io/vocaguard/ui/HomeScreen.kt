@@ -1,6 +1,10 @@
 package io.vocaguard.ui
 
+import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.provider.Settings
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,6 +39,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.vocaguard.R
@@ -128,6 +135,22 @@ fun HomeTab(
     val callForwardingEnabled by settingsViewModel.callForwardingEnabled.collectAsStateWithLifecycle()
     val serverActivationCode by settingsViewModel.serverActivationCode.collectAsStateWithLifecycle()
     val forwardingCode = serverActivationCode.ifEmpty { "*21*+97233741493#" }
+
+    // Android 14+: the incoming-call screen (the only thing that plays the ringtone)
+    // can only open over the lock screen / another app through a full-screen intent.
+    // Play grants that permission automatically only to approved calling apps
+    // installed from Play, and users can switch it off — without it, a VocaGuard
+    // call shows just a silent notification (2026-11-24). Re-checked on every resume
+    // so the warning disappears as soon as the user allows it.
+    var canFullScreen by remember { mutableStateOf(canUseFullScreenIntent(context)) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) canFullScreen = canUseFullScreenIntent(context)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -243,6 +266,53 @@ fun HomeTab(
                         Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Fix Now — Dial $forwardingCode")
+                    }
+                }
+            }
+        }
+
+        // Full-screen call permission missing → calls arrive as a silent notification
+        if (!canFullScreen) item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Calls won't ring",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text(
+                                text = "Allow VocaGuard to show full-screen calls, otherwise incoming calls only appear as a silent notification.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { openFullScreenIntentSettings(context) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        )
+                    ) {
+                        Text("Allow full-screen calls")
                     }
                 }
             }
@@ -867,4 +937,27 @@ fun SystemPermissionGuideDialog(
             TextButton(onClick = onSkip) { Text("Skip") }
         }
     )
+}
+
+/** True when incoming calls can open the full-screen call screen (always true before Android 14). */
+internal fun canUseFullScreenIntent(context: Context): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE ||
+        context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+
+/** Opens the system page where the user allows full-screen calls for VocaGuard. */
+internal fun openFullScreenIntentSettings(context: Context) {
+    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:${context.packageName}"))
+    } else {
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+    }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    // Some OEM builds lack the dedicated page — fall back to the app's details screen.
+    try {
+        context.startActivity(intent)
+    } catch (e: android.content.ActivityNotFoundException) {
+        context.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
 }
