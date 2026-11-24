@@ -497,6 +497,7 @@ class ScamPatternDetector() {
             "pay now", "payment required", "send money",
             // Russian
             "подарочная карта", "биткоин", "перевод средств", "вестерн юнион",
+            "криптовалют", "предоплат", "переведите на карт", "оплатите комисси",
             // Hebrew
             "גיפט קארד", "ביטקוין", "העברה בנקאית", "ביט", "פייבוקס",
             "פפר פיי", "גוגל פיי", "אפל פיי", "פייפאל",
@@ -773,6 +774,8 @@ class ScamPatternDetector() {
             "routing number", "account number",
             // Russian
             "пароль", "пин-код", "номер счёта", "паспортные данные",
+            "номер карт", "данные карт", "cvv код", "цифр на оборот", "код из смс",
+            "код подтвержден", "теудат зеут", "номер удостоверен",
             // Hebrew
             "סיסמה", "פין", "מספר חשבון", "תעודת זהות",
             "מספר כרטיס אשראי", "תאריך תפוגה", "שלוש ספרות בגב",
@@ -807,7 +810,8 @@ class ScamPatternDetector() {
             // Hebrew
             "ביטוי שחזור", "מפתח פרטי", "גרעין הארנק", "ביטוי סודי",
             // Russian
-            "фраза восстановления", "приватный ключ", "сид-фраза", "сид фраза",
+            // (stems: prefix-matched, so "сид-фразу" / "приватного ключа" also hit)
+            "фраз восстановлен", "приватн ключ", "сид-фраз", "сид фраз", "секретн фраз",
             // Arabic
             "عبارة الاسترداد", "المفتاح الخاص", "عبارة البذرة"
         )
@@ -874,12 +878,15 @@ class ScamPatternDetector() {
                 "ביטוח למשיכה", "שחרור כספים", "אגרת מס למשיכה",
                 "ארנק קריפטו", "מטבעות דיגיטליים", "סטייקינג",
                 "כריית מטבעות", "בריכת נזילות", "בורסת ישראל",
-                // Russian
-                "гарантированный доход", "торговая группа vip", "мой менеджер счёта",
-                "вывод прибыли", "комиссия за вывод", "сбор за обработку",
-                "торговый робот", "минимальный депозит", "торговая платформа",
-                "до листинга", "ранний инвестор", "криптосигналы",
-                "пассивный доход", "финансовая свобода", "удвоить деньги",
+                // Russian — word STEMS (prefix-matched, see keywordRegex)
+                "гарантированн доход", "гарантированн прибыл", "торгов групп", "vip групп",
+                "менеджер счет", "личн менеджер", "персональн менеджер", "вывод прибыл",
+                "вывест прибыл", "вывод средств", "вывест деньг", "комисси за вывод", "налог на вывод",
+                "сбор за обработк", "оплат страховк для вывод", "торгов робот", "торгов бот",
+                "минимальн депозит", "первоначальн депозит", "пополн счет", "торгов платформ",
+                "инвестиционн платформ", "торгов счет", "торгуете на бирж", "акций и валют",
+                "государственн проект", "криптоэволюц", "до листинга", "ранн инвестор", "криптосигнал",
+                "пассивн доход", "финансов свобод", "удво деньг", "подключ кошел",
                 // Arabic
                 "عائد مضمون", "مجموعة vip للتداول", "مدير حسابي",
                 "رسوم السحب", "رسوم التحرير", "رسوم المعالجة",
@@ -903,10 +910,12 @@ class ScamPatternDetector() {
                 "אמת זהותך", "כניסה חשודה", "אמת את החשבון",
                 "לחץ על הקישור", "חשבונך יושעה", "פעילות חריגה",
                 "עדכן סיסמה", "הזן את הקוד", "פרטיך עודכנו",
-                // Russian
-                "нажмите здесь для подтверждения", "обновите платёжные данные",
-                "подозрительный вход", "учётная запись заблокирована",
-                "подтвердите свою личность",
+                // Russian — word STEMS (prefix-matched, see keywordRegex)
+                "нажмите здесь", "нажмите на ссылк", "перейдите по ссылк", "пройдите по ссылк",
+                "скину ссылк", "подтверд личност", "подтверд свои данн", "обнов платежн данн",
+                "обнов данн карт", "подозрительн вход", "учетн запис заблокир", "аккаунт заблокир",
+                "аккаунт будет удал", "введите код", "сообщите код", "продиктуйте код", "код из смс",
+                "введите пароль",
                 // Arabic
                 "انقر هنا للتحقق", "تحديث بيانات الدفع",
                 "تسجيل دخول مشبوه", "تأكيد هويتك"
@@ -924,9 +933,10 @@ class ScamPatternDetector() {
                 // Hebrew
                 "שלח לי כסף", "תקוע בחו\"ל", "צריך כסף דחוף",
                 "פריסה צבאית", "אשלם לך בחזרה", "עזרה דחופה",
-                // Russian
-                "пришли мне деньги", "застрял за границей",
-                "срочно нужны деньги", "военная командировка",
+                // Russian — word STEMS (prefix-matched, see keywordRegex)
+                "пришл мне деньг", "отправ мне деньг", "переведи мне деньг", "застрял за границ",
+                "срочно нужн деньг", "военн командировк", "верну тебе деньг", "оплат билет",
+                "помоги мне деньг",
                 // Arabic
                 "أرسل لي مالاً", "عالق في الخارج",
                 "أحتاج مالاً بشكل عاجل", "نشر عسكري"
@@ -942,9 +952,10 @@ class ScamPatternDetector() {
                 // Hebrew
                 "עבודה מהבית", "הכנסה יומית מובטחת", "דמי הרשמה",
                 "לא נדרש ניסיון", "עמלה קבועה",
-                // Russian
-                "работа из дома", "регистрационный взнос",
-                "ежедневный заработок гарантирован", "без опыта работы",
+                // Russian — word STEMS (prefix-matched, see keywordRegex)
+                "работа из дома", "работ на дому", "удаленн работ", "регистрационн взнос",
+                "ежедневн заработ", "оплата каждый день", "без опыта работ", "ставить лайк",
+                "лайки за деньг", "простые задан", "оплачиваем задан", "доход в день", "заработок в день",
                 // Arabic
                 "عمل من المنزل", "رسوم تسجيل",
                 "دخل يومي مضمون", "لا يلزم خبرة"
@@ -959,8 +970,10 @@ class ScamPatternDetector() {
                 "redelivery fee", "shipment held",
                 // Hebrew
                 "חבילה עצורה", "תשלום למכס", "דמי שחרור", "משלוח עצור",
-                // Russian
-                "посылка задержана", "таможенный сбор", "оплатите доставку",
+                // Russian — word STEMS (prefix-matched, see keywordRegex)
+                "посылк задержан", "ваша посылк", "таможенн сбор", "таможенн пошлин", "оплат доставк",
+                "оплат таможн", "повторн доставк", "не удалось достав", "обнов адрес доставк",
+                "почт израил", "накладная", "код получения",
                 // Arabic
                 "الطرد محتجز", "رسوم جمركية", "رسوم الاستلام"
             ),
@@ -978,9 +991,11 @@ class ScamPatternDetector() {
                 "הכרטיס שלך הושעה", "פריצה לחשבון", "מחלקת הונאות",
                 "החשבון שלך נחסם", "עסקה חשודה", "בנק הפועלים",
                 "בנק לאומי", "ישראכרט", "כאל",
-                // Russian
-                "несанкционированная операция", "счёт заблокирован",
-                "подозрительная активность", "отдел по борьбе с мошенничеством",
+                // Russian — word STEMS (prefix-matched, see keywordRegex)
+                "несанкционированн операц", "счет заблокир", "карт заблокир", "подозрительн активн",
+                "подозрительн операц", "отдел по борьбе с мошенничеств", "служб безопасн банк",
+                "банк леуми", "банк апоалим", "банк хапоалим", "дисконт банк", "банк мизрахи",
+                "изракарт", "доступ к аккаунт",
                 // Arabic
                 "نشاط مشبوه", "معاملة غير مصرح بها", "حسابك محظور"
             ),
@@ -1000,9 +1015,11 @@ class ScamPatternDetector() {
                 "שמור על סודיות", "חקירה פדרלית", "מגינים עליך",
                 "אל תתקשר לבנק", "אל תתקשר למשטרה", "חקירה חסויה",
                 "לא לספר לבן זוג", "הזהות שלך נגנבה", "העבר לחשבון בטוח",
-                // Russian
-                "никому не говорите", "безопасный счёт", "переведите деньги",
-                "держите в тайне", "федеральное расследование",
+                // Russian — word STEMS (prefix-matched, see keywordRegex)
+                "никому не говор", "безопасн счет", "защищенн счет", "резервн счет", "переведите деньг",
+                "перевед сбережен", "держ в тайн", "федеральн расследован", "не звон в банк",
+                "не звон в полиц", "кредит на ваш им", "ваши данн утекл", "арендовал ваш аккаунт",
+                "вас обманули",
                 // Arabic
                 "لا تخبر أحداً", "حساب آمن", "حوّل أموالك",
                 "اكتم هذا الأمر", "قيد التحقيق"
@@ -1018,9 +1035,9 @@ class ScamPatternDetector() {
                 // Hebrew
                 "זכית בפרס", "תבע את הפרס שלך", "מיליון דולר",
                 "נבחרת לקבל", "כסף פרס",
-                // Russian
-                "вы выиграли", "ваш приз", "получите выигрыш",
-                "миллион долларов", "вы стали победителем",
+                // Russian — word STEMS (prefix-matched, see keywordRegex)
+                "вы выиграл", "получ выигрыш", "миллион доллар", "стали победител", "забер приз",
+                "розыгрыш приз", "бонус в размер",
                 // Arabic
                 "فزت بجائزة", "استلم جائزتك", "مليون دولار", "تم اختيارك"
             ),
@@ -1033,8 +1050,9 @@ class ScamPatternDetector() {
                 "back taxes", "tax refund claim",
                 // Hebrew
                 "חוב מס", "מס הכנסה", "עיקול מס", "חוב מסים",
-                // Russian
-                "налоговый долг", "задолженность по налогам", "налоговая служба",
+                // Russian — word STEMS (prefix-matched, see keywordRegex)
+                "налогов долг", "задолженност по налог", "налогов служб", "налогов управлен",
+                "мас ахнаса", "возврат налог", "возврат подоходн налог", "ордер на арест",
                 // Arabic
                 "ديون ضريبية", "مصلحة الضرائب", "مديونية ضريبية"
             ),
@@ -1046,8 +1064,8 @@ class ScamPatternDetector() {
                 "social security administration",
                 // Hebrew
                 "מספר ביטוח לאומי", "ת.ז חסומה", "ביטוח לאומי נחסם",
-                // Russian
-                "страховой номер снилс", "пенсионный фонд заблокирован",
+                // Russian — word STEMS (prefix-matched, see keywordRegex)
+                "битуах леуми", "национальн страхован", "пособи приостановл", "снилс", "пенсионн фонд заблокир",
                 // Arabic
                 "رقم الضمان الاجتماعي", "الضمان الاجتماعي معلق"
             ),
@@ -1060,8 +1078,9 @@ class ScamPatternDetector() {
                 "malware detected", "tech support", "apple support",
                 // Hebrew
                 "המחשב שלך נגוע", "גישה מרחוק", "תמיכה טכנית",
-                // Russian
-                "ваш компьютер взломан", "удалённый доступ", "техподдержка",
+                // Russian — word STEMS (prefix-matched, see keywordRegex)
+                "компьютер взлом", "удален доступ", "техподдержк", "телефон заражен", "вирус на телефон",
+                "вирус на компьютер", "установ anydesk", "установ teamviewer",
                 // Arabic
                 "جهازك مخترق", "وصول عن بعد", "دعم فني"
             )
@@ -1072,10 +1091,8 @@ class ScamPatternDetector() {
      * Returns true if [text] contains [keyword] as a whole word (word-boundary match,
      * case-insensitive). Prevents false positives like "bitcoin" inside "habitcoin".
      */
-    private fun containsWord(text: String, keyword: String): Boolean {
-        val pattern = "(?<![\\w])${Regex.escape(keyword.lowercase())}(?![\\w])"
-        return Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(text)
-    }
+    private fun containsWord(text: String, keyword: String): Boolean =
+        keywordRegex(keyword).containsMatchIn(normalizeYo(text))
 
     fun analyzeText(text: String): DetectionResult {
         val lowerText = text.lowercase()
@@ -1362,4 +1379,44 @@ class ScamPatternDetector() {
         return score.coerceAtMost(1.0f)
     }
 
+}
+
+/**
+ * Word boundaries use explicit Unicode letter/digit classes rather than `\w`: on
+ * Android (ICU) `\w` is Unicode-aware, but on the JVM (unit tests) it is ASCII-only,
+ * so Hebrew/Russian keywords matched inside longer words in tests but not on the
+ * device.
+ */
+private const val WORD_CHAR = "[\\p{L}\\p{N}_]"
+
+/** Up to one extra word allowed between the words of a Russian phrase
+ *  ("переведите ВАШИ деньги", "посылка задержана НА таможне"). */
+private const val RU_GAP = "(?:[\\s,.:;!?\\-–—«»\"']+[\\p{L}\\p{N}]+)?[\\s,.:;!?\\-–—«»\"']+"
+
+private val CYRILLIC = Regex("[\\u0400-\\u04FF]")
+
+private val keywordRegexCache = java.util.concurrent.ConcurrentHashMap<String, Regex>()
+
+/** "ё" is often typed as "е"; treat them as the same letter on both sides. */
+internal fun normalizeYo(s: String): String = s.replace('ё', 'е').replace('Ё', 'Е')
+
+/**
+ * Regex for one keyword, cached (messages are scanned on every notification, and
+ * each scan checks hundreds of keywords).
+ *
+ * - Latin / Hebrew / Arabic: whole-word, exact phrase (previous behavior).
+ * - Russian: each word is a STEM matched as a word prefix, so "посылк задержан"
+ *   matches "посылка задержана" / "посылку задержали", and one extra word may sit
+ *   between consecutive words. Russian is heavily inflected; exact forms missed
+ *   most real messages. Same approach as the server call engine (scam_detector.py).
+ */
+internal fun keywordRegex(keyword: String): Regex = keywordRegexCache.getOrPut(keyword) {
+    val kw = normalizeYo(keyword.lowercase()).trim()
+    val pattern = if (CYRILLIC.containsMatchIn(kw)) {
+        val words = kw.split(Regex("\\s+")).filter { it.isNotEmpty() }
+        "(?<!$WORD_CHAR)" + words.joinToString(RU_GAP) { Regex.escape(it) + "$WORD_CHAR*" }
+    } else {
+        "(?<!$WORD_CHAR)${Regex.escape(kw)}(?!$WORD_CHAR)"
+    }
+    Regex(pattern, RegexOption.IGNORE_CASE)
 }
