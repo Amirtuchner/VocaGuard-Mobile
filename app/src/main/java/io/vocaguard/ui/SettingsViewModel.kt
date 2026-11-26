@@ -873,10 +873,34 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-    /** Enable call forwarding on its own — inline retry from the onboarding screen. */
+    /** True while the Call Forwarding card is sending a code to the carrier. */
+    private val _forwardingBusy = MutableStateFlow(false)
+    val forwardingBusy: StateFlow<Boolean> = _forwardingBusy.asStateFlow()
+
+    /** Enable call forwarding on its own — onboarding's inline retry and the Settings
+     *  card. The state flips only once the code actually went to the carrier. */
     fun enableCallForwarding() {
+        if (_forwardingBusy.value) return
         viewModelScope.launch {
-            if (enableForwardingNow()) setCallForwardingEnabled(true)
+            _forwardingBusy.value = true
+            try {
+                if (enableForwardingNow()) setCallForwardingEnabled(true)
+            } finally {
+                _forwardingBusy.value = false
+            }
+        }
+    }
+
+    /** Turn call forwarding off (Settings card): pause protection, keep the account. */
+    fun disableCallForwarding() {
+        if (_forwardingBusy.value) return
+        viewModelScope.launch {
+            _forwardingBusy.value = true
+            try {
+                if (disableForwardingNow()) setCallForwardingEnabled(false)
+            } finally {
+                _forwardingBusy.value = false
+            }
         }
     }
 

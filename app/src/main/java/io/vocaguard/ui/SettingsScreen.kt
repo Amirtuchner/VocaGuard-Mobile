@@ -70,6 +70,7 @@ fun SettingsTab(
     val serverPhoneInput     by viewModel.serverPhoneInput.collectAsStateWithLifecycle()
     val serverSipExtension   by viewModel.serverSipExtension.collectAsStateWithLifecycle()
     val serverActivationCode by viewModel.serverActivationCode.collectAsStateWithLifecycle()
+    val forwardingBusy       by viewModel.forwardingBusy.collectAsStateWithLifecycle()
     val serverRegStatus      by viewModel.serverRegStatus.collectAsStateWithLifecycle()
     val serverIsRegistering  by viewModel.serverIsRegistering.collectAsStateWithLifecycle()
     var serverPhoneField by remember(serverPhoneInput) { mutableStateOf(serverPhoneInput) }
@@ -207,9 +208,10 @@ fun SettingsTab(
         item {
             CallForwardingCard(
                 enabled         = callForwardingEnabled,
-                activationCode  = serverActivationCode.ifEmpty { "*21*+97233741493#" },
-                onEnabled       = { viewModel.setCallForwardingEnabled(true) },
-                onDisabled      = { viewModel.setCallForwardingEnabled(false) }
+                registered      = serverRegistered,
+                busy            = forwardingBusy,
+                onEnable        = viewModel::enableCallForwarding,
+                onDisable       = viewModel::disableCallForwarding
             )
         }
 
@@ -1290,13 +1292,11 @@ private fun ScamType.displayName(): String = when (this) {
 @Composable
 private fun CallForwardingCard(
     enabled: Boolean,
-    activationCode: String,
-    onEnabled: () -> Unit,
-    onDisabled: () -> Unit
+    registered: Boolean,
+    busy: Boolean,
+    onEnable: () -> Unit,
+    onDisable: () -> Unit
 ) {
-    val context = LocalContext.current
-    // Carrier-aware: ##21# on GSM carriers, *73 on Verizon.
-    val deactivationCode = remember { ServerDetectionManager.getDeactivationCode(context) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -1325,31 +1325,29 @@ private fun CallForwardingCard(
                     MaterialTheme.colorScheme.error
             )
             Spacer(modifier = Modifier.height(12.dp))
+            // VocaGuard sends the code to the carrier itself (silently when the carrier
+            // allows it, otherwise by dialing it) and only then flips the state. It used
+            // to open the dialer and flip the state right away, so backing out of the
+            // dialer left the card showing the wrong state.
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
-                    onClick = {
-                        context.startActivity(
-                            Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", activationCode, null))
-                        )
-                        onEnabled()
-                    },
-                    enabled = !enabled,
+                    onClick = onEnable,
+                    enabled = !enabled && registered && !busy,
                     modifier = Modifier.weight(1f)
                 ) { Text("Enable") }
                 OutlinedButton(
-                    onClick = {
-                        context.startActivity(
-                            Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", deactivationCode, null))
-                        )
-                        onDisabled()
-                    },
-                    enabled = enabled,
+                    onClick = onDisable,
+                    enabled = enabled && !busy,
                     modifier = Modifier.weight(1f)
                 ) { Text("Disable") }
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Tap Enable or Disable, then tap the Call button in the dialer to apply.",
+                text = when {
+                    busy        -> "Updating call forwarding with your carrier…"
+                    !registered -> "Activate protection first, then you can turn forwarding on and off here."
+                    else        -> "Disable pauses protection without deleting your account."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

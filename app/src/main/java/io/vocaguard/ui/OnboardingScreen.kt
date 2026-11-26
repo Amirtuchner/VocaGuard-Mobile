@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.ui.text.withStyle
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -641,9 +642,15 @@ private fun RegistrationStep(
             shape = MaterialTheme.shapes.medium
         ) {
             Text(
-                text = "Important notice: if you ever remove VocaGuard, first turn off call " +
-                    "forwarding (Settings → Call Forwarding → Disable, or dial $deactivationCode). " +
-                    "Uninstalling alone doesn't cancel it.",
+                // Bold label only: draws the eye to the one note whose miss costs calls.
+                text = androidx.compose.ui.text.buildAnnotatedString {
+                    withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("Important:")
+                    }
+                    append(" to remove VocaGuard, use Settings → Uninstall VocaGuard. It turns " +
+                        "off call forwarding for you. If you remove the app another way, first " +
+                        "dial $deactivationCode, or your calls won't reach you.")
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(12.dp)
