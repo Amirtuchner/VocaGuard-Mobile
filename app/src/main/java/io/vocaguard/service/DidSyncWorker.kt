@@ -94,8 +94,10 @@ class DidSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         val oldDid = ServerDetectionManager.getDidNumber().trimStart('+')
         val result = ServerDetectionManager.register(phone, fcmToken)
         if (!result.success) {
-            Log.w(TAG, "re-register failed: ${result.error}")
-            return Result.retry()
+            Log.w(TAG, "re-register failed: ${result.error} ${result.errorCode}")
+            // 401 = the server wants proof of the number (this install doesn't hold the
+            // account's auth token). Retrying can't fix that; re-verifying in Settings can.
+            return if (result.errorCode.isNotEmpty()) Result.success() else Result.retry()
         }
         val newDid = result.didNumber.trimStart('+')
         if (newDid.isEmpty() || newDid == oldDid) return Result.success()

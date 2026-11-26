@@ -152,12 +152,10 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                     put("type", scamType.name)
                     put("reporter", io.vocaguard.service.ServerDetectionManager.getPhoneNumber())
                 }.toString()
-                val request = okhttp3.Request.Builder()
-                    .url("https://${io.vocaguard.BuildConfig.TOKEN_SERVER_HOST}/report-scam")
-                    .addHeader("Authorization", "Bearer ${io.vocaguard.BuildConfig.TOKEN_SERVER_SECRET}")
+                val request = io.vocaguard.service.ServerApi.request("/report-scam")
                     .post(body.toRequestBody("application/json".toMediaType()))
                     .build()
-                okhttp3.OkHttpClient().newCall(request).execute().use { response ->
+                io.vocaguard.service.ServerApi.client.newCall(request).execute().use { response ->
                     android.util.Log.i("HistoryViewModel", "Scam report uploaded: ${response.code}")
                 }
             } catch (e: Exception) {
@@ -173,12 +171,10 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                     put("number", phoneNumber)
                     put("reporter", io.vocaguard.service.ServerDetectionManager.getPhoneNumber())
                 }.toString()
-                val request = okhttp3.Request.Builder()
-                    .url("https://${io.vocaguard.BuildConfig.TOKEN_SERVER_HOST}/remove-scam")
-                    .addHeader("Authorization", "Bearer ${io.vocaguard.BuildConfig.TOKEN_SERVER_SECRET}")
+                val request = io.vocaguard.service.ServerApi.request("/remove-scam")
                     .post(body.toRequestBody("application/json".toMediaType()))
                     .build()
-                okhttp3.OkHttpClient().newCall(request).execute().use { response ->
+                io.vocaguard.service.ServerApi.client.newCall(request).execute().use { response ->
                     android.util.Log.i("HistoryViewModel", "Scam removal uploaded: ${response.code}")
                 }
             } catch (e: Exception) {

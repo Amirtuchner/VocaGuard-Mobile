@@ -462,20 +462,122 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _phoneWarning = MutableStateFlow<String?>(null)
     val phoneWarning: StateFlow<String?> = _phoneWarning.asStateFlow()
 
+    /** True once automatic number detection has failed (or couldn't start): only then
+     *  does onboarding offer manual entry, so people take the reliable path first. */
+    private val _detectionFailed = MutableStateFlow(false)
+    val detectionFailed: StateFlow<Boolean> = _detectionFailed.asStateFlow()
+
+    /** The number an SMS verification code was sent to, while we wait for the user to
+     *  type it in (null = no code pending). Typed numbers, and re-claiming an existing
+     *  account on a new install, are proven this way. */
+    private val _smsCodePhone = MutableStateFlow<String?>(null)
+    val smsCodePhone: StateFlow<String?> = _smsCodePhone.asStateFlow()
+
+    /** What to do once the number is proven: true = also enable call forwarding
+     *  (onboarding one-tap), false = register only (Settings card). */
+    private var smsThenForward = true
+
     init {
         // When the server pushes back the device's own number (CLI-capture onboarding),
         // auto-fill it and continue straight into registration + call forwarding.
         viewModelScope.launch {
-            io.vocaguard.service.VocaGuardFcmService.numberVerifiedFlow.collect { num ->
-                if (!num.isNullOrBlank() && _awaitingNumberVerify.value) {
+            io.vocaguard.service.VocaGuardFcmService.numberVerifiedFlow.collect { v ->
+                if (v != null && v.phone.isNotBlank() && _awaitingNumberVerify.value) {
                     _awaitingNumberVerify.value = false
                     io.vocaguard.service.VocaGuardFcmService.numberVerifiedFlow.value = null
-                    updateServerPhoneInput(num)
-                    _serverRegStatus.value = "Number detected: $num"
-                    activateProtection(num, force = true)   // from the network — trusted
+                    updateServerPhoneInput(v.phone)
+                    _serverRegStatus.value = "Number detected: ${v.phone}"
+                    // From the network — trusted; the ticket proves it to the server.
+                    activateProtection(v.phone, force = true, ticket = v.ticket)
                 }
             }
         }
+    }
+
+    /** Detection didn't produce a number: reveal manual entry, pre-filled with the
+     *  SIM's number when the phone exposes it. */
+    private fun markDetectionFailed(message: String) {
+        _detectionFailed.value = true
+        if (_serverPhoneInput.value.isBlank()) {
+            val sim = io.vocaguard.service.PhoneNumberHelper.readSimNumber(context)
+            if (sim.isNotBlank()) _serverPhoneInput.value = sim
+        }
+        _serverRegStatus.value = message
+    }
+
+    /** /register refused for lack of proof → text a code to that number. */
+    private fun needsProof(result: io.vocaguard.service.ServerDetectionManager.RegistrationResult): Boolean =
+        result.errorCode == io.vocaguard.service.ServerDetectionManager.ERR_SMS_REQUIRED ||
+            result.errorCode == io.vocaguard.service.ServerDetectionManager.ERR_VERIFICATION_REQUIRED
+
+    /** Text a 6-digit code to [phone]; the UI then shows the code field. */
+    fun startSmsVerification(phone: String, thenForward: Boolean = smsThenForward) {
+        smsThenForward = thenForward
+        _serverIsRegistering.value = true
+        _serverRegStatus.value = "Sending a verification code to $phone…"
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { fcmToken ->
+                viewModelScope.launch {
+                    val s = sdm.requestSmsCode(phone, fcmToken)
+                    _serverIsRegistering.value = false
+                    _serverRegStatus.value = when (s) {
+                        io.vocaguard.service.ServerDetectionManager.SmsStatus.SENT -> {
+                            _smsCodePhone.value = phone
+                            "We sent a 6-digit code by SMS to $phone. Enter it below."
+                        }
+                        io.vocaguard.service.ServerDetectionManager.SmsStatus.RATE_LIMITED ->
+                            "Too many codes requested. Please try again in an hour."
+                        io.vocaguard.service.ServerDetectionManager.SmsStatus.UNSUPPORTED ->
+                            "We can't send a code to this number. Check it's your mobile number, with the country code."
+                        else -> "Couldn't send the code. Check your connection and try again."
+                    }
+                }
+            }
+            .addOnFailureListener { e ->
+                _serverIsRegistering.value = false
+                _serverRegStatus.value = "Couldn't get a device token: ${e.message}"
+            }
+    }
+
+    fun resendSmsCode() {
+        _smsCodePhone.value?.let { startSmsVerification(it) }
+    }
+
+    fun cancelSmsVerification() {
+        _smsCodePhone.value = null
+        _serverRegStatus.value = ""
+    }
+
+    /** Check the typed code; on success register with the resulting ticket. */
+    fun submitSmsCode(code: String) {
+        val phone = _smsCodePhone.value ?: return
+        if (_serverIsRegistering.value) return
+        _serverIsRegistering.value = true
+        _serverRegStatus.value = "Checking the code…"
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { fcmToken ->
+                viewModelScope.launch {
+                    val (s, ticket) = sdm.checkSmsCode(phone, fcmToken, code)
+                    _serverIsRegistering.value = false
+                    when (s) {
+                        io.vocaguard.service.ServerDetectionManager.SmsStatus.OK -> {
+                            _smsCodePhone.value = null
+                            if (smsThenForward) activateProtection(phone, force = true, ticket = ticket)
+                            else registerWithServer(force = true, ticket = ticket, phoneOverride = phone)
+                        }
+                        io.vocaguard.service.ServerDetectionManager.SmsStatus.WRONG ->
+                            _serverRegStatus.value = "That code isn't right. Please try again."
+                        io.vocaguard.service.ServerDetectionManager.SmsStatus.EXPIRED ->
+                            _serverRegStatus.value = "This code has expired. Tap “Send a new code”."
+                        else ->
+                            _serverRegStatus.value = "Couldn't check the code. Check your connection and try again."
+                    }
+                }
+            }
+            .addOnFailureListener { e ->
+                _serverIsRegistering.value = false
+                _serverRegStatus.value = "Couldn't get a device token: ${e.message}"
+            }
     }
 
     fun updateServerPhoneInput(phone: String) {
@@ -494,16 +596,21 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun registerWithServer(force: Boolean = false) {
+    fun registerWithServer(force: Boolean = false, ticket: String = "", phoneOverride: String? = null) {
         if (_serverIsRegistering.value) return
-        val phone = checkedPhone(_serverPhoneInput.value, force) ?: return
+        val phone = checkedPhone(phoneOverride ?: _serverPhoneInput.value, force) ?: return
         _serverPhoneInput.value = phone
         _serverIsRegistering.value = true
         _serverRegStatus.value = "Registering…"
         com.google.firebase.messaging.FirebaseMessaging.getInstance().token
             .addOnSuccessListener { fcmToken ->
                 viewModelScope.launch {
-                    val result = sdm.register(phone, fcmToken)
+                    val result = sdm.register(phone, fcmToken, ticket)
+                    if (!result.success && needsProof(result) && ticket.isEmpty()) {
+                        _serverIsRegistering.value = false
+                        startSmsVerification(phone, thenForward = false)
+                        return@launch
+                    }
                     if (result.success) {
                         _serverRegistered.value = true
                         io.vocaguard.TenjinEvents.send(context, io.vocaguard.TenjinEvents.REGISTERED)
@@ -549,8 +656,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     val vs = sdm.startNumberVerification(fcmToken)
                     if (!vs.success) {
                         _awaitingNumberVerify.value = false
-                        _serverRegStatus.value =
-                            "Couldn't start number detection — enter it manually below."
+                        markDetectionFailed("Couldn't start number detection — enter it manually below.")
                         return@launch
                     }
                     // Dial the verification DID; the commas are post-dial pauses after
@@ -566,8 +672,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     } catch (e: Exception) {
                         _awaitingNumberVerify.value = false
                         Log.w("VGActivate", "number-detect ACTION_CALL failed: ${e.message}")
-                        _serverRegStatus.value =
-                            "Couldn't place the detection call — enter your number manually below."
+                        markDetectionFailed("Couldn't place the detection call — enter your number manually below.")
                         return@launch
                     }
                     // Timeout → fall back to manual entry if nothing came back.
@@ -575,15 +680,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     if (_awaitingNumberVerify.value) {
                         _awaitingNumberVerify.value = false
                         if (!_serverRegistered.value) {
-                            _serverRegStatus.value =
-                                "Couldn't detect your number automatically — enter it manually below."
+                            markDetectionFailed("Couldn't detect your number automatically — enter it manually below.")
                         }
                     }
                 }
             }
             .addOnFailureListener { e ->
                 _awaitingNumberVerify.value = false
-                _serverRegStatus.value = "Couldn't get a device token: ${e.message}"
+                markDetectionFailed("Couldn't get a device token: ${e.message}")
             }
     }
 
@@ -592,7 +696,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
      * AND silently enable call forwarding (no dialer), in a single step. Falls back
      * to the manual "dial this code" flow if the silent USSD fails on the carrier.
      */
-    fun activateProtection(phoneNumber: String, force: Boolean = false) {
+    fun activateProtection(phoneNumber: String, force: Boolean = false, ticket: String = "") {
         if (_serverIsRegistering.value) return
         if (phoneNumber.isBlank()) {
             _serverRegStatus.value = "Pick or enter your phone number first"
@@ -605,8 +709,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         com.google.firebase.messaging.FirebaseMessaging.getInstance().token
             .addOnSuccessListener { fcmToken ->
                 viewModelScope.launch {
-                    val result = sdm.register(phone, fcmToken)
-                    Log.i("VGActivate", "register success=${result.success} ext=${result.sipExtension} err=${result.error}")
+                    val result = sdm.register(phone, fcmToken, ticket)
+                    Log.i("VGActivate", "register success=${result.success} ext=${result.sipExtension} err=${result.error} ${result.errorCode}")
+                    if (!result.success && needsProof(result)) {
+                        // A typed number, or this number already has an account (e.g.
+                        // after a reinstall): prove it with an SMS code, then continue.
+                        _serverIsRegistering.value = false
+                        startSmsVerification(phone, thenForward = true)
+                        return@launch
+                    }
                     if (!result.success) {
                         _serverRegStatus.value = "Activation failed: ${result.error}"
                         ErrorReporter.report(getApplication(), "Activation failed: ${result.error}")
@@ -685,6 +796,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun unregisterFromServer() {
+        _smsCodePhone.value = null
         sdm.clear()
         _serverRegistered.value = false
         _serverSipExtension.value = ""

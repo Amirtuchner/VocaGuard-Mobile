@@ -2,11 +2,9 @@ package io.vocaguard.service
 
 import android.content.Context
 import android.util.Log
-import io.vocaguard.BuildConfig
 import io.vocaguard.data.DetectionSettings
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -41,9 +39,7 @@ object ErrorReporter {
                     put("phone_number", phone)
                     put("error", error)
                 }
-                val request = Request.Builder()
-                    .url("https://${BuildConfig.TOKEN_SERVER_HOST}/report-error")
-                    .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                val request = ServerApi.request("/report-error")
                     .post(json.toString().toRequestBody(JSON_TYPE))
                     .build()
                 client.newCall(request).execute().use { response ->

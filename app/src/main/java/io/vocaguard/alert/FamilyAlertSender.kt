@@ -2,27 +2,20 @@ package io.vocaguard.alert
 
 import android.content.Context
 import android.util.Log
-import io.vocaguard.BuildConfig
 import io.vocaguard.data.FamilyContact
 import io.vocaguard.data.FamilyGuardSettings
 import io.vocaguard.data.ScamType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import io.vocaguard.service.ServerApi
+import io.vocaguard.service.ServerDetectionManager
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.TimeUnit
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
 
 /**
  * Notifies family members / caregivers when a scam call is detected on the senior's device.
@@ -83,13 +76,13 @@ class FamilyAlertSender(private val context: Context) {
             val payload = JSONObject().apply {
                 put("caregiver_number", contact.phoneNumber)
                 put("message", message)
+                // Whose alert this is: the server checks our auth token against it.
+                put("phone_number", ServerDetectionManager.getPhoneNumber())
             }.toString()
-            val request = Request.Builder()
-                .url("https://${BuildConfig.TOKEN_SERVER_HOST}/alert_caregiver")
-                .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+            val request = ServerApi.request("/alert_caregiver")
                 .post(payload.toRequestBody("application/json".toMediaType()))
                 .build()
-            buildTrustAllHttpClient().newCall(request).execute().use { response ->
+            ServerApi.client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
                     Log.i(TAG, "Server SMS alert queued for ${contact.name} (${contact.phoneNumber})")
                 } else {
@@ -134,16 +127,15 @@ class FamilyAlertSender(private val context: Context) {
                     put("senior_name", settings.seniorName.ifBlank { "your family member" })
                     val seniorPhone = settings.seniorPhoneNumber
                     if (seniorPhone.isNotBlank()) put("senior_number", seniorPhone)
+                    put("phone_number", ServerDetectionManager.getPhoneNumber())
                 }.toString()
 
                 val body = payload.toRequestBody("application/json".toMediaType())
-                val request = Request.Builder()
-                    .url("https://${BuildConfig.TOKEN_SERVER_HOST}/call_caregiver")
-                    .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                val request = ServerApi.request("/call_caregiver")
                     .post(body)
                     .build()
 
-                buildTrustAllHttpClient().newCall(request).execute().use { response ->
+                ServerApi.client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
                         Log.i(TAG, "Server call alert initiated to ${contact.name} (${contact.phoneNumber})")
                     } else {
@@ -154,23 +146,6 @@ class FamilyAlertSender(private val context: Context) {
                 Log.e(TAG, "Failed to request server call alert", e)
             }
         }
-    }
-
-    private fun buildTrustAllHttpClient(): OkHttpClient {
-        val trustAll = object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
-            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
-        }
-        val sslCtx = SSLContext.getInstance("TLS").also {
-            it.init(null, arrayOf<TrustManager>(trustAll), SecureRandom())
-        }
-        return OkHttpClient.Builder()
-            .sslSocketFactory(sslCtx.socketFactory, trustAll)
-            .hostnameVerifier { _, _ -> true }
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build()
     }
 
     private fun ScamType.displayName(): String = when (this) {

@@ -11,7 +11,6 @@ import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import io.vocaguard.BuildConfig
 import io.vocaguard.MainActivity
 import io.vocaguard.R
 import io.vocaguard.alert.ScamAlertManager
@@ -25,8 +24,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
@@ -49,32 +46,28 @@ class VocaGuardFcmService : FirebaseMessagingService() {
          *  out of "Connecting" instead of bridging into a dead call. */
         val callGoneFlow = MutableStateFlow<String?>(null)
 
-        /** Emits the device's own phone number (E.164) once the server has verified it
-         *  via the onboarding CLI-capture flow (a brief call that reveals the ANI).
-         *  SettingsViewModel collects this to auto-fill + register without typing. */
-        val numberVerifiedFlow = MutableStateFlow<String?>(null)
+        /** The device's own number as verified by the server through the onboarding
+         *  CLI-capture call (a brief call that reveals the ANI), plus the ticket that
+         *  proves it to /register. SettingsViewModel collects this to register without
+         *  typing. */
+        data class VerifiedNumber(val phone: String, val ticket: String)
+        val numberVerifiedFlow = MutableStateFlow<VerifiedNumber?>(null)
 
-        // Upload current device token to the Asterisk server over HTTPS.
-        // Includes phone_number for multi-tenant routing if the user has registered.
+        // Upload the current device token to the server once registered (the server
+        // only accepts tokens for known users, authenticated by our auth token).
         fun uploadToken(token: String) {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val client = OkHttpClient()
                     val phoneNumber = ServerDetectionManager.getPhoneNumber()
-                    val body = if (phoneNumber.isNotEmpty()) {
-                        JSONObject().apply {
-                            put("phone_number", phoneNumber)
-                            put("fcm_token", token)
-                        }.toString().toRequestBody("application/json".toMediaType())
-                    } else {
-                        token.toRequestBody("text/plain".toMediaType())
-                    }
-                    val request = Request.Builder()
-                        .url("https://${BuildConfig.TOKEN_SERVER_HOST}/register-token")
-                        .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                    if (phoneNumber.isEmpty()) return@launch   // registration sends it
+                    val body = JSONObject().apply {
+                        put("phone_number", phoneNumber)
+                        put("fcm_token", token)
+                    }.toString().toRequestBody("application/json".toMediaType())
+                    val request = ServerApi.request("/register-token")
                         .post(body)
                         .build()
-                    client.newCall(request).execute().use { response ->
+                    ServerApi.client.newCall(request).execute().use { response ->
                         Log.i(TAG, "Token uploaded: ${response.code}")
                     }
                 } catch (e: Exception) {
@@ -99,12 +92,10 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                         val phone = ServerDetectionManager.getPhoneNumber()
                         if (phone.isNotEmpty()) put("phone_number", phone)
                     }.toString().toRequestBody("application/json".toMediaType())
-                    val request = Request.Builder()
-                        .url("https://${BuildConfig.TOKEN_SERVER_HOST}/hangup")
-                        .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                    val request = ServerApi.request("/hangup")
                         .post(body)
                         .build()
-                    OkHttpClient().newCall(request).execute().use { response ->
+                    ServerApi.client.newCall(request).execute().use { response ->
                         Log.i(TAG, "Hangup signalled: ${response.code}")
                     }
                 } catch (e: Exception) {
@@ -116,7 +107,7 @@ class VocaGuardFcmService : FirebaseMessagingService() {
         // Signal Asterisk to bridge the waiting incoming call to the user's SIP phone.
         fun acceptCall(channel: String, callerNumber: String) {
             CoroutineScope(Dispatchers.IO).launch {
-                val client = OkHttpClient.Builder()
+                val client = ServerApi.client.newBuilder()
                     .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
                     .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
                     .build()
@@ -126,9 +117,7 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                     val phone = ServerDetectionManager.getPhoneNumber()
                     if (phone.isNotEmpty()) put("phone_number", phone)
                 }.toString()
-                val request = Request.Builder()
-                    .url("https://${BuildConfig.TOKEN_SERVER_HOST}/accept-call")
-                    .addHeader("Authorization", "Bearer ${BuildConfig.TOKEN_SERVER_SECRET}")
+                val request = ServerApi.request("/accept-call")
                     .post(jsonBody.toRequestBody("application/json".toMediaType()))
                     .build()
 
@@ -149,6 +138,9 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                                 // Caller hung up while we were still ringing — no
                                 // bridge is coming, tell the UI the call is gone.
                                 callGoneFlow.value = channel
+                            } else if (response.code == 401 || response.code == 403) {
+                                // Not authorized for this call (no retry will help).
+                                acceptFailedFlow.value = true
                             }
                         }
                         return@launch
@@ -172,7 +164,7 @@ class VocaGuardFcmService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        Log.i(TAG, "FCM message received: ${message.data}")
+        Log.i(TAG, "FCM message received: ${message.data.filterKeys { it != "ticket" }}")
 
         when (message.data["type"]) {
             "incoming_call" -> {
@@ -238,8 +230,9 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                 // Onboarding CLI-capture: the server detected this device's own number
                 // from the verification call's ANI. Hand it to the ViewModel to register.
                 val phone = message.data["phone_number"] ?: ""
-                Log.i(TAG, "Number verified by server: $phone")
-                if (phone.isNotBlank()) numberVerifiedFlow.value = phone
+                val ticket = message.data["ticket"] ?: ""
+                Log.i(TAG, "Number verified by server: $phone (ticket=${ticket.isNotEmpty()})")
+                if (phone.isNotBlank()) numberVerifiedFlow.value = VerifiedNumber(phone, ticket)
                 return
             }
             "error_report" -> {

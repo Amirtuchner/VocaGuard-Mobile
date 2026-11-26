@@ -82,25 +82,19 @@ fun OnboardingScreen(
     val activationCode      by viewModel.serverActivationCode.collectAsStateWithLifecycle()
     val callForwardingEnabled by viewModel.callForwardingEnabled.collectAsStateWithLifecycle()
     val awaitingNumberVerify by viewModel.awaitingNumberVerify.collectAsStateWithLifecycle()
+    val detectionFailed     by viewModel.detectionFailed.collectAsStateWithLifecycle()
+    val smsCodePhone        by viewModel.smsCodePhone.collectAsStateWithLifecycle()
 
     val callScreeningLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { callScreeningOk = permissionsManager.isCallScreeningEnabled() }
 
     // One-tap activation: detect the user's number, then register + enable call
-    // forwarding in a single step. Detection order: silent telephony read → CLI-capture
-    // verification call (reveals the number on carriers that hide it, e.g. Israeli
-    // SIMs) → manual entry. Server registration + forwarding follow automatically.
-    val onActivate: () -> Unit = {
-        // A typed number is sanity-checked (warning + "use anyway"); a SIM-read one is trusted.
-        val sim = if (serverPhoneInput.isBlank())
-            io.vocaguard.service.PhoneNumberHelper.readSimNumber(context) else ""
-        when {
-            serverPhoneInput.isNotBlank() -> viewModel.activateProtection(serverPhoneInput)
-            sim.isNotBlank()              -> viewModel.activateProtection(sim, force = true)
-            else                          -> viewModel.verifyNumberThenActivate()
-        }
-    }
+    // forwarding in a single step. The CLI-capture verification call both reveals the
+    // number (works where the SIM doesn't expose it, e.g. Israeli SIMs) and proves it
+    // to the server. Only if that fails is manual entry offered (then an SMS code
+    // proves the typed number). Server registration + forwarding follow automatically.
+    val onActivate: () -> Unit = { viewModel.verifyNumberThenActivate() }
 
     // Battery-optimization exemption prompt (a single system "Allow" dialog) — hoisted
     // so the nav bar's soft-gate can trigger it too.
@@ -177,7 +171,12 @@ fun OnboardingScreen(
                     isRegistered    = serverRegistered,
                     status          = serverRegStatus,
                     forwardingEnabled = callForwardingEnabled,
-                    onEnableForwarding = viewModel::enableCallForwarding
+                    onEnableForwarding = viewModel::enableCallForwarding,
+                    detectionFailed = detectionFailed,
+                    smsCodePhone    = smsCodePhone,
+                    onSubmitCode    = viewModel::submitSmsCode,
+                    onResendCode    = viewModel::resendSmsCode,
+                    onCancelCode    = viewModel::cancelSmsVerification
                 )
                 2 -> BatteryOptimizationStep(
                     isDone   = batteryUnrestricted,
@@ -514,12 +513,17 @@ private fun RegistrationStep(
     isRegistered: Boolean,
     status: String,
     forwardingEnabled: Boolean,
-    onEnableForwarding: () -> Unit
+    onEnableForwarding: () -> Unit,
+    detectionFailed: Boolean,
+    smsCodePhone: String?,
+    onSubmitCode: (String) -> Unit,
+    onResendCode: () -> Unit,
+    onCancelCode: () -> Unit
 ) {
     val busy = isRegistering || isDetecting
-    var showManual by remember { mutableStateOf(false) }
-    // The main Activate button also uses a typed number — make sure its warning is visible.
-    LaunchedEffect(phoneWarning) { if (phoneWarning != null) showManual = true }
+    // Manual entry only once automatic detection has failed (or a typed number needs
+    // fixing): the detection call is reliable and proves the number, typing isn't.
+    val showManual = detectionFailed || phoneWarning != null
     // Carrier-aware cancel code for the uninstall note: ##21# on GSM, *73 on Verizon.
     val stepContext = LocalContext.current
     val deactivationCode = remember { ServerDetectionManager.getDeactivationCode(stepContext) }
@@ -540,6 +544,16 @@ private fun RegistrationStep(
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        if (smsCodePhone != null && !isRegistered) {
+            // A code is on its way: that's the only thing to do on this screen now.
+            SmsCodeEntry(
+                phone    = smsCodePhone,
+                busy     = busy,
+                onSubmit = onSubmitCode,
+                onResend = onResendCode,
+                onCancel = onCancelCode
+            )
+        } else {
         // Primary one-tap CTA: detect number → register → enable forwarding.
         Button(
             onClick = onActivate,
@@ -553,15 +567,21 @@ private fun RegistrationStep(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
             } else {
-                Text(if (isRegistered) "Protected ✓" else "Activate protection")
+                Text(when {
+                    isRegistered    -> "Protected ✓"
+                    detectionFailed -> "Try detecting again"
+                    else            -> "Activate protection"
+                })
             }
         }
 
         if (!isRegistered) {
-            TextButton(onClick = { showManual = !showManual }) {
-                Text(if (showManual) "Hide manual entry" else "Enter number manually instead")
-            }
             if (showManual) {
+                Text(
+                    text = "Or enter your number — we'll text you a code to confirm it.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
                 OutlinedTextField(
                     value = phoneInput,
                     onValueChange = onPhoneChange,
@@ -575,11 +595,11 @@ private fun RegistrationStep(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                TextButton(
+                OutlinedButton(
                     onClick = if (phoneWarning != null) onRegisterAnyway else onRegister,
-                    enabled = !busy,
+                    enabled = !busy && phoneInput.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()
-                ) { Text(if (phoneWarning != null) "Use this number anyway" else "Register this number") }
+                ) { Text(if (phoneWarning != null) "Use this number anyway" else "Text me a code") }
             }
         } else {
             // Registered. Forwarding is set by the same Activate tap; if the carrier
@@ -600,14 +620,16 @@ private fun RegistrationStep(
                 Text("Change number")
             }
         }
+        }
         if (status.isNotEmpty()) {
             Text(
                 text = status,
                 style = MaterialTheme.typography.bodySmall,
-                color = if (isRegistered)
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.error,
+                color = when {
+                    isRegistered         -> MaterialTheme.colorScheme.primary
+                    smsCodePhone != null -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else                 -> MaterialTheme.colorScheme.error
+                },
                 textAlign = TextAlign.Center
             )
         }

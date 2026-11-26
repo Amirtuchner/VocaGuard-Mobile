@@ -56,6 +56,7 @@ fun SettingsTab(
     val messageScanEnabled by viewModel.messageScanEnabled.collectAsStateWithLifecycle()
     val showCallerNames by viewModel.showCallerNames.collectAsStateWithLifecycle()
     val phoneWarning by viewModel.phoneWarning.collectAsStateWithLifecycle()
+    val smsCodePhone by viewModel.smsCodePhone.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.reloadShowCallerNames() }
     val alertTypeEnabled by viewModel.alertTypeEnabled.collectAsStateWithLifecycle()
     val themePreference  by viewModel.themePreference.collectAsStateWithLifecycle()
@@ -191,7 +192,11 @@ fun SettingsTab(
                 phoneWarning   = phoneWarning,
                 onRegisterAnyway = { viewModel.registerWithServer(force = true) },
                 onUnregister   = { viewModel.unregisterFromServer() },
-                isUS           = isUS
+                isUS           = isUS,
+                smsCodePhone   = smsCodePhone,
+                onSubmitCode   = viewModel::submitSmsCode,
+                onResendCode   = viewModel::resendSmsCode,
+                onCancelCode   = viewModel::cancelSmsVerification
             )
         }
 
@@ -1330,7 +1335,11 @@ private fun ServerDetectionCard(
     phoneWarning: String? = null,
     onRegisterAnyway: () -> Unit = {},
     onUnregister: () -> Unit,
-    isUS: Boolean = false
+    isUS: Boolean = false,
+    smsCodePhone: String? = null,
+    onSubmitCode: (String) -> Unit = {},
+    onResendCode: () -> Unit = {},
+    onCancelCode: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1355,7 +1364,15 @@ private fun ServerDetectionCard(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (!registered) {
+            if (!registered && smsCodePhone != null) {
+                SmsCodeEntry(
+                    phone    = smsCodePhone,
+                    busy     = isRegistering,
+                    onSubmit = onSubmitCode,
+                    onResend = onResendCode,
+                    onCancel = onCancelCode
+                )
+            } else if (!registered) {
                 OutlinedTextField(
                     value = phoneField,
                     onValueChange = onPhoneChange,
