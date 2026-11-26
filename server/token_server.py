@@ -88,6 +88,9 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
 )
 log = logging.getLogger("token_server")
+# The Twilio SDK logs every request's full URL/headers/body at INFO (phone numbers,
+# SMS text). Our own log lines already record what matters.
+logging.getLogger("twilio").setLevel(logging.WARNING)
 
 # \Z, not $: "$" also matches before a trailing "\n", which would let a newline
 # through into the AMI text protocol.
@@ -253,6 +256,17 @@ def init_db():
             fcm_token    TEXT NOT NULL,
             created_at   REAL NOT NULL,
             attempts     INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    # Free-trial memory for DELETED accounts: a keyed hash of the phone number (not
+    # reversible without the server key) and when their first trial started, so
+    # "delete account → sign up again" can't restart the 30-day trial. Kept
+    # TRIAL_HISTORY_DAYS after deletion (privacy policy §5).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS trial_history (
+            phone_hash       TEXT PRIMARY KEY,
+            trial_started_at TEXT NOT NULL,
+            deleted_at       REAL NOT NULL
         )
     """)
     # Which user each incoming_call push went to (written by notify_incoming.py), so
@@ -473,11 +487,15 @@ def register_user(phone: str, fcm_token: str, srtp: bool = False) -> dict:
     sip_ext   = f"vocaguard_{next_num}"
     sip_pass  = secrets.token_urlsafe(16)
 
+    # A number that had an account before keeps its original trial start.
+    prior_trial = _prior_trial_start(conn, phone)
     conn.execute(
-        "INSERT INTO users (phone_number, fcm_token, sip_extension, sip_password) "
-        "VALUES (?, ?, ?, ?)",
-        (phone, fcm_token, sip_ext, sip_pass)
+        "INSERT INTO users (phone_number, fcm_token, sip_extension, sip_password, created_at) "
+        "VALUES (?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))",
+        (phone, fcm_token, sip_ext, sip_pass, prior_trial)
     )
+    if prior_trial:
+        log.info("New account for %s continues trial started %s", _safe_callerid(phone), prior_trial)
     # Carrier-aware DID: Diversion-safe carriers (HOT/019) use the shared DID; everyone
     # else (Partner/Cellcom/Pelephone/unknown) gets a dedicated DID when the pool has one.
     # Non-Israeli-mobile numbers (typos, foreign, Play pre-launch robots) stay shared.
@@ -498,7 +516,7 @@ def register_user(phone: str, fcm_token: str, srtp: bool = False) -> dict:
         "sip_extension": sip_ext,
         "sip_password":  sip_pass,
         "did_number":    did or _shared_did_for(phone),
-        **_trial_info(None),   # brand-new user → full trial starting now
+        **_trial_info(prior_trial),   # None → brand-new number, full trial from now
     }
 
 
@@ -770,6 +788,37 @@ def update_fcm_token(phone: str, fcm_token: str) -> bool:
     return updated
 
 
+TRIAL_HISTORY_DAYS = 730   # how long a deleted account's trial start is remembered
+
+
+def _trial_hash(phone: str) -> str:
+    """Keyed hash of the phone number: the same number always maps to the same value,
+    but the table can't be turned back into phone numbers without the server key."""
+    return hmac.new(_auth_key(), b"trial|" + _normalize_phone(phone).encode(),
+                    hashlib.sha256).hexdigest()
+
+
+def _remember_trial(conn, phone: str):
+    """Before deleting an account: keep when its trial started (the earliest seen)."""
+    row = conn.execute("SELECT created_at FROM users WHERE phone_number=?", (phone,)).fetchone()
+    if not row or not row[0]:
+        return
+    h = _trial_hash(phone)
+    old = conn.execute("SELECT trial_started_at FROM trial_history WHERE phone_hash=?", (h,)).fetchone()
+    started = min(row[0], old[0]) if old else row[0]
+    conn.execute("INSERT OR REPLACE INTO trial_history (phone_hash, trial_started_at, deleted_at) "
+                 "VALUES (?, ?, ?)", (h, started, time.time()))
+
+
+def _prior_trial_start(conn, phone: str) -> str | None:
+    """Trial start of an earlier, deleted account on this number (None if none)."""
+    conn.execute("DELETE FROM trial_history WHERE deleted_at < ?",
+                 (time.time() - TRIAL_HISTORY_DAYS * 86400,))
+    row = conn.execute("SELECT trial_started_at FROM trial_history WHERE phone_hash=?",
+                       (_trial_hash(phone),)).fetchone()
+    return row[0] if row else None
+
+
 def delete_user(phone: str) -> bool:
     """Remove a user from the DB and from pjsip_users.conf, then reload PJSIP."""
     phone = _normalize_phone(phone)
@@ -781,6 +830,7 @@ def delete_user(phone: str) -> bool:
         if not row:
             return False
         ext = row[0]
+        _remember_trial(conn, phone)
         conn.execute("DELETE FROM users WHERE phone_number=?", (phone,))
         # Return their dedicated DID to the pool. It is only re-assigned after
         # DID_QUARANTINE_DAYS without calls (stale forwarding protection).
