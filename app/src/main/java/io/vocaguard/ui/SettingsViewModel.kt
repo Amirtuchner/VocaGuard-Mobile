@@ -403,26 +403,102 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _deleteDataStatus = MutableStateFlow("")
     val deleteDataStatus: StateFlow<String> = _deleteDataStatus.asStateFlow()
 
-    fun deleteAllData() {
+    /** True while "Delete my account" / "Uninstall VocaGuard" is running. */
+    private val _accountBusy = MutableStateFlow(false)
+    val accountBusy: StateFlow<Boolean> = _accountBusy.asStateFlow()
+
+    /** Set once the account is gone (the status line turns green). */
+    private val _accountDeleted = MutableStateFlow(false)
+    val accountDeleted: StateFlow<Boolean> = _accountDeleted.asStateFlow()
+
+    /**
+     * "Delete my account" (and the first part of "Uninstall VocaGuard"):
+     *  1. turn off call forwarding — it lives at the carrier and would otherwise keep
+     *     sending the user's calls to a number with no account behind it;
+     *  2. delete the account on the server;
+     *  3. wipe everything stored on the phone.
+     * Each step must succeed before the next: if the server can't be reached we stop
+     * and keep everything, because the auth token wiped in step 3 is the only thing
+     * that can delete the account later. With [thenUninstall], Android's uninstall
+     * prompt opens at the end.
+     */
+    fun deleteAccount(thenUninstall: Boolean) {
+        if (_accountBusy.value) return
         viewModelScope.launch {
-            _deleteDataStatus.value = "Deleting…"
-            val db = io.vocaguard.data.db.VocaGuardDatabase.getInstance(context)
-            // 1. Delete from server
-            val serverOk = sdm.deleteFromServer()
-            // 2. Clear local DB
-            db.transcriptDao().clearAll()
-            // 3. Clear all local prefs and registration
-            sdm.clear()
-            detectionSettings.reset()
-            familySettings.reset()
-            _familyGuardEnabled.value = false
-            _familyContacts.value = emptyList()
-            _serverRegistered.value = false
-            _serverSipExtension.value = ""
-            _serverActivationCode.value = ""
-            // 4. Tear down SIP
-            io.vocaguard.service.VocaGuardSipManager.reinitialize(getApplication())
-            _deleteDataStatus.value = if (serverOk) "All data deleted" else "Local data deleted (server unreachable)"
+            _accountBusy.value = true
+            try {
+                if (sdm.isRegistered() || detectionSettings.callForwardingEnabled) {
+                    _deleteDataStatus.value = "Turning off call forwarding…"
+                    if (!disableForwardingNow()) {
+                        _deleteDataStatus.value =
+                            "Couldn't turn off call forwarding. Dial ${sdm.getDeactivationCode(getApplication())} " +
+                            "from your phone, then try again."
+                        return@launch
+                    }
+                    setCallForwardingEnabled(false)
+                }
+                _deleteDataStatus.value = "Deleting your account…"
+                if (!sdm.deleteFromServer()) {
+                    _deleteDataStatus.value =
+                        "Couldn't reach the VocaGuard server, so your account wasn't deleted. " +
+                        "Check your internet connection and try again."
+                    return@launch
+                }
+                wipeLocalData()
+                _accountDeleted.value = true
+                _deleteDataStatus.value = "Your account has been deleted."
+                if (thenUninstall) openUninstallPrompt()
+            } finally {
+                _accountBusy.value = false
+            }
+        }
+    }
+
+    private suspend fun wipeLocalData() {
+        io.vocaguard.data.db.VocaGuardDatabase.getInstance(context).transcriptDao().clearAll()
+        sdm.clear()
+        detectionSettings.reset()
+        familySettings.reset()
+        _familyGuardEnabled.value = false
+        _familyContacts.value = emptyList()
+        _serverRegistered.value = false
+        _serverSipExtension.value = ""
+        _serverActivationCode.value = ""
+        io.vocaguard.service.VocaGuardSipManager.reinitialize(getApplication())
+    }
+
+    /** Cancel call forwarding: silent USSD first; if the carrier rejects that, dial the
+     *  code (the dialer shows the carrier's answer). False only if neither could run. */
+    private suspend fun disableForwardingNow(): Boolean {
+        val code = sdm.getDeactivationCode(getApplication())
+        val silentOk = kotlinx.coroutines.withTimeoutOrNull(12_000) { trySilentUssd(code) } ?: false
+        Log.i("VGAccount", "cancel forwarding silent ok=$silentOk code=$code")
+        if (silentOk) return true
+        return try {
+            context.startActivity(
+                Intent(Intent.ACTION_CALL, Uri.fromParts("tel", code, null))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            kotlinx.coroutines.delay(6_000)   // let the carrier answer before moving on
+            true
+        } catch (e: Exception) {
+            Log.w("VGAccount", "dialing $code failed: ${e.message}")
+            false
+        }
+    }
+
+    /** Android's own "Uninstall VocaGuard?" prompt (the user confirms with one tap);
+     *  falls back to the app's system settings page, which has an Uninstall button. */
+    private fun openUninstallPrompt() {
+        val pkg = Uri.fromParts("package", context.packageName, null)
+        try {
+            context.startActivity(Intent(Intent.ACTION_DELETE, pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) {
+            Log.w("VGAccount", "uninstall prompt failed: ${e.message}")
+            context.startActivity(
+                Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
         }
     }
 

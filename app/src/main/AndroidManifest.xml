@@ -53,6 +53,9 @@
          (the phone rings into a frozen app). Justified: real-time call
          screening requires a persistent connection. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- "Uninstall VocaGuard" in Settings opens Android's own uninstall prompt for this
+         app (ACTION_DELETE); apps targeting API 28+ need this normal permission for it. -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <!-- Telephony hardware is optional — app runs on tablets/ChromeOS without a SIM -->
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
     <!-- Wi-Fi hardware is optional too. The Linphone SDK merges ACCESS_WIFI_STATE /

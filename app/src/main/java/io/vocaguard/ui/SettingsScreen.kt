@@ -91,7 +91,10 @@ fun SettingsTab(
     var showMessengerTipDialog by remember { mutableStateOf(false) }
     var advancedExpanded by remember { mutableStateOf(false) }
     var showDeleteDataDialog by remember { mutableStateOf(false) }
+    var showUninstallDialog by remember { mutableStateOf(false) }
     val deleteDataStatus by viewModel.deleteDataStatus.collectAsStateWithLifecycle()
+    val accountBusy by viewModel.accountBusy.collectAsStateWithLifecycle()
+    val accountDeleted by viewModel.accountDeleted.collectAsStateWithLifecycle()
 
     // Family Guard local state
     var newContactName by remember { mutableStateOf("") }
@@ -816,7 +819,8 @@ fun SettingsTab(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Delete all data stored by VocaGuard, including call history and your server registration.",
+                        text = "Delete my account turns off call forwarding, deletes your account from " +
+                            "the VocaGuard server, and erases your call history and settings on this phone.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -824,19 +828,29 @@ fun SettingsTab(
                         Text(
                             text = deleteDataStatus,
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (deleteDataStatus.startsWith("All data"))
-                                MaterialTheme.colorScheme.secondary
-                            else
-                                MaterialTheme.colorScheme.error
+                            color = when {
+                                accountDeleted -> MaterialTheme.colorScheme.secondary
+                                accountBusy    -> MaterialTheme.colorScheme.onSurfaceVariant
+                                else           -> MaterialTheme.colorScheme.error
+                            }
                         )
                     }
                     Button(
                         onClick = { showDeleteDataDialog = true },
+                        enabled = !accountBusy,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error
                         )
-                    ) { Text("Delete all my data") }
+                    ) { Text("Delete my account") }
+                    OutlinedButton(
+                        onClick = { showUninstallDialog = true },
+                        enabled = !accountBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) { Text("Uninstall VocaGuard") }
                 }
             }
         }
@@ -845,22 +859,50 @@ fun SettingsTab(
     if (showDeleteDataDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDataDialog = false },
-            title = { Text("Delete all data?") },
+            title = { Text("Delete your account?") },
             text = {
-                Text("This will permanently delete your call history, server registration, and all settings. This cannot be undone.")
+                Text("VocaGuard will turn off call forwarding, delete your account from our server, " +
+                    "and erase your call history and settings on this phone. Your calls will no longer " +
+                    "be protected. This cannot be undone.")
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showDeleteDataDialog = false
-                        viewModel.deleteAllData()
+                        viewModel.deleteAccount(thenUninstall = false)
                     }
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text("Delete account", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDataDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showUninstallDialog) {
+        AlertDialog(
+            onDismissRequest = { showUninstallDialog = false },
+            title = { Text("Uninstall VocaGuard?") },
+            text = {
+                Text("VocaGuard will first turn off call forwarding and delete your account, so your " +
+                    "calls keep reaching you normally. Then Android will ask you to confirm removing the app.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showUninstallDialog = false
+                        viewModel.deleteAccount(thenUninstall = true)
+                    }
+                ) {
+                    Text("Uninstall", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUninstallDialog = false }) {
                     Text("Cancel")
                 }
             }
