@@ -77,8 +77,11 @@ def pool_status(conn) -> dict:
                          "AND last_call_at >= ?", quiet_since),
         # Users who need their own DID but don't have one: non-Diversion carrier on the
         # shared DID, or still sharing a DID the pool says belongs to someone else.
+        # Only well-formed Israeli mobiles: token_server never gives anyone else a
+        # dedicated DID (_is_il_mobile), so foreign/typo numbers aren't waiting for one.
         "waiting":     q("SELECT COUNT(*) FROM users u WHERE u.uninstalled_at IS NULL "
-                         "AND u.token_dead_at IS NULL AND ("
+                         "AND u.token_dead_at IS NULL "
+                         "AND u.phone_number GLOB '9725[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]' AND ("
                          "(u.did_number IS NULL AND u.carrier_safe = 0) OR "
                          "EXISTS (SELECT 1 FROM did_pool p WHERE p.did_number = u.did_number "
                          "AND COALESCE(p.assigned_to,'') != u.phone_number))"),
