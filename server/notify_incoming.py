@@ -256,6 +256,24 @@ def _handle_dead_token(token: str):
         _log(f"dead-token handling error: {e}")
 
 
+def _record_call_channel(channel: str, token: str):
+    """Remember who this call was pushed to: token_server only lets that user
+    accept or hang up the channel (security audit 2026-11-23, finding 5)."""
+    if not channel:
+        return
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        row = conn.execute("SELECT phone_number FROM users WHERE fcm_token=?", (token,)).fetchone()
+        conn.execute("DELETE FROM call_channels WHERE created_at < ?", (time.time() - 86400,))
+        conn.execute(
+            "INSERT OR REPLACE INTO call_channels (channel, phone_number, fcm_token, created_at) "
+            "VALUES (?, ?, ?, ?)", (channel, row[0] if row else None, token, time.time()))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        _log(f"call_channels write failed: {e}")
+
+
 def send_fcm(diversion_number: str, data: dict, called_did: str = "") -> str:
     """Send the push. Returns 'sent', 'dead_token' (UNREGISTERED — app gone),
     'no_token' or 'error' so main() can fail-fast the dialplan."""
@@ -278,6 +296,8 @@ def send_fcm(diversion_number: str, data: dict, called_did: str = "") -> str:
         try:
             r = messaging.send(msg)
             _log(f"FCM sent type={data.get('type')} tail={token[-10:]} id={r}")
+            if data.get("type") == "incoming_call":
+                _record_call_channel(data.get("asterisk_channel", ""), token)
             return "sent"
         except messaging.UnregisteredError:
             _log(f"FCM UNREGISTERED tail={token[-10:]} — app likely uninstalled")

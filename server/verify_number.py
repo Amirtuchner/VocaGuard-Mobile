@@ -12,7 +12,7 @@ writes (no session delete here); token_server purges expired nonces by TTL.
 
 argv: <code> <caller_ani>
 """
-import sys, time, re, sqlite3
+import sys, time, re, sqlite3, hmac, hashlib
 import firebase_admin
 from firebase_admin import credentials, messaging
 
@@ -21,6 +21,8 @@ DB_PATH         = "/opt/vocaguard/data/users.db"   # root:asterisk 0660 in a 277
 LOG             = "/var/log/vocaguard_notify.log"
 VERIFY_TTL      = 300
 _DID_CC         = "972"
+AUTH_KEY_FILE   = "/opt/vocaguard/verify_hmac.key"   # root:asterisk 0640
+TICKET_TTL      = 900
 
 
 def _log(msg: str):
@@ -91,10 +93,23 @@ def main():
         _log(f"ANI did not normalize to a usable number: {ani!r} -> {phone!r}")
         return
 
+    # Proof for /register that this number was verified for this app install
+    # (same format as token_server.make_ticket — keep the two in sync). Without a
+    # ticket the push still carries the number, so onboarding falls back to SMS.
+    ticket = ""
+    try:
+        key = open(AUTH_KEY_FILE).read().strip().encode()
+        exp = int(time.time()) + TICKET_TTL
+        digits = phone.lstrip("+")
+        sig = hmac.new(key, f"cli|{exp}|{digits}|{fcm_token}".encode(), hashlib.sha256).hexdigest()
+        ticket = f"cli.{exp}.{sig}"
+    except Exception as e:
+        _log(f"ticket error: {e}")
+
     try:
         firebase_admin.initialize_app(credentials.Certificate(SERVICE_ACCOUNT))
         msg = messaging.Message(
-            data={"type": "number_verified", "phone_number": phone},
+            data={"type": "number_verified", "phone_number": phone, "ticket": ticket},
             android=messaging.AndroidConfig(priority="high"),
             token=fcm_token,
         )

@@ -240,6 +240,31 @@ def init_db():
     # DID, so prev_did is only cleared once did_acked == did_number.
     if "did_acked" not in _cols:
         conn.execute("ALTER TABLE users ADD COLUMN did_acked TEXT")
+    # SHA-256 (hex) of the per-device auth token issued by /register once the number
+    # is proven (security audit 2026-11-23, findings 1/3/5). NULL = legacy account
+    # from an app build that predates per-user auth.
+    if "auth_hash" not in _cols:
+        conn.execute("ALTER TABLE users ADD COLUMN auth_hash TEXT")
+    # Pending SMS verification codes (manual number entry / re-claiming an account).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sms_codes (
+            phone_number TEXT PRIMARY KEY,
+            code_hash    TEXT NOT NULL,
+            fcm_token    TEXT NOT NULL,
+            created_at   REAL NOT NULL,
+            attempts     INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    # Which user each incoming_call push went to (written by notify_incoming.py), so
+    # /accept-call and /hangup only act on the caller's own calls.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS call_channels (
+            channel      TEXT PRIMARY KEY,
+            phone_number TEXT,
+            fcm_token    TEXT,
+            created_at   REAL NOT NULL
+        )
+    """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS did_pool (
             did_number  TEXT PRIMARY KEY,
@@ -475,6 +500,225 @@ def register_user(phone: str, fcm_token: str, srtp: bool = False) -> dict:
         "did_number":    did or _shared_did_for(phone),
         **_trial_info(None),   # brand-new user → full trial starting now
     }
+
+
+# ---------------------------------------------------------------------------
+# Per-user auth (security audit 2026-11-23, findings 1/3/5)
+#
+# The shared TOKEN_SERVER_SECRET ships in every APK, so it proves nothing. A user
+# now gets a random per-device auth token from /register, but only after proving
+# the number is theirs:
+#   * "cli" ticket: the onboarding verification call. verify_number.py sees the
+#     caller ID and pushes a ticket (HMAC over phone + fcm_token) to the app.
+#   * "sms" ticket: a 6-digit code texted to the number (/verify-number/sms).
+# Caller ID can be spoofed, so taking over an EXISTING account needs an sms ticket
+# (or the same FCM token the account already has: same device).
+# Every other endpoint then requires the token for accounts that have one. Accounts
+# without one (app builds <= 1.0.26) keep working while legacy access is allowed;
+# `touch /opt/vocaguard/legacy_auth_off` turns that off once old builds are gone.
+# ---------------------------------------------------------------------------
+import hashlib, hmac
+
+AUTH_KEY_FILE   = "/opt/vocaguard/verify_hmac.key"   # root:asterisk 0640, shared with verify_number.py
+LEGACY_OFF_FILE = "/opt/vocaguard/legacy_auth_off"
+TICKET_TTL      = 900      # seconds a verification ticket stays valid
+SMS_CODE_TTL    = 600      # seconds an SMS code stays valid
+SMS_MAX_TRIES   = 5        # wrong guesses before the code is burned
+CHANNEL_TTL     = 600      # seconds after the push that a call can be accepted/hung up
+
+_auth_key_cache: bytes | None = None
+
+
+def _auth_key() -> bytes:
+    global _auth_key_cache
+    if _auth_key_cache is None:
+        with open(AUTH_KEY_FILE) as f:
+            _auth_key_cache = f.read().strip().encode()
+    return _auth_key_cache
+
+
+def legacy_allowed() -> bool:
+    return not os.path.exists(LEGACY_OFF_FILE)
+
+
+def _ticket_sig(method: str, exp: int, phone: str, fcm: str) -> str:
+    msg = f"{method}|{exp}|{phone}|{fcm}".encode()
+    return hmac.new(_auth_key(), msg, hashlib.sha256).hexdigest()
+
+
+def make_ticket(phone: str, fcm: str, method: str) -> str:
+    """'<method>.<expiry>.<hmac>' proving `phone` was verified for this fcm_token.
+    verify_number.py builds the same format (keep the two in sync)."""
+    exp = int(time.time()) + TICKET_TTL
+    return f"{method}.{exp}.{_ticket_sig(method, exp, _normalize_phone(phone), fcm)}"
+
+
+def check_ticket(ticket: str, phone: str, fcm: str) -> str | None:
+    """The ticket's method ('cli' / 'sms') if valid for this phone + fcm_token."""
+    try:
+        method, exp_s, sig = (ticket or "").split(".")
+        exp = int(exp_s)
+    except ValueError:
+        return None
+    if method not in ("cli", "sms") or exp < time.time():
+        return None
+    good = _ticket_sig(method, exp, _normalize_phone(phone), fcm)
+    return method if hmac.compare_digest(good, sig) else None
+
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def issue_auth_token(phone: str) -> str:
+    """New per-device token for this user (replaces any previous one)."""
+    token = secrets.token_urlsafe(32)
+    conn = db_connect()
+    try:
+        conn.execute("UPDATE users SET auth_hash=? WHERE phone_number=?",
+                     (_hash_token(token), _normalize_phone(phone)))
+        conn.commit()
+    finally:
+        conn.close()
+    return token
+
+
+def auth_token_valid(phone: str, token: str) -> bool:
+    if not phone or not token:
+        return False
+    conn = db_connect()
+    try:
+        row = conn.execute("SELECT auth_hash FROM users WHERE phone_number=?",
+                           (_normalize_phone(phone),)).fetchone()
+    finally:
+        conn.close()
+    return bool(row and row[0]) and hmac.compare_digest(row[0], _hash_token(token))
+
+
+def user_has_auth(phone: str) -> bool:
+    conn = db_connect()
+    try:
+        row = conn.execute("SELECT auth_hash FROM users WHERE phone_number=?",
+                           (_normalize_phone(phone),)).fetchone()
+    finally:
+        conn.close()
+    return bool(row and row[0])
+
+
+def channel_belongs_to(channel: str, phone: str) -> bool:
+    """True if notify_incoming.py pushed this call to this user recently."""
+    phone = _normalize_phone(phone)
+    conn = db_connect()
+    try:
+        row = conn.execute(
+            "SELECT c.phone_number, c.fcm_token, u.fcm_token FROM call_channels c "
+            "LEFT JOIN users u ON u.phone_number = ? WHERE c.channel = ? AND c.created_at > ?",
+            (phone, channel, time.time() - CHANNEL_TTL)).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return False
+    pushed_phone, pushed_fcm, user_fcm = row
+    return pushed_phone == phone or (bool(pushed_fcm) and pushed_fcm == user_fcm)
+
+
+# SMS codes cost money and SMS-pumping fraud targets exactly this kind of endpoint,
+# so: only Israeli mobiles and US/Canada numbers, and tight per-number / per-IP /
+# global caps (in memory; reset on restart, which is fine at this volume).
+_SMS_PER_PHONE_HOUR = 3
+_SMS_PER_PHONE_DAY  = 6
+_SMS_PER_IP_HOUR    = 10
+_SMS_GLOBAL_DAY     = 200
+_sms_log: list[tuple[float, str, str]] = []   # (time, phone, ip)
+_sms_lock = threading.Lock()
+
+
+def _sms_allowed(phone: str, ip: str) -> bool:
+    now = time.time()
+    with _sms_lock:
+        _sms_log[:] = [e for e in _sms_log if now - e[0] < 86400]
+        if len(_sms_log) >= _SMS_GLOBAL_DAY:
+            return False
+        if sum(1 for t, p, _ in _sms_log if p == phone) >= _SMS_PER_PHONE_DAY:
+            return False
+        if sum(1 for t, p, _ in _sms_log if p == phone and now - t < 3600) >= _SMS_PER_PHONE_HOUR:
+            return False
+        if sum(1 for t, _, i in _sms_log if i == ip and now - t < 3600) >= _SMS_PER_IP_HOUR:
+            return False
+        _sms_log.append((now, phone, ip))
+        return True
+
+
+def sms_destination_ok(phone: str) -> bool:
+    return _is_il_mobile(phone) or bool(_NANP_RE.match(phone))
+
+
+def send_sms_code(phone: str, fcm: str) -> None:
+    """Store a fresh code for this phone + fcm_token and text it."""
+    phone = _normalize_phone(phone)
+    code = f"{secrets.randbelow(900000) + 100000}"
+    conn = db_connect()
+    try:
+        conn.execute("DELETE FROM sms_codes WHERE created_at < ?", (time.time() - SMS_CODE_TTL,))
+        conn.execute(
+            "INSERT OR REPLACE INTO sms_codes (phone_number, code_hash, fcm_token, created_at, attempts) "
+            "VALUES (?, ?, ?, ?, 0)", (phone, _hash_token(code), fcm, time.time()))
+        conn.commit()
+    finally:
+        conn.close()
+    from twilio.rest import Client
+    body = f"VocaGuard code: {code}\nקוד האימות שלך ב-VocaGuard: {code}"
+    sms = Client(TWILIO_SID, TWILIO_TOKEN).messages.create(to="+" + phone, from_=TWILIO_NUMBER, body=body)
+    log.info("verification SMS to %s sid=%s", phone, sms.sid)
+
+
+def check_sms_code(phone: str, fcm: str, code: str) -> str:
+    """'ok' / 'wrong' / 'expired' (also: no code pending, or too many tries)."""
+    phone = _normalize_phone(phone)
+    conn = db_connect()
+    try:
+        row = conn.execute("SELECT code_hash, fcm_token, created_at, attempts FROM sms_codes "
+                           "WHERE phone_number=?", (phone,)).fetchone()
+        if (not row or row[1] != fcm or time.time() - row[2] > SMS_CODE_TTL
+                or row[3] >= SMS_MAX_TRIES):
+            return "expired"
+        if not hmac.compare_digest(row[0], _hash_token(re.sub(r"[^0-9]", "", code or ""))):
+            conn.execute("UPDATE sms_codes SET attempts = attempts + 1 WHERE phone_number=?", (phone,))
+            conn.commit()
+            return "wrong"
+        conn.execute("DELETE FROM sms_codes WHERE phone_number=?", (phone,))
+        conn.commit()
+        return "ok"
+    finally:
+        conn.close()
+
+
+def register_auth_decision(phone: str, fcm: str, ticket: str, token: str, new_app: bool):
+    """Who may register this number. Returns (allowed, issue_token, error)."""
+    phone = _normalize_phone(phone)
+    conn = db_connect()
+    try:
+        row = conn.execute("SELECT fcm_token, auth_hash FROM users WHERE phone_number=?",
+                           (phone,)).fetchone()
+    finally:
+        conn.close()
+    method = check_ticket(ticket, phone, fcm) if ticket else None
+    if row:
+        stored_fcm, auth_hash = row
+        if auth_hash and token and hmac.compare_digest(auth_hash, _hash_token(token)):
+            return True, False, ""          # the device that already holds the token
+        if method == "sms":
+            return True, True, ""           # proved they receive SMS on this number
+        if stored_fcm and stored_fcm == fcm:
+            return True, True, ""           # same app install that owns the account
+        if not new_app and not auth_hash and legacy_allowed():
+            return True, False, ""          # old build, account not yet upgraded
+        return False, False, "sms_required"
+    if method:
+        return True, True, ""
+    if not new_app and legacy_allowed():
+        return True, False, ""
+    return False, False, "verification_required"
 
 
 VERIFY_TTL = 300  # seconds a number-verification nonce stays valid
@@ -907,6 +1151,23 @@ class Handler(BaseHTTPRequestHandler):
     def _auth_ok(self) -> bool:
         return self.headers.get("Authorization", "") == f"Bearer {EXPECTED_SECRET}"
 
+    def _user_token(self) -> str:
+        return self.headers.get("X-VG-Auth", "").strip()
+
+    def _caller_ok(self, phone: str) -> bool:
+        """May this request act for `phone`? Accounts with an auth token need it;
+        legacy accounts (and requests naming no user) only while legacy is allowed."""
+        if phone and auth_token_valid(phone, self._user_token()):
+            return True
+        if phone and user_has_auth(phone):
+            return False
+        return legacy_allowed()
+
+    def _deny(self, what: str, phone: str = ""):
+        log.warning("%s: unauthorized for %s from %s", what, _safe_callerid(phone) or "-",
+                    self.client_address[0])
+        self._send(401, {"error": "unauthorized"})
+
     def _read_json(self) -> dict:
         length = int(self.headers.get("Content-Length", 0))
         return json.loads(self.rfile.read(length).decode())
@@ -935,10 +1196,60 @@ class Handler(BaseHTTPRequestHandler):
                 if not phone or not fcm:
                     self._send(400, {"error": "phone_number and fcm_token required"})
                     return
+                allowed, issue, err = register_auth_decision(
+                    phone, fcm, data.get("ticket", ""), self._user_token(),
+                    new_app=bool(data.get("auth_v")))
+                if not allowed:
+                    log.warning("register: %s for %s from %s", err, _safe_callerid(phone),
+                                self.client_address[0])
+                    self._send(401, {"error": err})
+                    return
                 result = register_user(phone, fcm, srtp=data.get("srtp") is True)
+                if issue:
+                    result["auth_token"] = issue_auth_token(phone)
+                    log.info("register: auth token issued for %s", _safe_callerid(phone))
                 self._send(200, result)
             except Exception as e:
                 log.error("register error: %s", e)
+                self._send(500, {"error": "internal error"})
+
+        elif self.path == "/verify-number/sms":
+            # Text a 6-digit code to the number (manual entry, or re-claiming an
+            # existing account on a new install). Always 200 for an allowed number so
+            # the response doesn't reveal whether the number has an account.
+            try:
+                data  = self._read_json()
+                phone = _normalize_phone(data.get("phone_number", ""))
+                fcm   = data.get("fcm_token", "").strip()
+                if not phone or not fcm:
+                    self._send(400, {"error": "phone_number and fcm_token required"})
+                    return
+                if not sms_destination_ok(phone):
+                    self._send(400, {"error": "unsupported_number"})
+                    return
+                if not _sms_allowed(phone, self.client_address[0]):
+                    log.warning("verify sms: rate limit for %s from %s", phone, self.client_address[0])
+                    self._send(429, {"error": "rate_limited"})
+                    return
+                send_sms_code(phone, fcm)
+                self._send(200, {"sent": True, "ttl": SMS_CODE_TTL})
+            except Exception as e:
+                log.error("verify-number/sms error: %s", e)
+                self._send(500, {"error": "internal error"})
+
+        elif self.path == "/verify-number/sms-check":
+            try:
+                data  = self._read_json()
+                phone = _normalize_phone(data.get("phone_number", ""))
+                fcm   = data.get("fcm_token", "").strip()
+                status = check_sms_code(phone, fcm, data.get("code", "")) if phone and fcm else "expired"
+                if status == "ok":
+                    self._send(200, {"ticket": make_ticket(phone, fcm, "sms")})
+                else:
+                    log.info("verify sms-check: %s for %s", status, _safe_callerid(phone))
+                    self._send(400, {"error": status})
+            except Exception as e:
+                log.error("verify-number/sms-check error: %s", e)
                 self._send(500, {"error": "internal error"})
 
         elif self.path == "/verify-number/start":
@@ -968,6 +1279,9 @@ class Handler(BaseHTTPRequestHandler):
                     # overwrite it (audit finding 3). Only registered users' tokens
                     # get updated; none of these fallback writes happened in the
                     # 30 days before this change.
+                    if phone and fcm and not self._caller_ok(phone):
+                        self._deny("register-token", phone)
+                        return
                     if phone and fcm:
                         if not update_fcm_token(phone, fcm):
                             log.warning("register-token: unknown phone %s, ignored", _safe_callerid(phone))
@@ -989,6 +1303,14 @@ class Handler(BaseHTTPRequestHandler):
 
                 if not _CHANNEL_RE.match(channel):
                     self._send(400, {"error": "invalid channel"})
+                    return
+                if not self._caller_ok(phone):
+                    self._deny("accept-call", phone)
+                    return
+                # A token holder may only answer calls that were pushed to them.
+                if user_has_auth(phone) and not channel_belongs_to(channel, phone):
+                    log.warning("accept-call: %s was not pushed to %s", channel, _safe_callerid(phone))
+                    self._send(403, {"error": "not_your_call"})
                     return
 
                 # Caller may have hung up while the app was still ringing (the
@@ -1043,6 +1365,13 @@ class Handler(BaseHTTPRequestHandler):
                 if not _CHANNEL_RE.match(channel):
                     self._send(400, {"error": "invalid channel"})
                     return
+                if not self._caller_ok(phone):
+                    self._deny("hangup", phone)
+                    return
+                if user_has_auth(phone) and not channel_belongs_to(channel, phone):
+                    log.warning("hangup: %s was not pushed to %s", channel, _safe_callerid(phone))
+                    self._send(403, {"error": "not_your_call"})
+                    return
 
                 user    = get_user_by_phone(phone) if phone else None
                 sip_ext = user["sip_extension"] if user else "vocaguard"
@@ -1065,6 +1394,9 @@ class Handler(BaseHTTPRequestHandler):
                 scam_type  = data.get("scam_type", "Suspicious Call").strip()
                 confidence = int(data.get("confidence_pct", 0))
                 senior     = data.get("senior_name", "your family member").strip() or "your family member"
+                if not self._caller_ok(data.get("phone_number", "").strip()):
+                    self._deny("call_caregiver", data.get("phone_number", ""))
+                    return
                 to_number = _caregiver_dest(caregiver)
                 if not to_number:
                     self._send(400, {"error": "valid caregiver_number required"})
@@ -1123,6 +1455,9 @@ class Handler(BaseHTTPRequestHandler):
                 data      = self._read_json()
                 caregiver = data.get("caregiver_number", "").strip()
                 message   = data.get("message", "").strip()
+                if not self._caller_ok(data.get("phone_number", "").strip()):
+                    self._deny("alert_caregiver", data.get("phone_number", ""))
+                    return
                 to_number = _caregiver_dest(caregiver)
                 if not to_number or not message:
                     self._send(400, {"error": "valid caregiver_number and message required"})
@@ -1162,6 +1497,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not number:
                     self._send(400, {"error": "number required"})
                     return
+                if not self._caller_ok(reporter):
+                    self._deny("report-scam", reporter)
+                    return
                 conn = db_connect()
                 conn.execute(
                     "INSERT INTO community_blocklist (phone_number, scam_type, reported_by) "
@@ -1186,6 +1524,9 @@ class Handler(BaseHTTPRequestHandler):
                 reporter = data.get("reporter", "").strip()
                 if not number:
                     self._send(400, {"error": "number required"})
+                    return
+                if not self._caller_ok(reporter):
+                    self._deny("remove-scam", reporter)
                     return
                 conn = db_connect()
                 # A user can only withdraw their own report; this used to delete
@@ -1249,6 +1590,9 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, {"error": "phone_number required"})
                     return
                 phone = _normalize_phone(phone)
+                if not self._caller_ok(phone):
+                    self._deny("delete", phone)
+                    return
                 found = delete_user(phone)
                 if found:
                     log.info("Data deletion complete for %s", phone)
