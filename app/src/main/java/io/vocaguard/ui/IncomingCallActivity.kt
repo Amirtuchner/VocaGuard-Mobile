@@ -84,8 +84,39 @@ class IncomingCallActivity : ComponentActivity() {
         const val EXTRA_DEMO          = "demo_mode"
         const val NOTIFICATION_ID     = 2001
 
-        /** True while an IncomingCallActivity instance is alive — used to block duplicate launches. */
-        @Volatile var isShowing = false
+        /** True while an IncomingCallActivity instance is alive (onCreate → onDestroy). */
+        @Volatile private var activityAlive = false
+
+        /** When the FCM service last asked to launch this screen (0 = none pending). */
+        @Volatile private var launchRequestedAt = 0L
+
+        /** How long a requested-but-not-yet-created launch keeps blocking duplicate pushes. */
+        private const val LAUNCH_GRACE_MS = 15_000L
+
+        /**
+         * True while a ring screen is up, or was requested in the last few seconds and
+         * may still be starting — used to drop duplicate incoming_call pushes.
+         *
+         * This used to be a plain flag set by the FCM service and cleared only in
+         * onDestroy(). When Android blocked the launch (background activity start with
+         * full-screen intents denied), onCreate/onDestroy never ran and the flag stayed
+         * true for the life of the process — every later call was silently ignored as a
+         * "duplicate" (2026-11-26, v1.0.23). The pending-launch half now expires.
+         */
+        val isShowing: Boolean
+            get() = activityAlive ||
+                (launchRequestedAt != 0L &&
+                    android.os.SystemClock.elapsedRealtime() - launchRequestedAt < LAUNCH_GRACE_MS)
+
+        /** Called by the FCM service right before it launches the ring screen. */
+        fun markLaunchRequested() {
+            launchRequestedAt = android.os.SystemClock.elapsedRealtime()
+        }
+
+        /** The call this launch was for is gone (server call_cancelled) — stop blocking. */
+        fun clearPendingLaunch() {
+            launchRequestedAt = 0L
+        }
 
         /** Set when the user explicitly taps Decline, so the later server call_cancelled
          *  push does NOT raise a "missed call" for a call they deliberately rejected.
@@ -133,7 +164,8 @@ class IncomingCallActivity : ComponentActivity() {
         val km = getSystemService(KeyguardManager::class.java)
         km.requestDismissKeyguard(this, null)
 
-        isShowing = true
+        activityAlive = true
+        launchRequestedAt = 0L
 
         // Blank the screen while the phone is held to the ear so a cheek/ear touch
         // can't hit the on-screen controls (End, speaker, etc.) and drop the call
@@ -482,7 +514,7 @@ class IncomingCallActivity : ComponentActivity() {
         super.onDestroy()
         releaseProximityLock()
         ringtone?.stop()
-        isShowing = false
+        activityAlive = false
         // Stop the in-call mic FGS only when the call is really over (isFinishing).
         // On a config-change recreation the service must survive — the new activity
         // instance re-fires the ACTIVE branch and keeps it alive.

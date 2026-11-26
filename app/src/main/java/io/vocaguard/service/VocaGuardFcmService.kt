@@ -206,6 +206,9 @@ class VocaGuardFcmService : FirebaseMessagingService() {
                 // Dismiss the full-screen/heads-up incoming notification either way
                 getSystemService(NotificationManager::class.java)
                     .cancel(io.vocaguard.ui.IncomingCallActivity.NOTIFICATION_ID)
+                // If the ring screen never came up, don't let that pending launch
+                // block the next call.
+                io.vocaguard.ui.IncomingCallActivity.clearPendingLaunch()
                 // Raise a "missed call" UNLESS the user deliberately declined — a
                 // decline isn't a missed call. (An accepted call can't reach here:
                 // the dialplan's h extension skips the cancel push when VG_ACCEPTED=1.)
@@ -338,7 +341,8 @@ class VocaGuardFcmService : FirebaseMessagingService() {
         }
         // Set the flag here — before launching the activity — so any duplicate FCM that
         // arrives in the milliseconds before onCreate() fires is already blocked.
-        io.vocaguard.ui.IncomingCallActivity.isShowing = true
+        // Expires after a few seconds, so a launch Android blocks can't wedge it.
+        io.vocaguard.ui.IncomingCallActivity.markLaunchRequested()
         // Fresh call — clear any decline flag left over from a previous call so a
         // genuine miss on THIS call still raises a missed-call notification.
         io.vocaguard.ui.IncomingCallActivity.userDeclined = false
