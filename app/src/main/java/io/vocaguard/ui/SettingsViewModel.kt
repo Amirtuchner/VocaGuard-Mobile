@@ -447,6 +447,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 wipeLocalData()
                 _accountDeleted.value = true
                 _deleteDataStatus.value = "Your account has been deleted."
+                // Start over at onboarding: its "Activate protection" registers AND turns
+                // forwarding back on. (Settings' "Register with Server" only registers, so
+                // re-registering there left forwarding off.) For uninstall, onboarding sits
+                // under Android's prompt, so backing out of it lands there too.
+                if (!thenUninstall) kotlinx.coroutines.delay(1_500)
+                context.startActivity(
+                    Intent(context, io.vocaguard.MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                )
                 if (thenUninstall) openUninstallPrompt()
             } finally {
                 _accountBusy.value = false
